@@ -13,7 +13,7 @@ use adk_rust::run;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
-    // Detects ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY automatically
+    // Minimal defaults to Gemini. Add provider features for OpenAI/Anthropic auto-detection.
     let response = run("You are a helpful assistant.", "Explain Rust in one sentence.").await?;
     println!("{response}");
     Ok(())

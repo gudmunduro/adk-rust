@@ -1,10 +1,9 @@
-//! # 13 — Standard: Full CLI Launcher
+//! # 13 — Standard: Lightweight Launcher
 //!
-//! The `standard` tier includes the full CLI launcher with rustyline history,
-//! thinking block rendering, and `--serve` mode for REST API.
+//! The `standard` tier keeps the lightweight launcher unless a `cli-*`
+//! provider feature is enabled.
 //!
 //! Run with: `cargo run --bin 13-standard-cli-launcher`
-//! Or serve: `cargo run --bin 13-standard-cli-launcher -- serve`
 //!
 //! ```toml
 //! [dependencies]
@@ -21,16 +20,12 @@ async fn main() -> AnyhowResult<()> {
     let model = GeminiModel::new(&api_key, "gemini-2.5-flash")?;
 
     let agent = LlmAgentBuilder::new("assistant")
-        .description("A helpful AI assistant with full CLI features")
+        .description("A helpful AI assistant with the lightweight launcher")
         .instruction("You are a helpful assistant. Be concise and accurate.")
         .model(Arc::new(model))
         .build()?;
 
-    // In standard tier, Launcher is adk_cli::Launcher with:
-    // - rustyline readline with history
-    // - `--serve` mode for REST API
-    // - thinking block rendering
-    // - clap CLI parsing
+    // Full CLI features are available through opt-in `cli-*` features.
     Launcher::new(Arc::new(agent)).run().await?;
     Ok(())
 }

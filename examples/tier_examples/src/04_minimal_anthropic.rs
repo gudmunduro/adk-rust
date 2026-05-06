@@ -1,11 +1,11 @@
-//! # 04 — Minimal Anthropic Example
+//! # 04 — Opt-in Anthropic Example
 //!
-//! Verbatim from the README "Anthropic Example" section.
-//! Anthropic is included in the minimal tier — no extra features needed.
+//! Anthropic is intentionally outside the default minimal tier. Enable it only
+//! when the agent needs Claude.
 //!
 //! ```toml
 //! [dependencies]
-//! adk-rust = "0.8.0"
+//! adk-rust = { version = "0.8.0", features = ["anthropic"] }
 //! ```
 
 use adk_rust::Launcher;

@@ -7,6 +7,10 @@ publish = false
 [workspace]
 
 # Default features only — no explicit tier. This is what README users get.
+[features]
+openai = ["adk-rust/openai"]
+anthropic = ["adk-rust/anthropic"]
+
 [dependencies]
 adk-rust = { path = "../../../adk-rust" }
 adk-tool = { path = "../../../adk-tool" }
@@ -29,10 +33,12 @@ path = "../src/02_minimal_launcher.rs"
 [[bin]]
 name = "03-minimal-openai"
 path = "../src/03_minimal_openai.rs"
+required-features = ["openai"]
 
 [[bin]]
 name = "04-minimal-anthropic"
 path = "../src/04_minimal_anthropic.rs"
+required-features = ["anthropic"]
 
 [[bin]]
 name = "05-minimal-tools"

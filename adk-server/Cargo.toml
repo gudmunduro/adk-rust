@@ -15,8 +15,8 @@ include = ["src/**/*", "assets/**/*", "Cargo.toml", "README.md"]
 
 [dependencies]
 adk-core.workspace = true
-adk-agent.workspace = true
-adk-runner.workspace = true
+adk-agent = { workspace = true, features = ["skills"] }
+adk-runner = { workspace = true, features = ["artifacts", "plugins", "skills"] }
 adk-session.workspace = true
 adk-artifact.workspace = true
 adk-telemetry.workspace = true

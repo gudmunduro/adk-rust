@@ -1,7 +1,7 @@
-//! # 06 — Minimal Multi-Provider Auto-Detect
+//! # 06 — Minimal Provider Auto-Detect
 //!
-//! All three major providers (Gemini, OpenAI, Anthropic) are in the minimal tier.
-//! Uses `provider_from_env()` to auto-detect which API key is set.
+//! The default minimal tier detects Gemini via `GOOGLE_API_KEY`. Add provider
+//! features such as `openai` or `anthropic` to widen auto-detection.
 //!
 //! ```toml
 //! [dependencies]

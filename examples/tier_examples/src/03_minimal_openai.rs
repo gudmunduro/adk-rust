@@ -1,11 +1,11 @@
-//! # 03 — Minimal OpenAI Example
+//! # 03 — Opt-in OpenAI Example
 //!
-//! Verbatim from the README "OpenAI Example" section.
-//! OpenAI is included in the minimal tier — no extra features needed.
+//! OpenAI is intentionally outside the default minimal tier. Enable it only
+//! when the agent needs OpenAI.
 //!
 //! ```toml
 //! [dependencies]
-//! adk-rust = "0.8.0"
+//! adk-rust = { version = "0.8.0", features = ["openai"] }
 //! ```
 
 use adk_rust::Launcher;

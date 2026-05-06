@@ -6,17 +6,17 @@ Validates that all README and quickstart code examples work across every feature
 
 ### Minimal (default — no features needed)
 
-These examples use `adk-rust = "0.8.0"` with **no explicit features**. The `minimal` default includes 3 LLM providers, tools, memory, sessions, telemetry, and the lightweight Launcher.
+These examples use `adk-rust = "0.8.0"` with **no explicit features**. The `minimal` default includes Gemini, agents, runner, sessions, and the lightweight launcher.
 
 | # | Example | What it validates | Source |
 |---|---------|-------------------|--------|
 | 01 | `01-minimal-hello` | `adk::run()` one-liner | README "Fastest Start" |
 | 02 | `02-minimal-launcher` | `Launcher::new(agent).run()` REPL | README "Basic Example (Gemini)" |
-| 03 | `03-minimal-openai` | OpenAI provider | README "OpenAI Example" |
-| 04 | `04-minimal-anthropic` | Anthropic provider | README "Anthropic Example" |
-| 05 | `05-minimal-tools` | `#[tool]` macro | README "Tool System" |
-| 06 | `06-minimal-multi-provider` | `provider_from_env()` auto-detect | README multi-provider |
-| 07 | `07-minimal-memory` | Multi-turn session memory | README sessions |
+| 03 | `03-minimal-openai` | OpenAI provider with opt-in `openai` feature | README "OpenAI Example" |
+| 04 | `04-minimal-anthropic` | Anthropic provider with opt-in `anthropic` feature | README "Anthropic Example" |
+| 05 | `05-minimal-tools` | `#[tool]` macro via explicit `adk-tool` dependency | README "Tool System" |
+| 06 | `06-minimal-multi-provider` | `provider_from_env()` with compiled providers | README provider detection |
+| 07 | `07-minimal-memory` | Multi-turn session history | README sessions |
 
 ### Quickstart (minimal tier)
 
@@ -30,13 +30,13 @@ These match the `docs/official_docs/quickstart.md` examples verbatim.
 
 ### Standard (`features = ["standard"]`)
 
-Adds: server, CLI, auth, graph, eval, guardrails, plugin, artifacts, skills.
+Adds: tools, memory, telemetry, server, auth, graph, eval, guardrail, plugin, artifacts, and skills. CLI providers remain opt-in.
 
 | # | Example | What it validates |
 |---|---------|-------------------|
 | 11 | `11-standard-graph` | Graph workflow with `GraphAgent::builder()` |
 | 12 | `12-standard-sequential` | Sequential multi-agent pipeline |
-| 13 | `13-standard-cli-launcher` | Full CLI launcher with `--serve` mode |
+| 13 | `13-standard-cli-launcher` | Lightweight launcher in the standard tier |
 
 ### Enterprise (`features = ["enterprise"]`)
 
@@ -64,8 +64,8 @@ cp .env.example .env   # add your API key(s)
 # ── Minimal tier ──
 cargo run --bin 01-minimal-hello
 cargo run --bin 02-minimal-launcher
-cargo run --bin 03-minimal-openai          # needs OPENAI_API_KEY
-cargo run --bin 04-minimal-anthropic       # needs ANTHROPIC_API_KEY
+cargo run --features openai --bin 03-minimal-openai          # needs OPENAI_API_KEY
+cargo run --features anthropic --bin 04-minimal-anthropic    # needs ANTHROPIC_API_KEY
 cargo run --bin 05-minimal-tools
 cargo run --bin 06-minimal-multi-provider
 cargo run --bin 07-minimal-memory
@@ -90,9 +90,9 @@ cargo run --bin 16-full-sandbox            # needs python3 and rustc
 
 ## Key Point
 
-All minimal/quickstart examples use `adk-rust = "0.8.0"` with **no explicit features**. The `minimal` default includes everything needed to build agents: 3 LLM providers, tools, memory, sessions, telemetry, and the lightweight Launcher.
+All minimal/quickstart examples use `adk-rust = "0.8.0"` with **no explicit features** unless the example name is a provider opt-in. The `minimal` default includes the smallest useful agent stack: Gemini, agents, runner, sessions, and the lightweight launcher.
 
 Higher tiers add production and specialist capabilities:
-- **standard** → server, CLI, auth, graph workflows, eval
+- **standard** → tools, memory, telemetry, server, auth, graph workflows, eval
 - **enterprise** → realtime voice, browser, RAG, payments, AWP
 - **full** → audio processing, code execution, sandbox
