@@ -101,7 +101,8 @@ fn main() {
                 .build()
                 .expect("failed to create tokio runtime");
 
-            if let Err(e) = rt.block_on(run_deploy(environment, token, server, skip_build, dry_run)) {
+            if let Err(e) = rt.block_on(run_deploy(environment, token, server, skip_build, dry_run))
+            {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
@@ -119,8 +120,8 @@ async fn run_deploy(
     dry_run: bool,
 ) -> Result<(), String> {
     use adk_deploy::{
-        DeployClient, DeployClientConfig, DeploymentManifest, LoginRequest,
-        PushDeploymentRequest, SecretSetRequest,
+        DeployClient, DeployClientConfig, DeploymentManifest, LoginRequest, PushDeploymentRequest,
+        SecretSetRequest,
     };
     use sha2::{Digest, Sha256};
 
@@ -138,11 +139,8 @@ async fn run_deploy(
 
     // ── Authenticate ────────────────────────────────────────────
     println!("Authenticating...");
-    let mut config = DeployClientConfig {
-        endpoint: server.clone(),
-        token: token.clone(),
-        workspace_id: None,
-    };
+    let mut config =
+        DeployClientConfig { endpoint: server.clone(), token: token.clone(), workspace_id: None };
 
     // Try loading cached config for workspace_id and token fallback
     if let Ok(cached) = DeployClientConfig::load() {
@@ -164,13 +162,9 @@ async fn run_deploy(
     } else {
         // Attempt ephemeral login
         println!("  No token provided. Attempting login...");
-        let email = std::env::var("ADK_DEPLOY_EMAIL")
-            .unwrap_or_else(|_| "cli@local".to_string());
+        let email = std::env::var("ADK_DEPLOY_EMAIL").unwrap_or_else(|_| "cli@local".to_string());
         let login_response = client
-            .login_ephemeral(&LoginRequest {
-                email,
-                workspace_name: None,
-            })
+            .login_ephemeral(&LoginRequest { email, workspace_name: None })
             .await
             .map_err(|e| format!("login failed: {e}. Provide --token or set ADK_DEPLOY_TOKEN"))?;
         config.workspace_id = Some(login_response.workspace_id.clone());
@@ -210,8 +204,8 @@ async fn run_deploy(
         let env_path = Path::new(".env");
         if env_path.exists() {
             println!("Uploading secrets...");
-            let env_content = fs::read_to_string(env_path)
-                .map_err(|e| format!("failed to read .env: {e}"))?;
+            let env_content =
+                fs::read_to_string(env_path).map_err(|e| format!("failed to read .env: {e}"))?;
 
             let mut uploaded = 0;
             for line in env_content.lines() {
@@ -225,7 +219,7 @@ async fn run_deploy(
                     let secret_key = key.to_lowercase().replace('_', "-");
                     if declared_secrets.contains(&secret_key.as_str()) {
                         if dry_run {
-                            println!("  [dry-run] would upload: {secret_key}");
+                            println!("  [dry-run] would upload secret ({} chars)", value.len());
                         } else {
                             client
                                 .set_secret(&SecretSetRequest {
@@ -234,19 +228,25 @@ async fn run_deploy(
                                     value: value.to_string(),
                                 })
                                 .await
-                                .map_err(|e| format!("failed to set secret '{secret_key}': {e}"))?;
-                            println!("  ✓ {secret_key}");
+                                .map_err(|e| format!("failed to set secret: {e}"))?;
+                            println!("  ✓ uploaded secret");
                         }
                         uploaded += 1;
                     }
                 }
             }
             if uploaded == 0 {
-                println!("  No matching secrets found in .env for declared secrets: {:?}", declared_secrets);
+                println!(
+                    "  No matching secrets found in .env for {} declared secret(s).",
+                    declared_secrets.len()
+                );
             }
             println!();
         } else {
-            println!("Note: manifest declares secrets {:?} but no .env file found.", declared_secrets);
+            println!(
+                "Note: manifest declares {} secret(s) but no .env file found.",
+                declared_secrets.len()
+            );
             println!("      Set secrets manually or create a .env file.");
             println!();
         }
@@ -263,8 +263,7 @@ async fn run_deploy(
     create_bundle(&bundle_path, manifest_path, &binary_path, &binary_name)?;
 
     // Compute SHA-256 checksum
-    let bundle_bytes =
-        fs::read(&bundle_path).map_err(|e| format!("failed to read bundle: {e}"))?;
+    let bundle_bytes = fs::read(&bundle_path).map_err(|e| format!("failed to read bundle: {e}"))?;
     let bundle_size = bundle_bytes.len();
     let mut hasher = Sha256::new();
     hasher.update(&bundle_bytes);
@@ -319,8 +318,8 @@ fn create_bundle(
     binary_path: &Path,
     binary_name: &str,
 ) -> Result<(), String> {
-    use flate2::write::GzEncoder;
     use flate2::Compression;
+    use flate2::write::GzEncoder;
 
     let file =
         fs::File::create(bundle_path).map_err(|e| format!("failed to create bundle file: {e}"))?;
@@ -339,8 +338,7 @@ fn create_bundle(
         .map_err(|e| format!("failed to add manifest to bundle: {e}"))?;
 
     // Add binary at bin/{binary_name} (bare path, no ./ prefix)
-    let binary_bytes =
-        fs::read(binary_path).map_err(|e| format!("failed to read binary: {e}"))?;
+    let binary_bytes = fs::read(binary_path).map_err(|e| format!("failed to read binary: {e}"))?;
     let mut header = tar::Header::new_gnu();
     header.set_size(binary_bytes.len() as u64);
     header.set_mode(0o755);
@@ -350,9 +348,7 @@ fn create_bundle(
         .append_data(&mut header, &bin_path, binary_bytes.as_slice())
         .map_err(|e| format!("failed to add binary to bundle: {e}"))?;
 
-    archive
-        .finish()
-        .map_err(|e| format!("failed to finalize bundle: {e}"))?;
+    archive.finish().map_err(|e| format!("failed to finalize bundle: {e}"))?;
 
     Ok(())
 }

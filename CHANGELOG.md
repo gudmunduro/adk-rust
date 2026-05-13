@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.1] - 2026-05-10
+## [0.8.1] - 2026-05-13
 
 ### Added
 
@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Creates .tar.gz bundles with correct paths (no ./ prefix)
   - Supports --dry-run for CI validation without pushing
   - Convention: UPPER_SNAKE_CASE env vars map to lower-kebab-case secret keys
+
+### Fixed
+
+- **MCP schema sanitization for Gemini**: `sanitize_schema` now strips `exclusiveMinimum`/`exclusiveMaximum`, collapses `"type": ["string", "null"]` to `"type": "string"`, and removes `items` on non-array types. Fixes Gemini API rejections when using computer-use or playwright MCP tools.
 
 ## [0.8.0] - 2026-04-28
 
