@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use agent_client_protocol::schema::{
     InitializeRequest, ProtocolVersion, RequestPermissionOutcome, RequestPermissionRequest,
@@ -12,9 +13,12 @@ use agent_client_protocol::schema::{
 };
 use agent_client_protocol::{Agent, Client, ConnectionTo};
 use agent_client_protocol_tokio::AcpAgent;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::error::{AcpError, Result};
+use crate::permissions::{
+    PermissionDecision, PermissionOption, PermissionPolicy, PermissionRequest,
+};
 
 /// Configuration for connecting to an ACP agent.
 #[derive(Debug, Clone)]
@@ -24,18 +28,12 @@ pub struct AcpAgentConfig {
     /// Working directory for the agent session.
     pub working_dir: PathBuf,
     /// Whether to auto-approve permission requests (YOLO mode).
+    /// Used by `prompt_agent()`. For fine-grained control, use `prompt_agent_with_policy()`.
     pub auto_approve: bool,
 }
 
 impl AcpAgentConfig {
     /// Create a new config with a command string.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let config = AcpAgentConfig::new("claude-code")
-    ///     .working_dir("/path/to/project");
-    /// ```
     pub fn new(command: impl Into<String>) -> Self {
         Self {
             command: command.into(),
@@ -51,8 +49,6 @@ impl AcpAgentConfig {
     }
 
     /// Set whether to auto-approve permission requests.
-    ///
-    /// Default is `true` (YOLO mode). Set to `false` to reject all permission requests.
     pub fn auto_approve(mut self, approve: bool) -> Self {
         self.auto_approve = approve;
         self
@@ -61,22 +57,42 @@ impl AcpAgentConfig {
 
 /// Send a single prompt to an ACP agent and return the response text.
 ///
-/// This spawns the agent process, initializes the connection, creates a session,
-/// sends the prompt, and collects the streamed response. The agent process is
-/// terminated when the connection completes.
+/// Uses simple auto-approve/deny based on `config.auto_approve`.
+/// For fine-grained permission control, use [`prompt_agent_with_policy`].
+pub async fn prompt_agent(config: &AcpAgentConfig, prompt: &str) -> Result<String> {
+    let policy =
+        if config.auto_approve { PermissionPolicy::AutoApprove } else { PermissionPolicy::DenyAll };
+    prompt_agent_with_policy(config, prompt, Arc::new(policy)).await
+}
+
+/// Send a single prompt to an ACP agent with a custom permission policy.
+///
+/// The policy is invoked for each `session/request_permission` message from the agent.
+/// This enables HITL (human-in-the-loop) control over sensitive operations.
 ///
 /// # Example
 ///
 /// ```rust,ignore
-/// use adk_acp::connection::{AcpAgentConfig, prompt_agent};
+/// use adk_acp::{AcpAgentConfig, PermissionPolicy, PermissionDecision};
+/// use adk_acp::connection::prompt_agent_with_policy;
+/// use std::sync::Arc;
 ///
-/// let config = AcpAgentConfig::new("claude-code")
-///     .working_dir("/path/to/project");
+/// let config = AcpAgentConfig::new("kiro-cli acp");
+/// let policy = Arc::new(PermissionPolicy::Custom(Box::new(|req| {
+///     if req.title.contains("delete") {
+///         PermissionDecision::deny()
+///     } else {
+///         PermissionDecision::allow_once()
+///     }
+/// })));
 ///
-/// let response = prompt_agent(&config, "Explain this function").await?;
-/// println!("{response}");
+/// let response = prompt_agent_with_policy(&config, "Refactor main.rs", policy).await?;
 /// ```
-pub async fn prompt_agent(config: &AcpAgentConfig, prompt: &str) -> Result<String> {
+pub async fn prompt_agent_with_policy(
+    config: &AcpAgentConfig,
+    prompt: &str,
+    policy: Arc<PermissionPolicy>,
+) -> Result<String> {
     info!(command = %config.command, cwd = %config.working_dir.display(), "spawning ACP agent");
 
     let agent = AcpAgent::from_str(&config.command).map_err(|e| {
@@ -85,29 +101,49 @@ pub async fn prompt_agent(config: &AcpAgentConfig, prompt: &str) -> Result<Strin
 
     let prompt_text = prompt.to_string();
     let working_dir = config.working_dir.clone();
-    let auto_approve = config.auto_approve;
+    let policy_clone = policy.clone();
 
     let result: std::result::Result<String, agent_client_protocol::Error> = Client
         .builder()
         .on_receive_request(
             async move |request: RequestPermissionRequest, responder, _cx: ConnectionTo<Agent>| {
-                if auto_approve {
-                    debug!("auto-approving ACP permission request");
-                    let option_id = request.options.first().map(|opt| opt.option_id.clone());
-                    if let Some(id) = option_id {
+                // Convert SDK permission request to our domain type
+                let title = request
+                    .options
+                    .first()
+                    .map(|o| o.name.to_string())
+                    .unwrap_or_else(|| "Unknown operation".to_string());
+
+                let perm_request = PermissionRequest {
+                    title: title.clone(),
+                    options: request
+                        .options
+                        .iter()
+                        .map(|o| PermissionOption {
+                            id: o.option_id.to_string(),
+                            name: o.name.to_string(),
+                        })
+                        .collect(),
+                };
+
+                // Evaluate the policy
+                let decision = policy_clone.decide(&perm_request);
+
+                match &decision {
+                    PermissionDecision::Allow(option_id) => {
+                        debug!(title = %title, decision = %decision, "ACP permission granted");
                         responder.respond(RequestPermissionResponse::new(
-                            RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(id)),
+                            RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(
+                                option_id.clone(),
+                            )),
                         ))
-                    } else {
+                    }
+                    PermissionDecision::Deny => {
+                        warn!(title = %title, "ACP permission DENIED by policy");
                         responder.respond(RequestPermissionResponse::new(
                             RequestPermissionOutcome::Cancelled,
                         ))
                     }
-                } else {
-                    debug!("rejecting ACP permission request (auto_approve=false)");
-                    responder.respond(RequestPermissionResponse::new(
-                        RequestPermissionOutcome::Cancelled,
-                    ))
                 }
             },
             agent_client_protocol::on_receive_request!(),

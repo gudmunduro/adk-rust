@@ -40,13 +40,23 @@
 
 pub mod connection;
 pub mod error;
+pub mod permissions;
+pub mod session;
+pub mod status;
+pub mod streaming;
 pub mod tool;
 pub mod toolset;
+pub mod usage;
 
-pub use connection::{AcpAgentConfig, prompt_agent};
+pub use connection::{AcpAgentConfig, prompt_agent, prompt_agent_with_policy};
 pub use error::{AcpError, Result};
+pub use permissions::{PermissionDecision, PermissionPolicy, PermissionRequest};
+pub use session::{AcpSession, PromptResult};
+pub use status::{AgentStatus, StatusTracker};
+pub use streaming::{OutputChunk, OutputStream, stream_prompt};
 pub use tool::AcpAgentTool;
 pub use toolset::AcpToolset;
+pub use usage::{AcpUsage, AcpUsageStats, UsageTracker};
 
 // Re-export the SDK for advanced usage
 pub use agent_client_protocol;

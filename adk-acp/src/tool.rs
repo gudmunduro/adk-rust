@@ -4,37 +4,64 @@
 //! (Claude Code, Codex, etc.) by sending prompts and receiving responses.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use adk_core::{AdkError, Result, Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{Value, json};
-use tracing::debug;
+use tracing::{debug, info, warn};
 
-use crate::connection::{AcpAgentConfig, prompt_agent};
+use crate::connection::{AcpAgentConfig, prompt_agent_with_policy};
+use crate::permissions::PermissionPolicy;
+use crate::usage::{AcpUsage, UsageTracker};
 
 /// An external ACP agent exposed as an ADK Tool.
 ///
 /// When invoked, spawns the ACP agent process, sends the `prompt` field from
 /// the tool arguments, and returns the agent's text response.
 ///
+/// # Features
+///
+/// - **Permission control**: Configure how tool permission requests are handled
+/// - **Usage tracking**: Monitor invocation counts, response sizes, and latency
+/// - **Telemetry**: All calls emit tracing spans for observability
+///
 /// # Example
 ///
 /// ```rust,ignore
-/// use adk_acp::AcpAgentTool;
+/// use adk_acp::{AcpAgentTool, PermissionPolicy, UsageTracker};
 /// use adk_agent::LlmAgentBuilder;
 /// use std::sync::Arc;
 ///
+/// let tracker = UsageTracker::new();
+///
 /// let claude = AcpAgentTool::new("claude-code")
-///     .description("Delegate complex coding tasks to Claude Code");
+///     .description("Delegate complex coding tasks to Claude Code")
+///     .permission_policy(PermissionPolicy::Custom(Box::new(|req| {
+///         if req.title.contains("delete") {
+///             adk_acp::PermissionDecision::deny()
+///         } else {
+///             adk_acp::PermissionDecision::allow_once()
+///         }
+///     })))
+///     .usage_tracker(tracker.clone());
 ///
 /// let agent = LlmAgentBuilder::new("orchestrator")
 ///     .tool(Arc::new(claude))
 ///     .build()?;
+///
+/// // After some invocations:
+/// let stats = tracker.stats();
+/// println!("ACP calls: {}, avg latency: {:?}",
+///     stats.total_calls,
+///     stats.total_duration / stats.total_calls.max(1) as u32);
 /// ```
 pub struct AcpAgentTool {
     name: String,
     description: String,
     config: AcpAgentConfig,
+    permission_policy: Arc<PermissionPolicy>,
+    usage_tracker: Option<UsageTracker>,
 }
 
 impl AcpAgentTool {
@@ -49,6 +76,8 @@ impl AcpAgentTool {
             name: name.clone(),
             description: format!("Delegate tasks to the {name} ACP agent"),
             config: AcpAgentConfig::new(&command),
+            permission_policy: Arc::new(PermissionPolicy::AutoApprove),
+            usage_tracker: None,
         }
     }
 
@@ -70,9 +99,21 @@ impl AcpAgentTool {
         self
     }
 
-    /// Set whether to auto-approve permission requests from the agent.
-    pub fn auto_approve(mut self, approve: bool) -> Self {
-        self.config.auto_approve = approve;
+    /// Set the permission policy for handling agent tool requests.
+    ///
+    /// Default is `PermissionPolicy::AutoApprove` (YOLO mode).
+    /// Use `PermissionPolicy::DenyAll` for safe mode, or
+    /// `PermissionPolicy::Custom(...)` for fine-grained control.
+    pub fn permission_policy(mut self, policy: PermissionPolicy) -> Self {
+        self.permission_policy = Arc::new(policy);
+        // Also update the config's auto_approve flag for the connection layer
+        self.config.auto_approve = matches!(*self.permission_policy, PermissionPolicy::AutoApprove);
+        self
+    }
+
+    /// Attach a usage tracker to record invocation metrics.
+    pub fn usage_tracker(mut self, tracker: UsageTracker) -> Self {
+        self.usage_tracker = Some(tracker);
         self
     }
 }
@@ -82,6 +123,7 @@ impl std::fmt::Debug for AcpAgentTool {
         f.debug_struct("AcpAgentTool")
             .field("name", &self.name)
             .field("command", &self.config.command)
+            .field("permission_policy", &self.permission_policy)
             .finish()
     }
 }
@@ -115,12 +157,64 @@ impl Tool for AcpAgentTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AdkError::tool("AcpAgentTool requires a 'prompt' string field"))?;
 
-        debug!(tool = %self.name, prompt_len = prompt.len(), "invoking ACP agent");
+        info!(
+            tool = %self.name,
+            prompt_len = prompt.len(),
+            cwd = %self.config.working_dir.display(),
+            "invoking ACP agent"
+        );
 
-        let response = prompt_agent(&self.config, prompt)
-            .await
-            .map_err(|e| AdkError::tool(format!("ACP agent error: {e}")))?;
+        let start = Instant::now();
 
-        Ok(json!({ "response": response }))
+        let result =
+            prompt_agent_with_policy(&self.config, prompt, self.permission_policy.clone()).await;
+        let duration = start.elapsed();
+
+        match &result {
+            Ok(response) => {
+                debug!(
+                    tool = %self.name,
+                    response_len = response.len(),
+                    duration_ms = duration.as_millis() as u64,
+                    "ACP agent responded"
+                );
+
+                if let Some(tracker) = &self.usage_tracker {
+                    tracker.record(&AcpUsage {
+                        tool_name: self.name.clone(),
+                        prompt_chars: prompt.len(),
+                        response_chars: response.len(),
+                        duration,
+                        success: true,
+                        permission_requests: 0,
+                        permissions_denied: 0,
+                    });
+                }
+
+                Ok(json!({ "response": response }))
+            }
+            Err(e) => {
+                warn!(
+                    tool = %self.name,
+                    error = %e,
+                    duration_ms = duration.as_millis() as u64,
+                    "ACP agent failed"
+                );
+
+                if let Some(tracker) = &self.usage_tracker {
+                    tracker.record(&AcpUsage {
+                        tool_name: self.name.clone(),
+                        prompt_chars: prompt.len(),
+                        response_chars: 0,
+                        duration,
+                        success: false,
+                        permission_requests: 0,
+                        permissions_denied: 0,
+                    });
+                }
+
+                Err(AdkError::tool(format!("ACP agent error: {e}")))
+            }
+        }
     }
 }

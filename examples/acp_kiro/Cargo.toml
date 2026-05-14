@@ -21,3 +21,7 @@ path = "src/delegate.rs"
 [[bin]]
 name = "acp-kiro-direct"
 path = "src/direct.rs"
+
+[[bin]]
+name = "acp-kiro-session"
+path = "src/session.rs"

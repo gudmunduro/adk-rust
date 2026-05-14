@@ -43,6 +43,7 @@ fn sanitize_schema(value: &mut Value) {
         map.remove("additionalProperties");
         map.remove("exclusiveMinimum");
         map.remove("exclusiveMaximum");
+        map.remove("propertyNames");
 
         // Convert "type": ["string", "null"] → "type": "string"
         // Gemini doesn't support type arrays; pick the first non-null type.
@@ -61,6 +62,13 @@ fn sanitize_schema(value: &mut Value) {
         let is_array_type = map.get("type").and_then(|t| t.as_str()).is_some_and(|t| t == "array");
         if !is_array_type {
             map.remove("items");
+        } else if let Some(items_val) = map.get_mut("items") {
+            // Gemini only supports "items": {object} not "items": [array] (tuple validation).
+            // Convert array form to the first element's schema.
+            if let Value::Array(arr) = items_val.clone() {
+                *items_val =
+                    arr.into_iter().next().unwrap_or(Value::Object(serde_json::Map::new()));
+            }
         }
 
         for (_, v) in map.iter_mut() {

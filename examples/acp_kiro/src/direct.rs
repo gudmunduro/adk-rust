@@ -1,8 +1,7 @@
-//! # Direct ACP connection to Kiro CLI
+//! # Direct ACP connection to Kiro CLI with usage tracking
 //!
 //! Demonstrates using `adk-acp` to send a prompt directly to Kiro CLI
-//! running as an ACP agent. No LLM orchestrator needed — just a direct
-//! prompt/response cycle.
+//! running as an ACP agent, with usage metrics printed after completion.
 //!
 //! ## Prerequisites
 //!
@@ -15,6 +14,7 @@
 //! ```
 
 use adk_acp::{AcpAgentConfig, prompt_agent};
+use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,15 +23,21 @@ async fn main() -> anyhow::Result<()> {
     let config = AcpAgentConfig::new("kiro-cli acp --trust-all-tools")
         .working_dir(std::env::current_dir()?);
 
-    println!("Spawning Kiro CLI as ACP agent...");
-    println!("Prompt: \"What files are in the current directory? List the first 5.\"\n");
+    let prompt = "What files are in the current directory? List the first 5.";
+    println!("Prompt: \"{prompt}\"\n");
 
-    let response = prompt_agent(&config, "What files are in the current directory? List the first 5.").await?;
+    let start = Instant::now();
+    let response = prompt_agent(&config, prompt).await?;
+    let duration = start.elapsed();
 
     println!("--- Response ---");
     println!("{response}");
     println!("--- End ---\n");
 
-    println!("✅ Direct ACP connection to Kiro CLI works.");
+    println!("📊 Metrics:");
+    println!("   Prompt chars:   {}", prompt.len());
+    println!("   Response chars: {}", response.len());
+    println!("   Latency:        {duration:?}");
+    println!("\n✅ Direct ACP connection to Kiro CLI works.");
     Ok(())
 }
