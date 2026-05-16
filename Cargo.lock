@@ -74,6 +74,7 @@ dependencies = [
  "adk-core",
  "adk-guardrail",
  "adk-model",
+ "adk-plugin",
  "adk-skill",
  "adk-telemetry",
  "adk-tool",
@@ -561,6 +562,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "adk-retry-reflect"
+version = "0.8.2"
+dependencies = [
+ "adk-core",
+ "adk-plugin",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "adk-runner"
 version = "0.8.2"
 dependencies = [
@@ -759,12 +774,14 @@ version = "0.8.2"
 dependencies = [
  "adk-code",
  "adk-core",
+ "adk-memory",
  "adk-rust-macros",
  "adk-sandbox",
  "adk-telemetry",
  "async-stream",
  "async-trait",
  "base64 0.22.1",
+ "chrono",
  "futures",
  "gcp-bigquery-client",
  "google-cloud-spanner",

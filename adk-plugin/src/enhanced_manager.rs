@@ -100,13 +100,12 @@ impl EnhancedPluginManager {
     }
 
     /// Creates a new `EnhancedPluginManager` with custom configuration.
-    pub fn with_config(mut plugins: Vec<Arc<dyn EnhancedPlugin>>, config: PluginManagerConfig) -> Self {
+    pub fn with_config(
+        mut plugins: Vec<Arc<dyn EnhancedPlugin>>,
+        config: PluginManagerConfig,
+    ) -> Self {
         plugins.sort_by_key(|p| p.priority());
-        Self {
-            plugins,
-            context: Arc::new(PluginContext::new()),
-            config,
-        }
+        Self { plugins, context: Arc::new(PluginContext::new()), config }
     }
 
     /// Adds a plugin after construction, re-sorting by priority.
@@ -248,10 +247,7 @@ impl EnhancedPluginManager {
 
         for plugin in &self.plugins {
             debug!(plugin = plugin.name(), "running before_model_call");
-            match plugin
-                .before_model_call(current_request, ctx.clone(), &self.context)
-                .await?
-            {
+            match plugin.before_model_call(current_request, ctx.clone(), &self.context).await? {
                 BeforeModelCallResult::Continue(modified_request) => {
                     current_request = modified_request;
                 }
@@ -288,10 +284,7 @@ impl EnhancedPluginManager {
 
         for plugin in &self.plugins {
             debug!(plugin = plugin.name(), "running after_model_call");
-            match plugin
-                .after_model_call(current_response, ctx.clone(), &self.context)
-                .await?
-            {
+            match plugin.after_model_call(current_response, ctx.clone(), &self.context).await? {
                 AfterModelCallResult::Continue(modified_response) => {
                     current_response = modified_response;
                 }
@@ -332,12 +325,11 @@ impl std::fmt::Debug for EnhancedPluginManager {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use adk_core::{AdkError, LlmRequest, LlmResponse, async_trait};
     use adk_core::Content as AdkContent;
+    use adk_core::{AdkError, LlmRequest, LlmResponse, async_trait};
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -780,10 +772,8 @@ mod tests {
 
     #[test]
     fn test_add_plugin_resorts() {
-        let plugins: Vec<Arc<dyn EnhancedPlugin>> = vec![
-            Arc::new(NoOpPlugin::new("b", 50)),
-            Arc::new(NoOpPlugin::new("c", 100)),
-        ];
+        let plugins: Vec<Arc<dyn EnhancedPlugin>> =
+            vec![Arc::new(NoOpPlugin::new("b", 50)), Arc::new(NoOpPlugin::new("c", 100))];
 
         let mut manager = EnhancedPluginManager::new(plugins);
         manager.add_plugin(Arc::new(NoOpPlugin::new("a", 10)));
@@ -855,10 +845,8 @@ mod tests {
         ];
 
         let manager = EnhancedPluginManager::new(plugins);
-        let result = manager
-            .run_before_tool_call(mock_tool(), json!({}), mock_ctx())
-            .await
-            .unwrap();
+        let result =
+            manager.run_before_tool_call(mock_tool(), json!({}), mock_ctx()).await.unwrap();
 
         match result {
             BeforeToolCallResult::ShortCircuit(value) => {
@@ -882,9 +870,7 @@ mod tests {
         ];
 
         let manager = EnhancedPluginManager::new(plugins);
-        let result = manager
-            .run_before_tool_call(mock_tool(), json!({}), mock_ctx())
-            .await;
+        let result = manager.run_before_tool_call(mock_tool(), json!({}), mock_ctx()).await;
 
         assert!(result.is_err());
         // The tracking plugin should NOT have been called
@@ -935,9 +921,8 @@ mod tests {
         ];
 
         let manager = EnhancedPluginManager::new(plugins);
-        let result = manager
-            .run_after_tool_call(mock_tool(), &json!({}), json!({}), mock_ctx())
-            .await;
+        let result =
+            manager.run_after_tool_call(mock_tool(), &json!({}), json!({}), mock_ctx()).await;
 
         assert!(result.is_err());
         assert!(!tracking.after_tool_called.load(Ordering::SeqCst));
@@ -953,10 +938,7 @@ mod tests {
 
         let manager = EnhancedPluginManager::new(plugins);
         let request = mock_request();
-        let result = manager
-            .run_before_model_call(request, mock_ctx())
-            .await
-            .unwrap();
+        let result = manager.run_before_model_call(request, mock_ctx()).await.unwrap();
 
         match result {
             BeforeModelCallResult::Continue(_) => { /* pass */ }
@@ -978,10 +960,7 @@ mod tests {
         ];
 
         let manager = EnhancedPluginManager::new(plugins);
-        let result = manager
-            .run_before_model_call(mock_request(), mock_ctx())
-            .await
-            .unwrap();
+        let result = manager.run_before_model_call(mock_request(), mock_ctx()).await.unwrap();
 
         match result {
             BeforeModelCallResult::ShortCircuit(_) => { /* pass */ }
@@ -1002,9 +981,7 @@ mod tests {
         ];
 
         let manager = EnhancedPluginManager::new(plugins);
-        let result = manager
-            .run_before_model_call(mock_request(), mock_ctx())
-            .await;
+        let result = manager.run_before_model_call(mock_request(), mock_ctx()).await;
 
         assert!(result.is_err());
         assert!(!tracking.before_model_called.load(Ordering::SeqCst));
@@ -1018,10 +995,8 @@ mod tests {
         ];
 
         let manager = EnhancedPluginManager::new(plugins);
-        let result = manager
-            .run_after_model_call(LlmResponse::default(), mock_ctx())
-            .await
-            .unwrap();
+        let result =
+            manager.run_after_model_call(LlmResponse::default(), mock_ctx()).await.unwrap();
 
         match result {
             AfterModelCallResult::Continue(_) => { /* pass */ }
@@ -1039,9 +1014,7 @@ mod tests {
         ];
 
         let manager = EnhancedPluginManager::new(plugins);
-        let result = manager
-            .run_after_model_call(LlmResponse::default(), mock_ctx())
-            .await;
+        let result = manager.run_after_model_call(LlmResponse::default(), mock_ctx()).await;
 
         assert!(result.is_err());
         assert!(!tracking.after_model_called.load(Ordering::SeqCst));
@@ -1082,10 +1055,7 @@ mod tests {
     async fn test_empty_plugin_list_before_model_call() {
         let manager = EnhancedPluginManager::new(vec![]);
         let request = mock_request();
-        let result = manager
-            .run_before_model_call(request, mock_ctx())
-            .await
-            .unwrap();
+        let result = manager.run_before_model_call(request, mock_ctx()).await.unwrap();
 
         match result {
             BeforeModelCallResult::Continue(_) => { /* pass */ }
@@ -1096,10 +1066,8 @@ mod tests {
     #[tokio::test]
     async fn test_empty_plugin_list_after_model_call() {
         let manager = EnhancedPluginManager::new(vec![]);
-        let result = manager
-            .run_after_model_call(LlmResponse::default(), mock_ctx())
-            .await
-            .unwrap();
+        let result =
+            manager.run_after_model_call(LlmResponse::default(), mock_ctx()).await.unwrap();
 
         match result {
             AfterModelCallResult::Continue(_) => { /* pass */ }
@@ -1121,10 +1089,7 @@ mod tests {
         let plugins: Vec<Arc<dyn EnhancedPlugin>> = vec![p3_clone, p1_clone, p2_clone];
 
         let manager = EnhancedPluginManager::new(plugins);
-        manager
-            .run_before_tool_call(mock_tool(), json!({}), mock_ctx())
-            .await
-            .unwrap();
+        manager.run_before_tool_call(mock_tool(), json!({}), mock_ctx()).await.unwrap();
 
         // Verify execution order: high (0), medium (1), low (2)
         assert_eq!(p1.execution_order(), 0);
@@ -1166,10 +1131,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_debug_impl() {
-        let plugins: Vec<Arc<dyn EnhancedPlugin>> = vec![
-            Arc::new(NoOpPlugin::new("alpha", 10)),
-            Arc::new(NoOpPlugin::new("beta", 20)),
-        ];
+        let plugins: Vec<Arc<dyn EnhancedPlugin>> =
+            vec![Arc::new(NoOpPlugin::new("alpha", 10)), Arc::new(NoOpPlugin::new("beta", 20))];
 
         let manager = EnhancedPluginManager::new(plugins);
         let debug_str = format!("{manager:?}");

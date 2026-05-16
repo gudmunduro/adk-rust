@@ -88,10 +88,7 @@ impl AdaptedPlugin {
     /// assert_eq!(adapted.priority(), 50);
     /// ```
     pub fn new(plugin: Plugin, priority: i32) -> Self {
-        Self {
-            inner: plugin,
-            priority,
-        }
+        Self { inner: plugin, priority }
     }
 }
 
@@ -152,9 +149,7 @@ impl EnhancedPlugin for AdaptedPlugin {
         if let Some(callback) = self.inner.before_model() {
             let legacy_result = callback(ctx, request).await?;
             match legacy_result {
-                BeforeModelResult::Continue(req) => {
-                    Ok(BeforeModelCallResult::Continue(req))
-                }
+                BeforeModelResult::Continue(req) => Ok(BeforeModelCallResult::Continue(req)),
                 BeforeModelResult::Skip(response) => {
                     Ok(BeforeModelCallResult::ShortCircuit(response))
                 }
@@ -175,9 +170,7 @@ impl EnhancedPlugin for AdaptedPlugin {
         if let Some(callback) = self.inner.after_model() {
             let result = callback(ctx, response.clone()).await?;
             match result {
-                Some(modified_response) => {
-                    Ok(AfterModelCallResult::Continue(modified_response))
-                }
+                Some(modified_response) => Ok(AfterModelCallResult::Continue(modified_response)),
                 None => Ok(AfterModelCallResult::Continue(response)),
             }
         } else {
@@ -272,10 +265,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_priority_uses_configured_value() {
-        let plugin = Plugin::new(PluginConfig {
-            name: "test".to_string(),
-            ..Default::default()
-        });
+        let plugin = Plugin::new(PluginConfig { name: "test".to_string(), ..Default::default() });
         let adapted = AdaptedPlugin::new(plugin, 42);
         assert_eq!(adapted.priority(), 42);
     }
@@ -303,10 +293,7 @@ mod tests {
         let tool: Arc<dyn Tool> = Arc::new(MockTool);
         let args = serde_json::json!({"key": "value"});
 
-        let result = adapted
-            .before_tool_call(tool, args.clone(), ctx, &plugin_ctx)
-            .await
-            .unwrap();
+        let result = adapted.before_tool_call(tool, args.clone(), ctx, &plugin_ctx).await.unwrap();
 
         assert!(called.load(Ordering::SeqCst));
         match result {
@@ -369,10 +356,7 @@ mod tests {
         let plugin_ctx = PluginContext::new();
         let request = LlmRequest::new("test-model", vec![]);
 
-        let result = adapted
-            .before_model_call(request, ctx, &plugin_ctx)
-            .await
-            .unwrap();
+        let result = adapted.before_model_call(request, ctx, &plugin_ctx).await.unwrap();
 
         match result {
             BeforeModelCallResult::Continue(req) => {
@@ -403,10 +387,7 @@ mod tests {
         let plugin_ctx = PluginContext::new();
         let request = LlmRequest::new("model", vec![]);
 
-        let result = adapted
-            .before_model_call(request, ctx, &plugin_ctx)
-            .await
-            .unwrap();
+        let result = adapted.before_model_call(request, ctx, &plugin_ctx).await.unwrap();
 
         match result {
             BeforeModelCallResult::ShortCircuit(resp) => {
@@ -437,15 +418,17 @@ mod tests {
         let plugin_ctx = PluginContext::new();
         let response = LlmResponse::default();
 
-        let result = adapted
-            .after_model_call(response, ctx, &plugin_ctx)
-            .await
-            .unwrap();
+        let result = adapted.after_model_call(response, ctx, &plugin_ctx).await.unwrap();
 
         match result {
             AfterModelCallResult::Continue(resp) => {
                 let content = resp.content.unwrap();
-                assert!(content.parts.iter().any(|p| matches!(p, Part::Text { text } if text == "modified")));
+                assert!(
+                    content
+                        .parts
+                        .iter()
+                        .any(|p| matches!(p, Part::Text { text } if text == "modified"))
+                );
             }
         }
     }
@@ -454,9 +437,7 @@ mod tests {
     async fn test_after_model_call_maps_none_to_continue_unchanged() {
         let plugin = Plugin::new(PluginConfig {
             name: "test".to_string(),
-            after_model: Some(Box::new(|_ctx, _response| {
-                Box::pin(async move { Ok(None) })
-            })),
+            after_model: Some(Box::new(|_ctx, _response| Box::pin(async move { Ok(None) }))),
             ..Default::default()
         });
 
@@ -468,15 +449,17 @@ mod tests {
             ..Default::default()
         };
 
-        let result = adapted
-            .after_model_call(response, ctx, &plugin_ctx)
-            .await
-            .unwrap();
+        let result = adapted.after_model_call(response, ctx, &plugin_ctx).await.unwrap();
 
         match result {
             AfterModelCallResult::Continue(resp) => {
                 let content = resp.content.unwrap();
-                assert!(content.parts.iter().any(|p| matches!(p, Part::Text { text } if text == "original")));
+                assert!(
+                    content
+                        .parts
+                        .iter()
+                        .any(|p| matches!(p, Part::Text { text } if text == "original"))
+                );
             }
         }
     }
@@ -505,10 +488,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_callbacks_returns_continue_unchanged() {
-        let plugin = Plugin::new(PluginConfig {
-            name: "empty".to_string(),
-            ..Default::default()
-        });
+        let plugin = Plugin::new(PluginConfig { name: "empty".to_string(), ..Default::default() });
 
         let adapted = AdaptedPlugin::new(plugin, 100);
         let ctx: Arc<dyn CallbackContext> = Arc::new(MockCallbackContext);
@@ -538,10 +518,7 @@ mod tests {
 
         // before_model_call with no callback
         let request = LlmRequest::new("m", vec![]);
-        let result = adapted
-            .before_model_call(request, ctx.clone(), &plugin_ctx)
-            .await
-            .unwrap();
+        let result = adapted.before_model_call(request, ctx.clone(), &plugin_ctx).await.unwrap();
         match result {
             BeforeModelCallResult::Continue(req) => assert_eq!(req.model, "m"),
             _ => panic!("expected Continue"),
@@ -552,10 +529,7 @@ mod tests {
             content: Some(Content::new("model").with_text("hi")),
             ..Default::default()
         };
-        let result = adapted
-            .after_model_call(response, ctx, &plugin_ctx)
-            .await
-            .unwrap();
+        let result = adapted.after_model_call(response, ctx, &plugin_ctx).await.unwrap();
         match result {
             AfterModelCallResult::Continue(resp) => {
                 assert!(resp.content.is_some());

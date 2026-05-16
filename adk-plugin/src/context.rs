@@ -104,9 +104,7 @@ impl PluginContext {
     /// let ctx = PluginContext::new();
     /// ```
     pub fn new() -> Self {
-        Self {
-            state: RwLock::new(HashMap::new()),
-        }
+        Self { state: RwLock::new(HashMap::new()) }
     }
 
     /// Inserts a value into the context. The type itself is the key.
@@ -132,10 +130,7 @@ impl PluginContext {
     /// # }
     /// ```
     pub async fn insert<T: Send + Sync + 'static>(&self, value: T) {
-        self.state
-            .write()
-            .await
-            .insert(TypeId::of::<T>(), Box::new(value));
+        self.state.write().await.insert(TypeId::of::<T>(), Box::new(value));
     }
 
     /// Gets a clone of the stored value for type `T`.
@@ -161,12 +156,7 @@ impl PluginContext {
     /// # }
     /// ```
     pub async fn get<T: Clone + Send + Sync + 'static>(&self) -> Option<T> {
-        self.state
-            .read()
-            .await
-            .get(&TypeId::of::<T>())
-            .and_then(|v| v.downcast_ref::<T>())
-            .cloned()
+        self.state.read().await.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref::<T>()).cloned()
     }
 
     /// Checks if a value of type `T` exists in the context.
