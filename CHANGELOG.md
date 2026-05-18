@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-05-18
+
+### Fixed
+
+- **Gemini schema: array types require `items`**: Fixed "missing field" errors from Gemini API when array-typed properties had tuple validation `items` (JSON array). Instead of stripping `items` entirely (which left arrays without the required field), tuple `items` are now converted to a single schema using the first element. Arrays without any `items` field also get a default `{"type": "string"}` added.
+
 ## [0.8.3] - 2026-05-18
 
 ### Fixed

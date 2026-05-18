@@ -310,14 +310,28 @@ fn remove_unsupported_keywords(schema: &mut Value) {
         obj.remove(*keyword);
     }
 
-    // Remove `items` when:
-    // 1. The schema type is NOT "array" (items is meaningless on non-array types), OR
-    // 2. The schema IS "array" but `items` is a JSON array (tuple validation syntax) —
-    //    Gemini only supports single-schema items, not tuple validation.
+    // Handle `items`:
+    // 1. If type is NOT "array", remove items entirely (meaningless on non-array types).
+    // 2. If type IS "array" and items is a JSON array (tuple validation syntax),
+    //    convert to single schema using the first element. Gemini requires items
+    //    on array types but only supports a single schema, not tuple validation.
+    // 3. If type IS "array" and items is already an object, keep it (valid).
+    // 4. If type IS "array" and items is missing, add a default items schema.
     let is_array_type = obj.get("type").and_then(|t| t.as_str()).is_some_and(|t| t == "array");
-    let items_is_tuple = obj.get("items").is_some_and(|v| v.is_array());
-    if !is_array_type || items_is_tuple {
+    if !is_array_type {
         obj.remove("items");
+    } else if obj.get("items").is_some_and(|v| v.is_array()) {
+        // Convert tuple items [schema1, schema2, ...] → first schema as single items
+        let first_schema = obj
+            .get("items")
+            .and_then(|v| v.as_array())
+            .and_then(|arr| arr.first())
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"type": "string"}));
+        obj.insert("items".to_string(), first_schema);
+    } else if !obj.contains_key("items") {
+        // Gemini requires items on array types — add default if missing
+        obj.insert("items".to_string(), serde_json::json!({"type": "string"}));
     }
 
     // Recurse into properties
@@ -329,7 +343,7 @@ fn remove_unsupported_keywords(schema: &mut Value) {
         }
     }
 
-    // Recurse into items (only present if type is "array" with valid single-schema)
+    // Recurse into items (now guaranteed to be a single schema object if present)
     if let Some(items) = obj.get_mut("items")
         && items.is_object()
     {
@@ -373,14 +387,26 @@ fn remove_unsupported_keywords_vertex(schema: &mut Value) {
         obj.remove("additionalProperties");
     }
 
-    // Remove `items` when:
-    // 1. The schema type is NOT "array" (items is meaningless on non-array types), OR
-    // 2. The schema IS "array" but `items` is a JSON array (tuple validation syntax) —
-    //    Gemini only supports single-schema items, not tuple validation.
+    // Handle `items`:
+    // 1. If type is NOT "array", remove items entirely (meaningless on non-array types).
+    // 2. If type IS "array" and items is a JSON array (tuple validation syntax),
+    //    convert to single schema using the first element. Gemini requires items
+    //    on array types but only supports a single schema, not tuple validation.
+    // 3. If type IS "array" and items is already an object, keep it (valid).
+    // 4. If type IS "array" and items is missing, add a default items schema.
     let is_array_type = obj.get("type").and_then(|t| t.as_str()).is_some_and(|t| t == "array");
-    let items_is_tuple = obj.get("items").is_some_and(|v| v.is_array());
-    if !is_array_type || items_is_tuple {
+    if !is_array_type {
         obj.remove("items");
+    } else if obj.get("items").is_some_and(|v| v.is_array()) {
+        let first_schema = obj
+            .get("items")
+            .and_then(|v| v.as_array())
+            .and_then(|arr| arr.first())
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"type": "string"}));
+        obj.insert("items".to_string(), first_schema);
+    } else if !obj.contains_key("items") {
+        obj.insert("items".to_string(), serde_json::json!({"type": "string"}));
     }
 
     // Recurse into properties
@@ -392,7 +418,7 @@ fn remove_unsupported_keywords_vertex(schema: &mut Value) {
         }
     }
 
-    // Recurse into items (only present if type is "array" with valid single-schema)
+    // Recurse into items (now guaranteed to be a single schema object if present)
     if let Some(items) = obj.get_mut("items")
         && items.is_object()
     {
@@ -477,24 +503,25 @@ mod tests {
     }
 
     #[test]
-    fn test_removes_items_tuple_validation_on_array() {
+    fn test_converts_items_tuple_validation_to_single_schema() {
         // Gemini's proto doesn't support tuple validation (items as JSON array).
-        // This caused 400 errors: "Proto field is not repeating, cannot start list"
+        // Convert to single schema using first element so arrays still have items.
         let adapter = GeminiSchemaAdapter::new();
         let schema = json!({
             "type": "array",
             "items": [
-                { "type": "string" },
+                { "type": "number" },
                 { "type": "number" }
             ]
         });
         let result = adapter.normalize_schema(schema);
-        assert!(result.get("items").is_none(), "tuple validation items should be stripped");
+        // items should be converted to the first element schema, not removed
+        assert_eq!(result["items"], json!({"type": "number"}));
         assert_eq!(result["type"], "array");
     }
 
     #[test]
-    fn test_vertex_ai_removes_items_tuple_validation() {
+    fn test_vertex_ai_converts_items_tuple_validation() {
         let adapter = GeminiSchemaAdapter::vertex_ai();
         let schema = json!({
             "type": "array",
@@ -504,10 +531,8 @@ mod tests {
             ]
         });
         let result = adapter.normalize_schema(schema);
-        assert!(
-            result.get("items").is_none(),
-            "tuple validation items should be stripped on Vertex AI"
-        );
+        // Converts to first element schema
+        assert_eq!(result["items"], json!({"type": "integer"}));
     }
 
     #[test]

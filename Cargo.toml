@@ -97,7 +97,7 @@ strip = false
 opt-level = 2
 
 [workspace.package]
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 rust-version = "1.85.0"
 license = "Apache-2.0"
@@ -135,35 +135,35 @@ livekit = { version = "0.7.36", default-features = false, features = ["tokio", "
 livekit-api = { version = "0.4.18", default-features = false, features = ["signal-client-tokio", "services-tokio", "access-token"] }
 
 # ADK internal crates (use { workspace = true } in member crates)
-adk-core = { path = "adk-core", version = "0.8.3" }
-adk-rust-macros = { path = "adk-rust-macros", version = "0.8.3" }
-adk-agent = { path = "adk-agent", version = "0.8.3", default-features = false }
-adk-model = { path = "adk-model", version = "0.8.3", default-features = false }
-adk-tool = { path = "adk-tool", version = "0.8.3" }
-adk-runner = { path = "adk-runner", version = "0.8.3", default-features = false }
-adk-server = { path = "adk-server", version = "0.8.3" }
-adk-session = { path = "adk-session", version = "0.8.3" }
-adk-artifact = { path = "adk-artifact", version = "0.8.3" }
-adk-memory = { path = "adk-memory", version = "0.8.3" }
-adk-cli = { path = "adk-cli", version = "0.8.3", default-features = false }
-adk-realtime = { path = "adk-realtime", version = "0.8.3" }
-adk-graph = { path = "adk-graph", version = "0.8.3" }
-adk-browser = { path = "adk-browser", version = "0.8.3" }
-adk-eval = { path = "adk-eval", version = "0.8.3" }
-adk-telemetry = { path = "adk-telemetry", version = "0.8.3" }
-adk-guardrail = { path = "adk-guardrail", version = "0.8.3" }
-adk-auth = { path = "adk-auth", version = "0.8.3" }
-adk-plugin = { path = "adk-plugin", version = "0.8.3" }
-adk-skill = { path = "adk-skill", version = "0.8.3" }
-adk-gemini = { path = "adk-gemini", version = "0.8.3" }
-adk-code = { path = "adk-code", version = "0.8.3" }
-adk-sandbox = { path = "adk-sandbox", version = "0.8.3" }
-adk-rag = { path = "adk-rag", version = "0.8.3" }
-adk-audio = { path = "adk-audio", version = "0.8.3" }
-adk-deploy = { path = "adk-deploy", version = "0.8.3" }
-adk-payments = { path = "adk-payments", version = "0.8.3" }
-adk-action = { path = "adk-action", version = "0.8.3" }
-adk-anthropic = { path = "adk-anthropic", version = "0.8.3" }
-awp-types = { path = "awp-types", version = "0.8.3" }
-adk-awp = { path = "adk-awp", version = "0.8.3" }
-adk-acp = { path = "adk-acp", version = "0.8.3" }
+adk-core = { path = "adk-core", version = "0.8.4" }
+adk-rust-macros = { path = "adk-rust-macros", version = "0.8.4" }
+adk-agent = { path = "adk-agent", version = "0.8.4", default-features = false }
+adk-model = { path = "adk-model", version = "0.8.4", default-features = false }
+adk-tool = { path = "adk-tool", version = "0.8.4" }
+adk-runner = { path = "adk-runner", version = "0.8.4", default-features = false }
+adk-server = { path = "adk-server", version = "0.8.4" }
+adk-session = { path = "adk-session", version = "0.8.4" }
+adk-artifact = { path = "adk-artifact", version = "0.8.4" }
+adk-memory = { path = "adk-memory", version = "0.8.4" }
+adk-cli = { path = "adk-cli", version = "0.8.4", default-features = false }
+adk-realtime = { path = "adk-realtime", version = "0.8.4" }
+adk-graph = { path = "adk-graph", version = "0.8.4" }
+adk-browser = { path = "adk-browser", version = "0.8.4" }
+adk-eval = { path = "adk-eval", version = "0.8.4" }
+adk-telemetry = { path = "adk-telemetry", version = "0.8.4" }
+adk-guardrail = { path = "adk-guardrail", version = "0.8.4" }
+adk-auth = { path = "adk-auth", version = "0.8.4" }
+adk-plugin = { path = "adk-plugin", version = "0.8.4" }
+adk-skill = { path = "adk-skill", version = "0.8.4" }
+adk-gemini = { path = "adk-gemini", version = "0.8.4" }
+adk-code = { path = "adk-code", version = "0.8.4" }
+adk-sandbox = { path = "adk-sandbox", version = "0.8.4" }
+adk-rag = { path = "adk-rag", version = "0.8.4" }
+adk-audio = { path = "adk-audio", version = "0.8.4" }
+adk-deploy = { path = "adk-deploy", version = "0.8.4" }
+adk-payments = { path = "adk-payments", version = "0.8.4" }
+adk-action = { path = "adk-action", version = "0.8.4" }
+adk-anthropic = { path = "adk-anthropic", version = "0.8.4" }
+awp-types = { path = "awp-types", version = "0.8.4" }
+adk-awp = { path = "adk-awp", version = "0.8.4" }
+adk-acp = { path = "adk-acp", version = "0.8.4" }
