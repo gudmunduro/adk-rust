@@ -1,6 +1,6 @@
 //! # cargo-adk
 //!
-//! Scaffolding and deployment tool for ADK-Rust agent projects.
+//! Scaffolding, validation, and deployment tool for ADK-Rust agent projects.
 //!
 //! ```bash
 //! cargo install cargo-adk
@@ -10,12 +10,19 @@
 //! cargo adk new my-agent --template tools   # agent with custom tools
 //! cargo adk new my-agent --template api     # REST-deployable agent
 //! cargo adk new my-agent --template openai  # OpenAI-powered agent
+//! cargo adk new my-agent --with-yaml        # also generate YAML agent definition
+//! cargo adk new my-agent --output-dir /tmp  # create at specific path
+//! cargo adk new my-agent --json-output      # structured JSON output
+//! cargo adk templates --json                # list templates as JSON
+//! cargo adk validate --yaml agent.yaml      # validate agent definition
 //! cargo adk deploy                          # deploy to platform
+//! cargo adk deploy --stream-output          # deploy with JSON event streaming
 //! ```
 
 use clap::{Parser, Subcommand};
+use serde::Serialize;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const ADK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -52,10 +59,45 @@ enum AdkCommand {
         /// LLM provider to use
         #[arg(short, long, default_value = "gemini")]
         provider: String,
+
+        /// Output directory (project created at <output-dir>/<name>/)
+        #[arg(long)]
+        output_dir: Option<PathBuf>,
+
+        /// Never prompt for input; use defaults or fail with error
+        #[arg(long)]
+        non_interactive: bool,
+
+        /// Emit structured JSON to stdout instead of human-readable text
+        #[arg(long)]
+        json_output: bool,
+
+        /// Also generate a YAML agent definition alongside Rust source
+        #[arg(long)]
+        with_yaml: bool,
     },
 
     /// List available templates
-    Templates,
+    Templates {
+        /// Output as JSON (name, description, provider, features)
+        #[arg(long)]
+        json: bool,
+
+        /// Custom template directory to include
+        #[arg(long)]
+        template_dir: Option<PathBuf>,
+    },
+
+    /// Validate an agent definition without building or deploying
+    Validate {
+        /// Path to a YAML agent definition file
+        #[arg(long)]
+        yaml: Option<PathBuf>,
+
+        /// Path to a Rust source file to syntax-check
+        #[arg(long)]
+        rust: Option<PathBuf>,
+    },
 
     /// Deploy the agent to the ADK platform
     Deploy {
@@ -78,46 +120,326 @@ enum AdkCommand {
         /// Validate everything without actually pushing (useful for CI)
         #[arg(long)]
         dry_run: bool,
+
+        /// Scope the deployment to a specific workspace (multi-tenancy)
+        #[arg(long)]
+        workspace_id: Option<String>,
+
+        /// Link the deployment to an existing agent record in the platform
+        #[arg(long)]
+        agent_id: Option<String>,
+
+        /// Emit build/deploy progress as newline-delimited JSON events
+        #[arg(long)]
+        stream_output: bool,
     },
 }
+
+// ── JSON output types ───────────────────────────────────────────
+
+#[derive(Serialize)]
+struct NewProjectOutput {
+    project_dir: String,
+    template: String,
+    provider: String,
+    files_created: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct TemplateInfo {
+    name: &'static str,
+    description: &'static str,
+    default_provider: &'static str,
+    features: Vec<&'static str>,
+}
+
+#[derive(Serialize)]
+struct ValidateOutput {
+    valid: bool,
+    warnings: Vec<String>,
+    errors: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct DeployEvent {
+    event: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timestamp: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    percent: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    environment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deployment_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<String>,
+}
+
+impl DeployEvent {
+    fn new(event: &str) -> Self {
+        Self {
+            event: event.to_string(),
+            timestamp: Some(chrono::Utc::now().to_rfc3339()),
+            message: None,
+            percent: None,
+            duration_ms: None,
+            environment: None,
+            deployment_id: None,
+            status: None,
+        }
+    }
+
+    fn with_message(mut self, msg: &str) -> Self {
+        self.message = Some(msg.to_string());
+        self
+    }
+
+    fn emit(&self) {
+        if let Ok(json) = serde_json::to_string(self) {
+            println!("{json}");
+        }
+    }
+}
+
+// ── Main ────────────────────────────────────────────────────────
 
 fn main() {
     let cli = Cargo::parse();
     let CargoSubcommand::Adk(adk) = cli.command;
 
     match adk.command {
-        AdkCommand::New { name, template, provider } => {
-            if let Err(e) = create_project(&name, &template, &provider) {
+        AdkCommand::New {
+            name,
+            template,
+            provider,
+            output_dir,
+            non_interactive: _,
+            json_output,
+            with_yaml,
+        } => {
+            if let Err(e) = create_project(
+                &name,
+                &template,
+                &provider,
+                output_dir.as_deref(),
+                json_output,
+                with_yaml,
+            ) {
+                if json_output {
+                    let err = serde_json::json!({"error": e});
+                    eprintln!("{err}");
+                } else {
+                    eprintln!("Error: {e}");
+                }
+                std::process::exit(1);
+            }
+        }
+        AdkCommand::Templates { json, template_dir } => {
+            if json {
+                print_templates_json(template_dir.as_deref());
+            } else {
+                print_templates(template_dir.as_deref());
+            }
+        }
+        AdkCommand::Validate { yaml, rust } => {
+            if let Err(e) = run_validate(yaml.as_deref(), rust.as_deref()) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }
         }
-        AdkCommand::Templates => {
-            print_templates();
-        }
-        AdkCommand::Deploy { environment, token, server, skip_build, dry_run } => {
+        AdkCommand::Deploy {
+            environment,
+            token,
+            server,
+            skip_build,
+            dry_run,
+            workspace_id,
+            agent_id,
+            stream_output,
+        } => {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .expect("failed to create tokio runtime");
 
-            if let Err(e) = rt.block_on(run_deploy(environment, token, server, skip_build, dry_run))
-            {
-                eprintln!("Error: {e}");
+            if let Err(e) = rt.block_on(run_deploy(
+                environment,
+                token,
+                server,
+                skip_build,
+                dry_run,
+                workspace_id,
+                agent_id,
+                stream_output,
+            )) {
+                if stream_output {
+                    DeployEvent::new("error").with_message(&e).emit();
+                } else {
+                    eprintln!("Error: {e}");
+                }
                 std::process::exit(1);
             }
         }
     }
 }
 
+// ── Validate command ────────────────────────────────────────────
+
+fn run_validate(yaml: Option<&Path>, rust: Option<&Path>) -> Result<(), String> {
+    if yaml.is_none() && rust.is_none() {
+        return Err("provide at least one of --yaml or --rust to validate".to_string());
+    }
+
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+
+    if let Some(yaml_path) = yaml {
+        validate_yaml(yaml_path, &mut warnings, &mut errors)?;
+    }
+
+    if let Some(rust_path) = rust {
+        validate_rust(rust_path, &mut warnings, &mut errors)?;
+    }
+
+    let valid = errors.is_empty();
+    let output = ValidateOutput { valid, warnings: warnings.clone(), errors: errors.clone() };
+    println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+
+    if valid { Ok(()) } else { Err("validation failed".to_string()) }
+}
+
+fn validate_yaml(
+    path: &Path,
+    warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
+) -> Result<(), String> {
+    if !path.exists() {
+        errors.push(format!("file not found: {}", path.display()));
+        return Ok(());
+    }
+
+    let content =
+        fs::read_to_string(path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+
+    // Parse as YAML and validate structure
+    let value: Result<serde_json::Value, _> = serde_yaml_ng::from_str(&content);
+    match value {
+        Err(e) => {
+            errors.push(format!("YAML parse error: {e}"));
+            return Ok(());
+        }
+        Ok(doc) => {
+            // Check required fields
+            if doc.get("name").and_then(|v| v.as_str()).is_none_or(|s| s.is_empty()) {
+                errors.push("missing required field: name".to_string());
+            }
+            if doc.get("model").is_none() {
+                errors.push("missing required field: model".to_string());
+            } else {
+                let model = &doc["model"];
+                if model.get("provider").and_then(|v| v.as_str()).is_none_or(|s| s.is_empty()) {
+                    errors.push("missing required field: model.provider".to_string());
+                }
+                if model.get("model_id").and_then(|v| v.as_str()).is_none_or(|s| s.is_empty()) {
+                    errors.push("missing required field: model.model_id".to_string());
+                }
+                // Validate provider is known
+                if let Some(provider) = model.get("provider").and_then(|v| v.as_str()) {
+                    let known = [
+                        "gemini",
+                        "openai",
+                        "anthropic",
+                        "deepseek",
+                        "groq",
+                        "ollama",
+                        "bedrock",
+                        "azure-ai",
+                    ];
+                    if !known.contains(&provider) {
+                        warnings.push(format!(
+                            "unknown model provider: '{provider}'. Known providers: {}",
+                            known.join(", ")
+                        ));
+                    }
+                }
+            }
+
+            // Check tools have descriptions
+            if let Some(tools) = doc.get("tools").and_then(|v| v.as_array()) {
+                for (i, tool) in tools.iter().enumerate() {
+                    if let Some(name) = tool.get("name").and_then(|v| v.as_str()) {
+                        if tool.get("description").is_none() {
+                            warnings.push(format!("tool '{name}' (index {i}) has no description"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_rust(
+    path: &Path,
+    _warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
+) -> Result<(), String> {
+    if !path.exists() {
+        errors.push(format!("file not found: {}", path.display()));
+        return Ok(());
+    }
+
+    // Run cargo check on the file's parent directory if it has a Cargo.toml
+    let parent = path.parent().unwrap_or(Path::new("."));
+    let cargo_toml = parent.join("Cargo.toml");
+
+    if cargo_toml.exists() {
+        let output = std::process::Command::new("cargo")
+            .args(["check", "--message-format=json"])
+            .current_dir(parent)
+            .output()
+            .map_err(|e| format!("failed to run cargo check: {e}"))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            for line in stderr.lines().take(10) {
+                if line.contains("error") {
+                    errors.push(line.to_string());
+                }
+            }
+            if errors.is_empty() {
+                errors.push("cargo check failed (see stderr for details)".to_string());
+            }
+        }
+    } else {
+        // Just check if the file is valid Rust syntax by reading it
+        let content = fs::read_to_string(path)
+            .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+        if let Err(e) = syn::parse_file(&content) {
+            errors.push(format!("Rust syntax error: {e}"));
+        }
+    }
+
+    Ok(())
+}
+
 // ── Deploy command ──────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 async fn run_deploy(
     environment: String,
     token: Option<String>,
     server: String,
     skip_build: bool,
     dry_run: bool,
+    workspace_id_override: Option<String>,
+    agent_id: Option<String>,
+    stream_output: bool,
 ) -> Result<(), String> {
     use adk_deploy::{
         DeployClient, DeployClientConfig, DeploymentManifest, LoginRequest, PushDeploymentRequest,
@@ -131,22 +453,38 @@ async fn run_deploy(
 
     let binary_name = manifest.agent.binary.clone();
 
-    println!("Deploying agent: {}", manifest.agent.name);
-    println!("  version:     {}", manifest.agent.version);
-    println!("  environment: {environment}");
-    println!("  server:      {server}");
-    println!();
+    if stream_output {
+        DeployEvent::new("deploy_init")
+            .with_message(&format!("deploying {} v{}", manifest.agent.name, manifest.agent.version))
+            .emit();
+    } else {
+        println!("Deploying agent: {}", manifest.agent.name);
+        println!("  version:     {}", manifest.agent.version);
+        println!("  environment: {environment}");
+        println!("  server:      {server}");
+        if let Some(ref aid) = agent_id {
+            println!("  agent_id:    {aid}");
+        }
+        println!();
+    }
 
     // ── Authenticate ────────────────────────────────────────────
-    println!("Authenticating...");
-    let mut config =
-        DeployClientConfig { endpoint: server.clone(), token: token.clone(), workspace_id: None };
+    if !stream_output {
+        println!("Authenticating...");
+    }
+    let mut config = DeployClientConfig {
+        endpoint: server.clone(),
+        token: token.clone(),
+        workspace_id: workspace_id_override.clone(),
+    };
 
     // Try loading cached config for workspace_id and token fallback
     if let Ok(cached) = DeployClientConfig::load() {
         if config.token.is_none() && cached.token.is_some() && cached.endpoint == server {
             config.token = cached.token;
-            println!("  Using cached credentials");
+            if !stream_output {
+                println!("  Using cached credentials");
+            }
         }
         if config.workspace_id.is_none() {
             config.workspace_id = cached.workspace_id;
@@ -158,23 +496,36 @@ async fn run_deploy(
     // If we have a token, use it directly. Otherwise, login.
     if let Some(ref token_value) = config.token {
         client = client.with_token(token_value.clone());
-        println!("  Using provided token");
+        if !stream_output {
+            println!("  Using provided token");
+        }
     } else {
-        // Attempt ephemeral login
-        println!("  No token provided. Attempting login...");
+        if !stream_output {
+            println!("  No token provided. Attempting login...");
+        }
         let email = std::env::var("ADK_DEPLOY_EMAIL").unwrap_or_else(|_| "cli@local".to_string());
         let login_response = client
             .login_ephemeral(&LoginRequest { email, workspace_name: None })
             .await
             .map_err(|e| format!("login failed: {e}. Provide --token or set ADK_DEPLOY_TOKEN"))?;
         config.workspace_id = Some(login_response.workspace_id.clone());
-        println!("  Logged in to workspace: {}", login_response.workspace_id);
+        if !stream_output {
+            println!("  Logged in to workspace: {}", login_response.workspace_id);
+        }
     }
-    println!();
+    if !stream_output {
+        println!();
+    }
 
     // ── Build ───────────────────────────────────────────────────
     if !skip_build {
-        println!("Building release binary...");
+        if stream_output {
+            DeployEvent::new("build_start").emit();
+        } else {
+            println!("Building release binary...");
+        }
+
+        let start = std::time::Instant::now();
         let status = std::process::Command::new("cargo")
             .args(["build", "--release"])
             .status()
@@ -183,8 +534,16 @@ async fn run_deploy(
         if !status.success() {
             return Err("cargo build --release failed".to_string());
         }
-        println!("  Build complete.");
-        println!();
+
+        let duration_ms = start.elapsed().as_millis() as u64;
+        if stream_output {
+            let mut ev = DeployEvent::new("build_complete");
+            ev.duration_ms = Some(duration_ms);
+            ev.emit();
+        } else {
+            println!("  Build complete ({duration_ms}ms).");
+            println!();
+        }
     }
 
     // Locate the compiled binary
@@ -197,13 +556,13 @@ async fn run_deploy(
     }
 
     // ── Upload secrets from .env ────────────────────────────────
-    // Convention: UPPER_SNAKE_CASE env vars map to lower-kebab-case secret keys.
-    // Example: GOOGLE_API_KEY in .env → google-api-key secret on the platform.
     let declared_secrets: Vec<&str> = manifest.secrets.iter().map(|s| s.key.as_str()).collect();
     if !declared_secrets.is_empty() {
         let env_path = Path::new(".env");
         if env_path.exists() {
-            println!("Uploading secrets...");
+            if !stream_output {
+                println!("Uploading secrets...");
+            }
             let env_content =
                 fs::read_to_string(env_path).map_err(|e| format!("failed to read .env: {e}"))?;
 
@@ -219,7 +578,9 @@ async fn run_deploy(
                     let secret_key = key.to_lowercase().replace('_', "-");
                     if declared_secrets.contains(&secret_key.as_str()) {
                         if dry_run {
-                            println!("  [dry-run] would upload secret ({} chars)", value.len());
+                            if !stream_output {
+                                println!("  [dry-run] would upload secret ({} chars)", value.len());
+                            }
                         } else {
                             client
                                 .set_secret(&SecretSetRequest {
@@ -229,20 +590,24 @@ async fn run_deploy(
                                 })
                                 .await
                                 .map_err(|e| format!("failed to set secret: {e}"))?;
-                            println!("  ✓ uploaded secret");
+                            if !stream_output {
+                                println!("  ✓ uploaded secret");
+                            }
                         }
                         uploaded += 1;
                     }
                 }
             }
-            if uploaded == 0 {
+            if uploaded == 0 && !stream_output {
                 println!(
                     "  No matching secrets found in .env for {} declared secret(s).",
                     declared_secrets.len()
                 );
             }
-            println!();
-        } else {
+            if !stream_output {
+                println!();
+            }
+        } else if !stream_output {
             println!(
                 "Note: manifest declares {} secret(s) but no .env file found.",
                 declared_secrets.len()
@@ -253,7 +618,9 @@ async fn run_deploy(
     }
 
     // ── Create bundle ───────────────────────────────────────────
-    println!("Creating deployment bundle...");
+    if !stream_output {
+        println!("Creating deployment bundle...");
+    }
     let dist_dir = Path::new(".adk-deploy/dist");
     fs::create_dir_all(dist_dir).map_err(|e| format!("failed to create dist dir: {e}"))?;
 
@@ -269,23 +636,38 @@ async fn run_deploy(
     hasher.update(&bundle_bytes);
     let checksum = hex::encode(hasher.finalize());
 
-    println!("  bundle:   {}", bundle_path.display());
-    println!("  size:     {:.1} MB", bundle_size as f64 / 1_048_576.0);
-    println!("  checksum: {checksum}");
-    println!();
+    if !stream_output {
+        println!("  bundle:   {}", bundle_path.display());
+        println!("  size:     {:.1} MB", bundle_size as f64 / 1_048_576.0);
+        println!("  checksum: {checksum}");
+        println!();
+    }
 
     // ── Push deployment ─────────────────────────────────────────
     if dry_run {
-        println!("Dry run complete. Would push:");
-        println!("  bundle:       {}", bundle_path.display());
-        println!("  size:         {:.1} MB", bundle_size as f64 / 1_048_576.0);
-        println!("  environment:  {environment}");
-        println!("  workspace_id: {:?}", config.workspace_id);
-        println!("\nNo changes were made to the server.");
+        if stream_output {
+            DeployEvent::new("dry_run_complete").with_message("no changes made").emit();
+        } else {
+            println!("Dry run complete. Would push:");
+            println!("  bundle:       {}", bundle_path.display());
+            println!("  size:         {:.1} MB", bundle_size as f64 / 1_048_576.0);
+            println!("  environment:  {environment}");
+            println!("  workspace_id: {:?}", config.workspace_id);
+            if let Some(ref aid) = agent_id {
+                println!("  agent_id:     {aid}");
+            }
+            println!("\nNo changes were made to the server.");
+        }
         return Ok(());
     }
 
-    println!("Pushing bundle ({:.1} MB)...", bundle_size as f64 / 1_048_576.0);
+    if stream_output {
+        let mut ev = DeployEvent::new("deploy_start");
+        ev.environment = Some(environment.clone());
+        ev.emit();
+    } else {
+        println!("Pushing bundle ({:.1} MB)...", bundle_size as f64 / 1_048_576.0);
+    }
 
     let request = PushDeploymentRequest {
         workspace_id: config.workspace_id.clone(),
@@ -301,12 +683,19 @@ async fn run_deploy(
         .await
         .map_err(|e| format!("deployment push failed: {e}"))?;
 
-    println!();
-    println!("Deployment successful!");
-    println!("  id:       {}", response.deployment.id);
-    println!("  version:  {}", response.deployment.version);
-    println!("  status:   {:?}", response.deployment.status);
-    println!("  endpoint: {}", response.deployment.endpoint_url);
+    if stream_output {
+        let mut ev = DeployEvent::new("deploy_complete");
+        ev.deployment_id = Some(response.deployment.id.clone());
+        ev.status = Some(format!("{:?}", response.deployment.status));
+        ev.emit();
+    } else {
+        println!();
+        println!("Deployment successful!");
+        println!("  id:       {}", response.deployment.id);
+        println!("  version:  {}", response.deployment.version);
+        println!("  status:   {:?}", response.deployment.status);
+        println!("  endpoint: {}", response.deployment.endpoint_url);
+    }
 
     Ok(())
 }
@@ -326,7 +715,6 @@ fn create_bundle(
     let encoder = GzEncoder::new(file, Compression::default());
     let mut archive = tar::Builder::new(encoder);
 
-    // Add adk-deploy.toml at the root (bare path, no ./ prefix)
     let manifest_bytes =
         fs::read(manifest_path).map_err(|e| format!("failed to read manifest: {e}"))?;
     let mut header = tar::Header::new_gnu();
@@ -337,7 +725,6 @@ fn create_bundle(
         .append_data(&mut header, "adk-deploy.toml", manifest_bytes.as_slice())
         .map_err(|e| format!("failed to add manifest to bundle: {e}"))?;
 
-    // Add binary at bin/{binary_name} (bare path, no ./ prefix)
     let binary_bytes = fs::read(binary_path).map_err(|e| format!("failed to read binary: {e}"))?;
     let mut header = tar::Header::new_gnu();
     header.set_size(binary_bytes.len() as u64);
@@ -353,22 +740,102 @@ fn create_bundle(
     Ok(())
 }
 
-// ── Scaffolding commands ────────────────────────────────────────
+// ── Templates command ───────────────────────────────────────────
 
-fn print_templates() {
+fn get_builtin_templates() -> Vec<TemplateInfo> {
+    vec![
+        TemplateInfo {
+            name: "basic",
+            description: "Basic LLM agent with interactive console",
+            default_provider: "gemini",
+            features: vec!["minimal"],
+        },
+        TemplateInfo {
+            name: "tools",
+            description: "Agent with custom function tools using #[tool] macro",
+            default_provider: "gemini",
+            features: vec!["minimal", "tools"],
+        },
+        TemplateInfo {
+            name: "rag",
+            description: "RAG agent with document ingestion and vector search",
+            default_provider: "gemini",
+            features: vec!["minimal", "rag"],
+        },
+        TemplateInfo {
+            name: "api",
+            description: "REST API server with health check and A2A protocol",
+            default_provider: "gemini",
+            features: vec!["minimal", "server"],
+        },
+        TemplateInfo {
+            name: "openai",
+            description: "OpenAI-powered agent (gpt-5-mini)",
+            default_provider: "openai",
+            features: vec!["agents", "models", "openai", "runner", "sessions"],
+        },
+    ]
+}
+
+fn print_templates(_template_dir: Option<&Path>) {
     println!("Available templates:\n");
-    println!("  basic    Basic LLM agent with interactive console (default)");
-    println!("  tools    Agent with custom function tools using #[tool] macro");
-    println!("  rag      RAG agent with document ingestion and vector search");
-    println!("  api      REST API server with health check and A2A protocol");
-    println!("  openai   OpenAI-powered agent (gpt-5-mini)");
+    for t in get_builtin_templates() {
+        println!("  {:<8} {}", t.name, t.description);
+    }
     println!("\nUsage: cargo adk new my-agent --template <template>");
 }
 
-fn create_project(name: &str, template: &str, provider: &str) -> Result<(), String> {
-    let path = Path::new(name);
-    if path.exists() {
-        return Err(format!("directory '{name}' already exists"));
+fn print_templates_json(template_dir: Option<&Path>) {
+    let mut templates = get_builtin_templates();
+
+    // Load custom templates from directory if provided
+    if let Some(dir) = template_dir {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_some_and(|ext| ext == "toml") {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        // Parse custom template manifest (name, description)
+                        if let Ok(value) = content.parse::<toml::Value>() {
+                            let name =
+                                value.get("name").and_then(|v| v.as_str()).unwrap_or("custom");
+                            let desc =
+                                value.get("description").and_then(|v| v.as_str()).unwrap_or("");
+                            let provider =
+                                value.get("provider").and_then(|v| v.as_str()).unwrap_or("gemini");
+                            // We leak the strings here since TemplateInfo uses &'static str
+                            // For JSON output this is fine — process exits after printing
+                            templates.push(TemplateInfo {
+                                name: Box::leak(name.to_string().into_boxed_str()),
+                                description: Box::leak(desc.to_string().into_boxed_str()),
+                                default_provider: Box::leak(provider.to_string().into_boxed_str()),
+                                features: vec!["minimal"],
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    println!("{}", serde_json::to_string_pretty(&templates).unwrap_or_default());
+}
+
+// ── Scaffolding commands ────────────────────────────────────────
+
+fn create_project(
+    name: &str,
+    template: &str,
+    provider: &str,
+    output_dir: Option<&Path>,
+    json_output: bool,
+    with_yaml: bool,
+) -> Result<(), String> {
+    let base_dir = output_dir.unwrap_or_else(|| Path::new("."));
+    let project_path = base_dir.join(name);
+
+    if project_path.exists() {
+        return Err(format!("directory '{}' already exists", project_path.display()));
     }
 
     let (cargo_toml, main_rs, env_example) = match template {
@@ -385,22 +852,87 @@ fn create_project(name: &str, template: &str, provider: &str) -> Result<(), Stri
     };
 
     // Create project structure
-    fs::create_dir_all(path.join("src")).map_err(|e| e.to_string())?;
-    fs::write(path.join("Cargo.toml"), cargo_toml).map_err(|e| e.to_string())?;
-    fs::write(path.join("src/main.rs"), main_rs).map_err(|e| e.to_string())?;
-    fs::write(path.join(".env.example"), env_example).map_err(|e| e.to_string())?;
-    fs::write(path.join(".gitignore"), "/target\n.env\n").map_err(|e| e.to_string())?;
+    fs::create_dir_all(project_path.join("src")).map_err(|e| e.to_string())?;
+    fs::write(project_path.join("Cargo.toml"), &cargo_toml).map_err(|e| e.to_string())?;
+    fs::write(project_path.join("src/main.rs"), &main_rs).map_err(|e| e.to_string())?;
+    fs::write(project_path.join(".env.example"), &env_example).map_err(|e| e.to_string())?;
+    fs::write(project_path.join(".gitignore"), "/target\n.env\n").map_err(|e| e.to_string())?;
 
-    println!("Created ADK agent project: {name}/");
-    println!("  template: {template}");
-    println!("  provider: {provider}");
-    println!();
-    println!("Next steps:");
-    println!("  cd {name}");
-    println!("  cp .env.example .env    # add your API key");
-    println!("  cargo run");
+    let mut files_created = vec![
+        "Cargo.toml".to_string(),
+        "src/main.rs".to_string(),
+        ".env.example".to_string(),
+        ".gitignore".to_string(),
+    ];
+
+    // Generate YAML agent definition if requested
+    if with_yaml {
+        let yaml_content = generate_yaml_definition(name, provider, template);
+        fs::create_dir_all(project_path.join("agents")).map_err(|e| e.to_string())?;
+        let yaml_filename = format!("agents/{name}.yaml");
+        fs::write(project_path.join(&yaml_filename), &yaml_content).map_err(|e| e.to_string())?;
+        files_created.push(yaml_filename);
+    }
+
+    if json_output {
+        let output = NewProjectOutput {
+            project_dir: project_path.to_string_lossy().to_string(),
+            template: template.to_string(),
+            provider: provider.to_string(),
+            files_created,
+        };
+        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+    } else {
+        println!("Created ADK agent project: {}/", project_path.display());
+        println!("  template: {template}");
+        println!("  provider: {provider}");
+        if with_yaml {
+            println!("  yaml:     agents/{name}.yaml");
+        }
+        println!();
+        println!("Next steps:");
+        println!("  cd {}", project_path.display());
+        println!("  cp .env.example .env    # add your API key");
+        println!("  cargo run");
+    }
 
     Ok(())
+}
+
+// ── YAML generation ─────────────────────────────────────────────
+
+fn generate_yaml_definition(name: &str, provider: &str, template: &str) -> String {
+    let model_id = match provider {
+        "openai" => "gpt-5-mini",
+        "anthropic" => "claude-sonnet-4-5-20250929",
+        _ => "gemini-2.5-flash",
+    };
+
+    let tools_section = match template {
+        "tools" => "\ntools:\n  - name: greet\n",
+        "rag" => "\ntools:\n  - name: rag_search\n",
+        _ => "",
+    };
+
+    format!(
+        r#"# {name} — YAML agent definition
+# Hot-reloadable via adk-server (yaml-agent feature)
+# Mirrors the Rust agent configuration for runtime use.
+
+name: {name}
+description: "A helpful AI assistant"
+
+model:
+  provider: {provider}
+  model_id: {model_id}
+
+instructions: |
+  You are a friendly assistant. Be concise and helpful.
+{tools_section}
+config:
+  temperature: 0.7
+"#
+    )
 }
 
 // ── Template generators ─────────────────────────────────────────
@@ -421,7 +953,6 @@ fn adk_rust_dep(features: &[&str]) -> String {
 }
 
 fn provider_dep(provider: &str) -> (String, &str, &str) {
-    // Returns (feature_flags, model_constructor, env_var)
     match provider {
         "openai" => (
             adk_rust_dep(&provider_features(provider)),
@@ -562,7 +1093,6 @@ async fn main() -> anyhow::Result<()> {{
 
 fn generate_rag(name: &str, provider: &str) -> (String, String, String) {
     let (_, model_code, env_var) = provider_dep(provider);
-    // RAG always needs gemini for embeddings
     let dep = if provider == "gemini" {
         adk_rust_dep(&["agents", "models", "gemini", "runner", "sessions", "rag"])
     } else {
@@ -600,7 +1130,6 @@ async fn main() -> anyhow::Result<()> {{
     let api_key = std::env::var("{env_var}")?;
     let gemini_key = std::env::var("GOOGLE_API_KEY").unwrap_or_else(|_| api_key.clone());
 
-    // Build RAG pipeline
     let pipeline = Arc::new(
         RagPipeline::builder()
             .config(RagConfig::default())
@@ -610,7 +1139,6 @@ async fn main() -> anyhow::Result<()> {{
             .build()?,
     );
 
-    // Ingest sample documents
     pipeline.create_collection("docs").await?;
     pipeline.ingest("docs", &Document {{
         id: "example".into(),
@@ -752,8 +1280,84 @@ mod tests {
     }
 
     #[test]
+    fn create_project_with_output_dir() {
+        let tmp = std::env::temp_dir().join("cargo-adk-test-output-dir");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let result = create_project("test-agent", "basic", "gemini", Some(&tmp), false, false);
+        assert!(result.is_ok());
+        assert!(tmp.join("test-agent/Cargo.toml").exists());
+        assert!(tmp.join("test-agent/src/main.rs").exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn create_project_with_yaml() {
+        let tmp = std::env::temp_dir().join("cargo-adk-test-yaml");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let result = create_project("yaml-agent", "tools", "gemini", Some(&tmp), false, true);
+        assert!(result.is_ok());
+        assert!(tmp.join("yaml-agent/agents/yaml-agent.yaml").exists());
+
+        let yaml_content =
+            fs::read_to_string(tmp.join("yaml-agent/agents/yaml-agent.yaml")).unwrap();
+        assert!(yaml_content.contains("name: yaml-agent"));
+        assert!(yaml_content.contains("provider: gemini"));
+        assert!(yaml_content.contains("model_id: gemini-2.5-flash"));
+        assert!(yaml_content.contains("- name: greet"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn create_project_json_output() {
+        let tmp = std::env::temp_dir().join("cargo-adk-test-json");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        // json_output just changes what's printed, project is still created
+        let result = create_project("json-agent", "basic", "gemini", Some(&tmp), true, false);
+        assert!(result.is_ok());
+        assert!(tmp.join("json-agent/Cargo.toml").exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn templates_json_output() {
+        let templates = get_builtin_templates();
+        assert_eq!(templates.len(), 5);
+        assert_eq!(templates[0].name, "basic");
+        assert_eq!(templates[1].name, "tools");
+        assert_eq!(templates[2].name, "rag");
+        assert_eq!(templates[3].name, "api");
+        assert_eq!(templates[4].name, "openai");
+    }
+
+    #[test]
+    fn yaml_generation_providers() {
+        let gemini_yaml = generate_yaml_definition("test", "gemini", "basic");
+        assert!(gemini_yaml.contains("model_id: gemini-2.5-flash"));
+
+        let openai_yaml = generate_yaml_definition("test", "openai", "basic");
+        assert!(openai_yaml.contains("model_id: gpt-5-mini"));
+
+        let anthropic_yaml = generate_yaml_definition("test", "anthropic", "basic");
+        assert!(anthropic_yaml.contains("model_id: claude-sonnet-4-5-20250929"));
+    }
+
+    #[test]
+    fn yaml_generation_tools_template() {
+        let yaml = generate_yaml_definition("my-agent", "gemini", "tools");
+        assert!(yaml.contains("- name: greet"));
+    }
+
+    #[test]
     fn bundle_has_no_dot_slash_prefix() {
-        // Create a temp directory with a fake manifest and binary
         let tmp = std::env::temp_dir().join("cargo-adk-test-bundle");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
@@ -767,7 +1371,6 @@ mod tests {
         let bundle_path = tmp.join("test-bundle.tar.gz");
         create_bundle(&bundle_path, &manifest_path, &binary_path, "test-binary").unwrap();
 
-        // Read back and verify paths
         let file = fs::File::open(&bundle_path).unwrap();
         let decoder = flate2::read::GzDecoder::new(file);
         let mut archive = tar::Archive::new(decoder);
@@ -782,12 +1385,10 @@ mod tests {
         assert_eq!(paths[0], "adk-deploy.toml");
         assert_eq!(paths[1], "bin/test-binary");
 
-        // Verify no ./ prefix
         for path in &paths {
             assert!(!path.starts_with("./"), "path should not start with ./: {path}");
         }
 
-        // Cleanup
         let _ = fs::remove_dir_all(&tmp);
     }
 }

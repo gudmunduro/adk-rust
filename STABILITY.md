@@ -106,7 +106,7 @@ The ADK-Rust 1.0 release represents a commitment to long-term API stability for 
 The following criteria must be met before the 1.0 release:
 
 - **Semver compliance.** All Stable-tier crates pass `cargo semver-checks` with no breaking changes relative to the last published version.
-- **Documentation coverage.** All Stable-tier crates achieve 90%+ rustdoc coverage for public items, verified by `adk-doc-audit`.
+- **Documentation coverage.** All Stable-tier crates achieve 90%+ rustdoc coverage for public items.
 - **Test coverage.** All Stable-tier crates have unit tests, integration tests, and property-based tests for core functionality.
 - **Deprecation cleanup.** All items deprecated before the 1.0 grace-period cutoff have been removed.
 - **Beta promotion.** Crates intended for Stable at 1.0 have been promoted from Beta and have passed at least one release cycle without breaking changes.

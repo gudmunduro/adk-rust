@@ -44,46 +44,78 @@ Crate names are prefixed with `adk-`. The Rust module name uses underscores (`ad
 ### Core crates (publishable to crates.io)
 
 ```
-adk-core/        Core traits and types: Agent, Tool, Llm, Session, Event, Content, State
+adk-core/        Core traits and types: Agent, Tool, Llm, Session, Event, Content, State,
+                 SchemaAdapter, SchemaCache, SharedState, ToolExecutionStrategy, RequestContext
 adk-agent/       Agent implementations: LlmAgent, CustomAgent, SequentialAgent, ParallelAgent,
-                 LoopAgent, ConditionalAgent, LlmConditionalAgent
-adk-model/       LLM provider facade: Gemini, OpenAI, Anthropic, DeepSeek, Groq, Ollama,
-                 Fireworks, Together, Mistral, Perplexity, Cerebras, SambaNova, Bedrock, Azure AI
+                 LoopAgent, ConditionalAgent, LlmConditionalAgent. Parallel tool dispatch,
+                 SharedState coordination, skill shims.
+adk-model/       LLM provider facade: Gemini, OpenAI (Chat + Responses), Anthropic, DeepSeek (V4),
+                 Groq, Ollama, Bedrock, Azure AI, OpenRouter (native). Text-based tool call
+                 parser (7 model formats). Provider-aware schema normalization.
                  (feature-gated)
-adk-gemini/      Dedicated Gemini client with GeminiBackend trait (Studio + Vertex AI)
-adk-tool/        Tool system: FunctionTool, MCP integration (rmcp 1.2), Google Search, MCP Resource API
-adk-runner/      Agent execution runtime with event streaming
-adk-server/      HTTP server (Axum) and A2A v1.0.0 (Agent-to-Agent) protocol
-adk-session/     Session management and state persistence, encrypted sessions (AES-256-GCM)
+adk-gemini/      Dedicated Gemini client with GeminiBackend trait (Studio + Vertex AI),
+                 ThinkingConfig validation, built-in tool support (Search, Code Execution,
+                 Maps, File Search, Computer Use)
+adk-anthropic/   Dedicated Anthropic API client: streaming, adaptive thinking, prompt caching,
+                 citations, context management, fast mode, vision, PDF processing, pricing.
+                 Supports Claude Opus 4.7, Sonnet 4.6, Haiku 4.5.
+adk-tool/        Tool system: FunctionTool, StatefulTool, SimpleToolContext, MCP integration
+                 (rmcp 1.2), McpServerManager (lifecycle, health, auto-restart), MCP Resource
+                 API, MCP Elicitation, Google Search, built-in tool wrappers (Gemini/OpenAI/
+                 Anthropic), Slack/BigQuery/Spanner toolsets
+adk-runner/      Agent execution runtime with event streaming, RunnerConfigBuilder (typestate),
+                 Runner::interrupt() API, Runner::run_str(), per-session cancellation tokens
+adk-server/      HTTP server (Axum) and A2A v1.0.0 (Agent-to-Agent) protocol, ServerBuilder
+                 API, ShutdownHandle, YAML agent config, agent registry, auth bridge
+adk-session/     Session management: SQLite, PostgreSQL, Redis, MongoDB, Firestore, Neo4j
+                 backends. Encrypted sessions (AES-256-GCM) with key rotation.
 adk-artifact/    Binary artifact storage for agents
-adk-memory/      Semantic memory and RAG search
-adk-graph/       Graph-based workflow orchestration with checkpoints, durable resume, and HITL
+adk-memory/      Semantic memory and RAG search: InMemory, SQLite, PostgreSQL, Redis, MongoDB,
+                 Neo4j backends. Project-scoped memory isolation.
+adk-graph/       Graph-based workflow orchestration with checkpoints, durable resume,
+                 HITL interrupts, ActionNodeExecutor, WorkflowSchema interchange
 adk-realtime/    Real-time bidirectional audio/video streaming (OpenAI, Gemini Live, Vertex AI Live,
-                 LiveKit, WebRTC), mid-session context mutation, interruption detection
+                 LiveKit, WebRTC), mid-session context mutation, interruption detection,
+                 video avatar providers (HeyGen, D-ID)
 adk-browser/     Browser automation tools via WebDriver
-adk-eval/        Evaluation framework: trajectory, semantic, rubric, LLM-judge
+adk-eval/        Evaluation framework: trajectory, semantic, rubric, LLM-judge, user personas,
+                 prompt optimizer
 adk-telemetry/   OpenTelemetry 0.31 integration for agent observability
 adk-guardrail/   Input/output guardrails: validation, content filtering, PII redaction
-adk-auth/        Authentication: API keys, JWT, OAuth2, OIDC, SSO
+adk-auth/        Authentication: API keys, JWT, OAuth2, OIDC, SSO, cloud secret providers
+                 (AWS Secrets Manager, Azure Key Vault, GCP Secret Manager)
 adk-plugin/      Plugin system for agent lifecycle hooks — EnhancedPlugin trait with tool/model
                  interception, priority-based pipeline, PluginContext shared state
 adk-retry-reflect/ Retry & Reflect plugin — intercepts tool failures, injects reflection prompts,
                  exponential backoff, circuit-breaker patterns
 adk-skill/       Skill discovery, parsing, and convention-based agent capabilities
-adk-cli/         Command-line launcher for agents
-adk-anthropic/   Dedicated Anthropic API client with streaming, thinking, caching, citations, pricing
-adk-doc-audit/   Documentation audit: rustdoc coverage, link checking, crate validation
-adk-rust-macros/ Procedural macros (#[tool] attribute)
+adk-cli/         Command-line launcher for agents, `cargo adk deploy` for ADK Platform
+adk-rust-macros/ Procedural macros (#[tool] attribute with read_only, concurrency_safe,
+                 long_running metadata)
 adk-code/        Code execution (experimental)
 adk-sandbox/     Sandboxed execution environments — process/WASM backends, OS-level sandbox profiles
                  (Seatbelt on macOS, bubblewrap on Linux, AppContainer on Windows)
-adk-audio/       Audio processing, STT/TTS providers, Deepgram streaming (experimental)
+adk-audio/       Audio processing, STT/TTS providers, Deepgram streaming, desktop audio
+                 (capture/playback/VAD), ONNX models (Whisper, Moonshine, Kokoro, Chatterbox)
 adk-rag/         Retrieval-augmented generation pipelines
-adk-action/      Action node execution for deterministic workflow operations
+adk-action/      Action node definitions (14 node types), StandardProperties, variable
+                 interpolation — shared types for adk-graph ActionNodeExecutor
 adk-deploy/      Deployment utilities
-adk-payments/    Payment integration for agent services
-cargo-adk/       Cargo subcommand for project scaffolding
-adk-rust/        Umbrella crate re-exporting all of the above
+adk-payments/    Payment integration: ACP commerce, AP2 alpha mandates, multi-actor flows
+cargo-adk/       Cargo subcommand for project scaffolding and deployment
+adk-rust/        Umbrella crate re-exporting all of the above with tiered feature presets
+```
+
+### Protocol crates
+
+```
+awp-types/       Agentic Web Protocol types — TrustLevel, RequesterType, AwpVersion,
+                 BusinessContext, PaymentIntent, CapabilityManifest. Zero adk-* dependencies.
+adk-awp/         AWP implementation (Axum 0.8): discovery, rate limiting, consent (GDPR/KPA),
+                 event subscriptions (HMAC-SHA256 webhooks), health state machine, A2A messages
+adk-acp/         Agent Client Protocol — connect to external ACP agents (Claude Code, Codex,
+                 Kiro CLI) as tools. AcpAgentTool, AcpToolset, AcpServer (expose ADK agents
+                 as ACP-compatible), StdioTransport for IDE connections.
 ```
 
 ### Excluded from workspace
@@ -107,7 +139,8 @@ adk-ui/          Dynamic UI generation (forms, cards, tables, charts) — extrac
 ### Examples and docs
 
 ```
-examples/              README pointing to adk-playground repo (120+ examples)
+examples/              54 standalone example crates (each with own Cargo.toml) covering all major
+                       features. Additional 120+ examples in the adk-playground repo.
 docs/official_docs/    Comprehensive documentation site content
 ```
 
@@ -121,7 +154,7 @@ docs/official_docs/    Comprehensive documentation site content
 - `openrouter` — OpenRouter native chat, responses, routing, discovery, and credits APIs
 - `bedrock` — Amazon Bedrock via AWS SDK Converse API
 - `azure-ai` — Azure AI Inference endpoints
-- `all-providers` — enables all eight real feature flags
+- `all-providers` — enables all real feature flags
 - `fireworks`, `together`, `mistral`, `perplexity`, `cerebras`, `sambanova`, `xai` — backward-compat aliases for `openai`. Use `OpenAICompatibleConfig` presets instead of separate client types.
 
 ### Gemini model selection
@@ -147,24 +180,37 @@ All opt-in, no defaults:
 - `vertex-live` — Vertex AI Live API (OAuth2 via ADC, implies `gemini`)
 - `livekit` — LiveKit WebRTC bridge
 - `openai-webrtc` — OpenAI WebRTC transport (implies `openai`, requires cmake)
+- `heygen-avatar`, `did-avatar`, `video-avatar` — Video avatar providers
 - `full` — All providers except WebRTC (no cmake needed)
 - `full-webrtc` — Everything including WebRTC (requires cmake)
 
 ### adk-rust (umbrella)
 
-Five presets control which crates are compiled:
+Four tiered presets control which crates are compiled:
 
-- `minimal` **(default)** — agents, gemini, openai, anthropic, runner, sessions, tools, memory, telemetry. Everything needed to build agents with fast compile times.
-- `standard` — minimal + skills, graph, auth, server, cli, eval, guardrail, plugin, artifacts. Production deployment with server and auth.
+- `minimal` **(default)** — agents, models, gemini, runner, sessions. Fastest possible build for a single Gemini-powered agent.
+- `standard` — minimal + openai, anthropic, tools, memory, telemetry, skills, graph, auth, server, eval, guardrail, plugin, artifacts. Production deployment with server and auth.
 - `enterprise` — standard + realtime, browser, rag, payments, awp. Full-featured production.
 - `full` — enterprise + audio, code, sandbox. Everything.
 
-Domain add-ons (`audio`, `code`, `sandbox`) are composable with any tier: `features = ["minimal", "audio"]`.
-- `minimal` — agents, gemini, runner. Fastest possible build.
+Domain add-ons are composable with any tier: `features = ["minimal", "audio"]`.
 
-To compile everything (stable + experimental): `features = ["full", "labs"]`.
+Production backend features (require external infrastructure, NOT included in `full`):
+- `postgres-session`, `redis-session`, `mongodb-session`, `firestore-session`, `neo4j-session`
+- `sqlite-memory`, `database-memory`, `redis-memory`, `mongodb-memory`, `neo4j-memory`
+- `auth-bridge`
 
-Individual features (`agents`, `models`, `tools`, `sessions`, `server`, `graph`, `realtime`, `eval`, `browser`, `auth`, `guardrail`, `plugin`, `telemetry`, `cli`, `skills`, `artifacts`, `memory`, `code`, `sandbox`, `audio`, etc.) can be selected independently.
+Specialist opt-in features:
+- `yaml-agent`, `agent-registry` — YAML agent config and registry REST API
+- `mcp`, `mcp-http`, `mcp-sampling` — MCP transport and sampling support
+- `slack`, `bigquery`, `spanner` — Native toolsets
+- `action`, `action-http`, `action-trigger`, `action-db`, `action-code`, `action-email`, `action-rss`, `action-full` — Action node executors
+- `video-avatar` — HeyGen/D-ID avatar providers
+- `acp` — Agent Client Protocol integration
+- `openrouter` — OpenRouter native APIs
+- Audio ONNX models: `whisper-onnx`, `distil-whisper`, `moonshine`, `kokoro`, `chatterbox`, `qwen3-tts`
+
+Individual features (`agents`, `models`, `tools`, `sessions`, `server`, `graph`, `realtime`, `eval`, `browser`, `auth`, `guardrail`, `plugin`, `telemetry`, `cli`, `skills`, `artifacts`, `memory`, `code`, `sandbox`, `audio`, `awp`, `acp`, `rag`, `payments`, etc.) can be selected independently.
 
 ## Rust conventions
 
@@ -216,9 +262,11 @@ When implementing `Agent`:
 When implementing `Tool`:
 - `execute()` takes `Arc<dyn ToolContext>` and `Value`, returns `Result<Value>`.
 - `parameters_schema()` and `is_long_running()` have defaults — override only when needed.
+- `is_read_only()` and `is_concurrency_safe()` default to `false` — override for parallel dispatch.
 
 When implementing `Llm`:
 - `generate_content()` takes `LlmRequest` and `bool` (stream flag), returns `Result<LlmResponseStream>`.
+- `schema_adapter()` returns a `SchemaAdapter` for provider-specific schema normalization (default: `GenericSchemaAdapter`).
 
 ## Error handling
 
@@ -350,18 +398,29 @@ cargo nextest run -p adk-realtime --features full            # with features
 1. Implement `adk_core::Llm` in `adk-model/src/<provider>/`
 2. Add feature flag to `adk-model/Cargo.toml`
 3. Re-export from `adk-model/src/lib.rs` behind the feature
-4. Add example in [adk-playground](https://github.com/zavora-ai/adk-playground)
-5. Update `adk-studio` codegen if the provider should be available in Studio (separate repo: `../adk-studio/`)
+4. Implement `schema_adapter()` if the provider has specific schema requirements
+5. Add example in [adk-playground](https://github.com/zavora-ai/adk-playground) or as a standalone crate in `examples/`
+6. Update `adk-studio` codegen if the provider should be available in Studio (separate repo: `../adk-studio/`)
 
 ### New tool
 
 1. Implement `adk_core::Tool` trait (use `Arc<dyn ToolContext>` for context parameter)
 2. Add to `adk-tool/src/` or new crate if heavy deps
-3. Write unit + property tests
+3. Consider `is_read_only()` and `is_concurrency_safe()` for parallel dispatch
+4. Write unit + property tests
 
 ### New example
 
-Add examples to the [adk-playground](https://github.com/zavora-ai/adk-playground) repo. The `examples/` directory in this workspace contains only a README pointing there.
+Examples live as standalone crates in `examples/` (each with their own `Cargo.toml` and `[workspace]` key). Additional examples go to the [adk-playground](https://github.com/zavora-ai/adk-playground) repo.
+
+Pattern for a new example crate:
+```
+examples/my_example/
+├── Cargo.toml          # [workspace] key, path deps to workspace crates
+├── src/main.rs         # Entry point with dotenvy, tracing, banner
+├── README.md           # Documentation
+└── .env.example        # Required env vars
+```
 
 ## Commit messages
 
@@ -403,7 +462,6 @@ test(eval): add trajectory property tests
 - If you change `Cargo.toml` or `Cargo.lock`, run `cargo check --workspace` to verify resolution.
 - Internal crate dependencies use workspace inheritance: `adk-core = { workspace = true }` in member crates.
 - The root `Cargo.toml` `[workspace.dependencies]` section pins all internal crate versions.
-- `adk-plugin` now uses workspace inheritance for `adk-core` (previously hardcoded).
 
 ## Publishing to crates.io
 
@@ -415,11 +473,12 @@ Crates must be published in dependency order. Wait for each crate to be indexed 
 
 ```
 Tier 1: adk-core
-Tier 2: adk-telemetry, adk-memory, adk-artifact, adk-plugin, adk-skill, adk-auth, adk-guardrail, adk-gemini, adk-anthropic, adk-rust-macros
-Tier 3: adk-session
+Tier 2: adk-telemetry, adk-memory, adk-artifact, adk-plugin, adk-skill, adk-auth, adk-guardrail,
+        adk-gemini, adk-anthropic, adk-rust-macros, awp-types
+Tier 3: adk-session, adk-action
 Tier 4: adk-tool, adk-model, adk-browser, adk-audio
-Tier 5: adk-agent, adk-graph, adk-action
-Tier 6: adk-runner, adk-realtime, adk-eval, adk-rag
+Tier 5: adk-agent, adk-graph, adk-awp, adk-acp
+Tier 6: adk-runner, adk-realtime, adk-eval, adk-rag, adk-retry-reflect
 Tier 7: adk-server, adk-cli, adk-deploy, adk-payments
 Tier 8: cargo-adk
 Tier 9: adk-rust (umbrella — always last)
@@ -455,13 +514,26 @@ cargo publish -p <crate-name>
 
 - `adk_rust::provider_from_env()` — auto-detect LLM provider from `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`
 - `adk_rust::run(instructions, input)` — single-function agent invocation with auto provider detection
+- `Runner::builder()` — typestate builder enforcing required fields at compile time
+- `Runner::run_str()` — convenience accepting `&str` for user/session IDs
+- `Runner::interrupt(session_id)` — cancel a running agent mid-execution
 - Prompt caching is enabled by default for Anthropic and Bedrock. Gemini explicit caching activates when `cache_capable` is set on the runner.
 - Pricing modules: `adk_gemini::pricing`, `adk_model::openai::pricing`, `adk_anthropic::pricing`
 - `EncryptedSession<S>` in `adk-session` (behind `encrypted-session` feature) — AES-256-GCM encryption with key rotation
 - `InterruptionDetection` enum in `adk-realtime` — `Manual` (default) or `Automatic` VAD-based interruption
 - `ToolSearchConfig` in `adk-anthropic` — regex-based tool filtering for the Anthropic provider
 - MCP Resource API: `McpToolset::list_resources()`, `list_resource_templates()`, `read_resource(uri)`
+- MCP Elicitation: `McpToolset::with_elicitation_handler()` for form/URL-based elicitation
+- `McpServerManager` — lifecycle management for multiple MCP server processes with auto-restart
 - Graph durable resume: `PregelExecutor` resumes from last checkpoint on startup
+- `ServerBuilder` — register custom Axum controllers alongside built-in routes
+- `ToolExecutionStrategy` — `Sequential`, `Parallel`, or `Auto` dispatch for tool calls
+- `StatefulTool<S>` — generic wrapper for stateful tool closures
+- `SimpleToolContext` — lightweight context for non-agent callers (testing, MCP servers)
+- `SchemaAdapter` trait — provider-aware schema normalization (Gemini, OpenAI strict/non-strict, Anthropic, Generic)
+- `parse_text_tool_calls()` — detect tool calls in text from 7 model formats (Qwen, Llama, Mistral, DeepSeek, Gemma 4, etc.)
+- `SharedState` — thread-safe key-value store for parallel agent coordination
+- Project-scoped memory: `MemoryService::add_session_to_project()`, `search_in_project()`
 
 ## adk-studio (separate repo)
 

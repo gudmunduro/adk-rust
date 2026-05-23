@@ -20,7 +20,13 @@ path = "src/main.rs"
 clap = { version = "4", features = ["derive", "env"] }
 adk-deploy = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+toml = { workspace = true }
 sha2 = { workspace = true }
 flate2 = { workspace = true }
 tar = { workspace = true }
 hex = { workspace = true }
+syn = { version = "2", features = ["full", "parsing"] }
+serde_yaml_ng = "0.10"

@@ -743,9 +743,6 @@ Five adoption fixes reported by a real-world integrator (zavora-cli):
 - **adk-gemini**: Removed `println!` debug statements from tests.
 - **README versions**: Bumped 0.3→0.4 in adk-telemetry, adk-memory, adk-artifact, adk-plugin, adk-guardrail, adk-gemini.
 
-### Removed
-- **adk-doc-audit**: Removed from workspace (docs.rs provides this functionality). Backed up to standalone directory.
-
 #### adk-mistralrs
 - **Minimal tokio features**: Changed from `tokio = { features = ["full"] }` to `tokio = { features = ["rt", "sync", "macros"] }` — the minimal set actually used by the crate.
 
@@ -1147,9 +1144,6 @@ Thanks to the following people for their contributions to this release:
 - **adk-studio**: CORS restricted to localhost origins only (was allowing all origins)
 - **adk-ui**: `NumberInput` validation no longer false-fails when only `min` is set (`Some(min) > None` was always true)
 - **adk-graph**: Replaced `eprintln!("DEBUG: ...")` with `tracing::debug!()` in `AgentNode::execute_stream` and `CompiledGraph::stream` (stderr leakage in library code)
-- **adk-doc-audit**: Line numbers now use `syn::Span::start().line` instead of hardcoded `0`
-- **adk-doc-audit**: `suggest_similar_crate_names` and `suggest_similar_api_names` made static (removed dead `_static` variants)
-- **adk-doc-audit**: Deleted stale `test.md` artifact
 - **adk-ui**: Validation refactored from monolithic match into per-type `Validate` trait impls (Text, Button, TextInput, NumberInput, Select, Table, Chart, Card, Modal, Stack, Grid, Tabs)
 
 ### Changed
@@ -1158,7 +1152,6 @@ Thanks to the following people for their contributions to this release:
   - `gpt-4o` / `gpt-4o-mini` → `gpt-5-mini`
   - `claude-sonnet-4-20250514` → `claude-sonnet-4-5-20250929`
   - `gemini-2.0-flash-live-preview-04-09` → `gemini-live-2.5-flash-native-audio`
-- `adk-doc-audit` now depends on `proc-macro2` with `span-locations` feature for accurate line numbers
 - `CONTRIBUTING.md` rewritten with full 25+ crate inventory, build commands, architecture notes
 - `.kiro/` and `.vite/` excluded from git tracking
 - `.gitignore` cleaned up (removed absolute paths, duplicate entries)
