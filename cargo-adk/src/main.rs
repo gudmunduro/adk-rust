@@ -774,6 +774,12 @@ fn get_builtin_templates() -> Vec<TemplateInfo> {
             default_provider: "openai",
             features: vec!["agents", "models", "openai", "runner", "sessions"],
         },
+        TemplateInfo {
+            name: "a2a",
+            description: "A2A protocol agent with agent card and JSON-RPC endpoint",
+            default_provider: "gemini",
+            features: vec!["standard"],
+        },
     ]
 }
 
@@ -844,6 +850,7 @@ fn create_project(
         "rag" => generate_rag(name, provider),
         "api" => generate_api(name, provider),
         "openai" => generate_basic(name, "openai"),
+        "a2a" => generate_a2a(name, provider, with_yaml),
         _ => {
             return Err(format!(
                 "unknown template '{template}'. Run `cargo adk templates` to see options"
@@ -1239,6 +1246,95 @@ async fn main() -> anyhow::Result<()> {{
     (cargo, main, env)
 }
 
+fn generate_a2a(name: &str, provider: &str, with_yaml: bool) -> (String, String, String) {
+    let (_, model_code, env_var) = provider_dep(provider);
+    let dep = adk_rust_dep(&["standard"]);
+
+    let yaml_feature = if with_yaml {
+        r#"
+# Uncomment to enable YAML agent loading:
+# adk-rust = { version = "...", features = ["standard", "yaml-agent"] }"#
+    } else {
+        ""
+    };
+
+    let cargo = format!(
+        r#"[package]
+name = "{name}"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+{dep}
+tokio = {{ version = "1", features = ["full"] }}
+dotenvy = "0.15"
+anyhow = "1"
+{yaml_feature}"#
+    );
+
+    let yaml_commented_code = if with_yaml {
+        format!(
+            r#"
+    // ── YAML agent loading (requires "yaml-agent" feature) ──────────────
+    // To use the YAML agent definition instead of the Rust builder above,
+    // enable the "yaml-agent" feature in Cargo.toml and replace the agent
+    // creation with:
+    //
+    // use adk_rust::server::YamlAgentLoader;
+    // let loader = YamlAgentLoader::from_dir("agents")?;
+    // let agent = loader.load("{name}").await?;
+    //
+    // Then pass `agent` to A2aServer::builder().agent(agent).
+    // The YAML definition is at: agents/{name}.yaml
+    // ─────────────────────────────────────────────────────────────────────
+"#
+        )
+    } else {
+        String::new()
+    };
+
+    let main = format!(
+        r#"use adk_rust::prelude::*;
+use adk_rust::server::A2aServer;
+use std::sync::Arc;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {{
+    dotenvy::dotenv().ok();
+    let api_key = std::env::var("{env_var}")?;
+
+    {model_code}
+
+    let agent: Arc<dyn Agent> = Arc::new(
+        LlmAgentBuilder::new("{name}")
+            .description("An A2A-capable AI agent")
+            .instruction("You are a helpful assistant exposed via the A2A protocol.")
+            .model(Arc::new(model))
+            .build()?,
+    );
+{yaml_commented_code}
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let addr = format!("0.0.0.0:{{}}", port);
+
+    let server = A2aServer::builder()
+        .agent(agent)
+        .bind_addr(&addr)
+        .build()?;
+
+    println!("A2A agent server running on http://{{addr}}");
+    println!("  GET  /.well-known/agent-card.json — agent card");
+    println!("  POST /jsonrpc                     — JSON-RPC endpoint");
+
+    server.serve().await?;
+    Ok(())
+}}
+"#
+    );
+
+    let env = format!("{env_var}=your-api-key-here\nPORT=8080\n");
+    (cargo, main, env)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1330,12 +1426,13 @@ mod tests {
     #[test]
     fn templates_json_output() {
         let templates = get_builtin_templates();
-        assert_eq!(templates.len(), 5);
+        assert_eq!(templates.len(), 6);
         assert_eq!(templates[0].name, "basic");
         assert_eq!(templates[1].name, "tools");
         assert_eq!(templates[2].name, "rag");
         assert_eq!(templates[3].name, "api");
         assert_eq!(templates[4].name, "openai");
+        assert_eq!(templates[5].name, "a2a");
     }
 
     #[test]
@@ -1390,5 +1487,109 @@ mod tests {
         }
 
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn a2a_template_uses_current_version_and_standard_features() {
+        let (cargo_toml, main_rs, _env) = generate_a2a("test-agent", "gemini", false);
+
+        // Verify current version is used
+        assert!(
+            cargo_toml.contains(&format!(r#"version = "{ADK_VERSION}""#)),
+            "a2a template must use the current cargo-adk package version"
+        );
+
+        // Verify standard features are included
+        assert!(
+            cargo_toml.contains(r#"features = ["standard"]"#),
+            "a2a template must use the standard feature preset"
+        );
+
+        // Verify main.rs references A2aServer
+        assert!(main_rs.contains("A2aServer"), "a2a template main.rs must use A2aServer");
+    }
+
+    // ── Property-Based Tests ────────────────────────────────────────────────
+
+    mod property_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// Generate valid project names: alphanumeric with hyphens, 1-64 chars.
+        fn arb_project_name() -> impl Strategy<Value = String> {
+            "[a-z][a-z0-9-]{0,63}"
+                .prop_filter("must not end with hyphen", |s| !s.ends_with('-') && !s.contains("--"))
+        }
+
+        /// Generate a supported provider.
+        fn arb_provider() -> impl Strategy<Value = &'static str> {
+            prop_oneof![Just("gemini"), Just("openai"), Just("anthropic"),]
+        }
+
+        // **Feature: a2a-simple-scaffolding, Property 1: Template Generation Completeness**
+        // *For any* valid project name (alphanumeric with hyphens, 1-64 chars) and
+        // supported provider (gemini, openai, anthropic), the `a2a` template SHALL
+        // generate a project containing Cargo.toml, src/main.rs, .env.example, and
+        // .gitignore files, and the Cargo.toml SHALL contain the `standard` feature.
+        // **Validates: Requirements 1.1, 1.2, 1.4**
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(100))]
+
+            #[test]
+            fn prop_a2a_template_generation_completeness(
+                name in arb_project_name(),
+                provider in arb_provider(),
+            ) {
+                let tmp = std::env::temp_dir().join(format!("cargo-adk-prop-{name}"));
+                let _ = fs::remove_dir_all(&tmp);
+                fs::create_dir_all(&tmp).unwrap();
+
+                let result = create_project(&name, "a2a", provider, Some(&tmp), false, false);
+                prop_assert!(result.is_ok(), "create_project failed for name={name}, provider={provider}: {:?}", result.err());
+
+                let project_path = tmp.join(&name);
+
+                // All required files must exist
+                prop_assert!(
+                    project_path.join("Cargo.toml").exists(),
+                    "Cargo.toml missing for name={name}"
+                );
+                prop_assert!(
+                    project_path.join("src/main.rs").exists(),
+                    "src/main.rs missing for name={name}"
+                );
+                prop_assert!(
+                    project_path.join(".env.example").exists(),
+                    ".env.example missing for name={name}"
+                );
+                prop_assert!(
+                    project_path.join(".gitignore").exists(),
+                    ".gitignore missing for name={name}"
+                );
+
+                // Cargo.toml must contain the standard feature
+                let cargo_content = fs::read_to_string(project_path.join("Cargo.toml")).unwrap();
+                prop_assert!(
+                    cargo_content.contains(r#"features = ["standard"]"#),
+                    "Cargo.toml missing standard feature for name={name}"
+                );
+
+                // Cargo.toml must contain the current version
+                prop_assert!(
+                    cargo_content.contains(&format!(r#"version = "{ADK_VERSION}""#)),
+                    "Cargo.toml missing current version for name={name}"
+                );
+
+                // main.rs must reference A2aServer
+                let main_content = fs::read_to_string(project_path.join("src/main.rs")).unwrap();
+                prop_assert!(
+                    main_content.contains("A2aServer"),
+                    "main.rs missing A2aServer reference for name={name}"
+                );
+
+                // Clean up
+                let _ = fs::remove_dir_all(&tmp);
+            }
+        }
     }
 }

@@ -84,7 +84,7 @@ sessions = ["dep:adk-session"]
 artifacts = ["dep:adk-artifact"]
 memory = ["dep:adk-memory"]
 runner = ["dep:adk-runner"]
-server = ["dep:adk-server"]
+server = ["dep:adk-server", "adk-server/a2a-v1"]
 telemetry = ["dep:adk-telemetry"]
 telemetry-otlp = ["telemetry", "adk-telemetry/otlp"]
 graph = ["dep:adk-graph"]
@@ -100,6 +100,9 @@ rag = ["dep:adk-rag"]
 payments = ["dep:adk-payments"]
 awp = ["dep:adk-awp"]
 acp = ["dep:adk-acp"]
+
+# A2A protocol feature (forwarded to adk-server)
+a2a = ["server", "adk-server/a2a-v1"]
 
 # Model provider features (forwarded to adk-model)
 gemini = ["models", "adk-model/gemini"]

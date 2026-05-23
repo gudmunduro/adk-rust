@@ -363,7 +363,7 @@ impl RequestHandler {
                 ArtifactId::new(uuid::Uuid::new_v4().to_string()),
                 vec![a2a_protocol_types::Part::text(&response_text)],
             );
-            self.executor.record_artifact(task_id, &context_id, artifact).await?;
+            self.executor.record_artifact(task_id, context_id, artifact).await?;
         }
 
         Ok(())

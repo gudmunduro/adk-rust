@@ -30,3 +30,6 @@ tar = { workspace = true }
 hex = { workspace = true }
 syn = { version = "2", features = ["full", "parsing"] }
 serde_yaml_ng = "0.10"
+
+[dev-dependencies]
+proptest = "1.4"

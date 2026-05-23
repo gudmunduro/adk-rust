@@ -77,6 +77,8 @@ pub use a2a::{
     A2aClient, Executor, ExecutorConfig, RemoteA2aAgent, RemoteA2aAgentBuilder, RemoteA2aConfig,
     build_agent_card, build_agent_skills,
 };
+#[cfg(feature = "a2a-v1")]
+pub use a2a::{A2aServer, A2aServerApp, A2aServerBuilder};
 pub use auth_bridge::{RequestContext, RequestContextError, RequestContextExtractor};
 pub use config::{SecurityConfig, ServerConfig};
 pub use rest::{

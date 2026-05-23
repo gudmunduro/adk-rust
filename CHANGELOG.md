@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A2A Simple Scaffolding** — Dead-simple A2A agent creation:
+  - `A2aServer::quick_start(agent)` — one-liner to expose any agent via A2A protocol
+  - `A2aServer::builder()` — configurable builder for port, agent card metadata, session backend
+  - `cargo adk new my-agent --template a2a` — scaffold a complete A2A project
+  - `--with-yaml` flag support for YAML agent definitions
+  - `a2a` feature alias in umbrella crate (`a2a = ["server", "adk-server/a2a-v1"]`)
+  - `server` feature now includes `a2a-v1` automatically (standard tier gets A2A)
+  - Minimal example at `examples/a2a_quickstart/`
+  - Getting-started documentation at `docs/official_docs/a2a/getting-started.md`
+  - Property tests for template generation, builder composition, and error clarity
+  - Live integration tests against external A2A agents
+
 ## [0.8.5] - 2026-05-19
 
 ### Breaking

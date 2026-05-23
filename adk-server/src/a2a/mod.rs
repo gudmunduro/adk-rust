@@ -43,4 +43,8 @@ pub use interceptor::{
 pub use rate_limit::RateLimitInterceptor;
 
 #[cfg(feature = "a2a-v1")]
+pub mod convenience;
+#[cfg(feature = "a2a-v1")]
+pub use convenience::{A2aServer, A2aServerApp, A2aServerBuilder};
+#[cfg(feature = "a2a-v1")]
 pub mod v1;

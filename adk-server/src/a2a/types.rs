@@ -192,12 +192,13 @@ impl AgentSkill {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AgentCapabilities {
+    #[serde(default)]
     pub streaming: bool,
-    #[serde(rename = "pushNotifications")]
+    #[serde(default, rename = "pushNotifications")]
     pub push_notifications: bool,
-    #[serde(rename = "stateTransitionHistory")]
+    #[serde(default, rename = "stateTransitionHistory")]
     pub state_transition_history: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Vec<String>>,
@@ -209,9 +210,11 @@ pub struct AgentCard {
     pub description: String,
     pub url: String,
     pub version: String,
-    #[serde(rename = "protocolVersion")]
+    #[serde(default, rename = "protocolVersion")]
     pub protocol_version: String,
+    #[serde(default)]
     pub capabilities: AgentCapabilities,
+    #[serde(default)]
     pub skills: Vec<AgentSkill>,
 }
 

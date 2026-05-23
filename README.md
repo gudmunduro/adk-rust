@@ -162,6 +162,7 @@ Built-in tools:
 - **Session Management**: In-memory and SQLite-backed sessions with state persistence, encrypted sessions with AES-256-GCM and key rotation
 - **Memory System**: Long-term memory with semantic search, vector embeddings, and project-scoped isolation
 - **Servers**: REST API with SSE streaming, A2A v1.0.0 protocol for agent-to-agent communication
+- **A2A Quick Start**: `A2aServer::quick_start(agent)` — expose any agent via A2A in one line. Or use `cargo adk new --template a2a` to scaffold a complete project.
 - **Guardrails**: PII redaction, content filtering, JSON schema validation
 - **Tool Authorization**: Human-in-the-loop confirmation, before-tool callbacks, RBAC, graph interrupts
 - **Payments**: ACP and AP2 commerce support through `adk-payments`
