@@ -37,5 +37,6 @@ record-payloads = []
 adk-model = { workspace = true, features = ["gemini"] }
 adk-tool = { workspace = true }
 dotenvy = "0.15"
+proptest = "1.5"
 tempfile = "3"
 tokio = { workspace = true, features = ["rt", "macros"] }

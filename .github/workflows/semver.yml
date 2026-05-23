@@ -53,7 +53,7 @@ jobs:
       run: |
         echo "### Stable-tier crates (fail on breakage)" >> "$GITHUB_STEP_SUMMARY"
         FAILED=0
-        for crate in adk-core adk-agent adk-model adk-gemini adk-tool adk-runner adk-session; do
+        for crate in adk-core adk-agent adk-model adk-gemini adk-tool adk-runner adk-session adk-server adk-graph adk-memory adk-anthropic; do
           echo "Checking $crate..."
           if cargo semver-checks check-release -p "$crate" --default-features; then
             echo "✅ $crate" >> "$GITHUB_STEP_SUMMARY"
@@ -70,8 +70,8 @@ jobs:
     - name: Semver checks — Beta/Experimental (warn only)
       run: |
         echo "### Beta/Experimental crates (warn only)" >> "$GITHUB_STEP_SUMMARY"
-        for crate in adk-server adk-graph adk-memory adk-artifact adk-auth \
-          adk-telemetry adk-guardrail adk-plugin adk-skill adk-anthropic \
+        for crate in adk-artifact adk-auth \
+          adk-telemetry adk-guardrail adk-plugin adk-skill \
           adk-cli adk-realtime adk-browser adk-eval adk-audio; do
           echo "Checking $crate..."
           if cargo semver-checks check-release -p "$crate" --default-features; then

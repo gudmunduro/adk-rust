@@ -1,4 +1,5 @@
 //! Agent-facing `Llm` adapter and extension-bag helpers for OpenRouter.
+#![allow(missing_docs)]
 
 use super::OPENROUTER_EXTENSION_NAMESPACE;
 use super::chat::{

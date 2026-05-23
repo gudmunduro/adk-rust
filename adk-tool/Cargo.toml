@@ -20,7 +20,7 @@ memory-tools = ["dep:adk-memory", "dep:chrono"]
 mcp = ["dep:rmcp"]
 # Enable HTTP transport for remote MCP servers (streamable HTTP)
 http-transport = ["mcp", "rmcp/transport-streamable-http-client-reqwest", "reqwest"]
-# Enable code execution tools (RustCodeTool, etc.)
+# Enable code execution tools (CodeTool, etc.)
 code = ["dep:adk-code", "dep:adk-sandbox"]
 # Enable embedded JavaScript execution (requires boa_engine)
 code-embedded-js = ["code", "adk-code/embedded-js"]
@@ -68,7 +68,12 @@ async-stream.workspace = true
 proptest = "1.5"
 tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
 adk-code = { workspace = true }
+adk-sandbox = { workspace = true }
 
 [[test]]
 name = "mcp_server_lifecycle_integration_tests"
+required-features = ["mcp"]
+
+[[test]]
+name = "mcp_roundtrip_property_tests"
 required-features = ["mcp"]

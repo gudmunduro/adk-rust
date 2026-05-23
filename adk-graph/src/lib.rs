@@ -67,6 +67,7 @@
 
 pub mod agent;
 pub mod checkpoint;
+pub mod deferred;
 pub mod edge;
 pub mod error;
 pub mod executor;
@@ -75,6 +76,16 @@ pub mod interrupt;
 pub mod node;
 pub mod state;
 pub mod stream;
+pub mod timeout;
+
+#[cfg(feature = "node-cache")]
+pub mod cache;
+
+#[cfg(feature = "delta-checkpoint")]
+pub mod delta;
+
+#[cfg(feature = "time-travel")]
+pub mod time_travel;
 
 #[cfg(feature = "action")]
 pub mod action;
@@ -84,6 +95,7 @@ pub mod workflow;
 // Re-exports
 pub use agent::{GraphAgent, GraphAgentBuilder};
 pub use checkpoint::{Checkpointer, MemoryCheckpointer};
+pub use deferred::{DeferredNodeConfig, FanInTracker, MergeStrategy};
 pub use edge::{END, Edge, EdgeTarget, Router, START};
 pub use error::{GraphError, InterruptedExecution, Result};
 pub use executor::PregelExecutor;
@@ -92,14 +104,27 @@ pub use interrupt::{Interrupt, interrupt, interrupt_with_data};
 pub use node::{AgentNode, ExecutionConfig, FunctionNode, Node, NodeContext, NodeOutput};
 pub use state::{Channel, Checkpoint, Reducer, State, StateSchema, StateSchemaBuilder};
 pub use stream::{StreamEvent, StreamMode};
+pub use timeout::{OnTimeout, ProgressHandle, TimeoutPolicy, execute_with_timeout};
 
 #[cfg(feature = "sqlite")]
 pub use checkpoint::SqliteCheckpointer;
+
+#[cfg(feature = "node-cache")]
+pub use cache::{CacheBackend, NodeCache, NodeCachePolicy, compute_cache_key};
+
+#[cfg(feature = "delta-checkpoint")]
+pub use delta::{
+    CheckpointType, DeltaCheckpointer, DeltaConfig, Diff, MapDelta, StringDelta, StringOp, VecDelta,
+};
+
+#[cfg(feature = "time-travel")]
+pub use time_travel::{StepInfo, TimeTravelHandle};
 
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::agent::{GraphAgent, GraphAgentBuilder};
     pub use crate::checkpoint::{Checkpointer, MemoryCheckpointer};
+    pub use crate::deferred::{DeferredNodeConfig, FanInTracker, MergeStrategy};
     pub use crate::edge::{END, Edge, EdgeTarget, Router, START};
     pub use crate::error::{GraphError, InterruptedExecution, Result};
     pub use crate::graph::{CompiledGraph, StateGraph};

@@ -3,10 +3,12 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::sync::Arc;
 
+/// A control-flow tool that signals a loop agent to exit its iteration cycle.
 #[derive(Default)]
 pub struct ExitLoopTool;
 
 impl ExitLoopTool {
+    /// Create a new `ExitLoopTool`.
     pub fn new() -> Self {
         Self
     }

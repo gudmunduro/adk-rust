@@ -20,7 +20,9 @@ pub const MAX_INLINE_DATA_SIZE: usize = 10 * 1024 * 1024;
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InlineDataPart {
+    /// MIME type of the inline data (e.g., "image/png", "audio/wav").
     pub mime_type: String,
+    /// Raw binary data.
     pub data: Vec<u8>,
 }
 
@@ -40,13 +42,18 @@ pub struct InlineDataPart {
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileDataPart {
+    /// MIME type of the file (e.g., "application/pdf").
     pub mime_type: String,
+    /// URI to the file (URL, gs://, etc.).
     pub file_uri: String,
 }
 
+/// Data for a function (tool) response, including optional multimodal parts.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionResponseData {
+    /// Name of the function that produced this response.
     pub name: String,
+    /// The JSON response payload from the function.
     pub response: serde_json::Value,
     /// Optional inline binary data parts (images, audio, PDFs).
     /// Each part is validated against [`MAX_INLINE_DATA_SIZE`] on construction.
@@ -167,12 +174,19 @@ impl FunctionResponseData {
     }
 }
 
+/// A message in a conversation, consisting of a role and content parts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Content {
+    /// The role of this content's author (e.g., "user", "model", "function").
     pub role: String,
+    /// The parts that make up this content (text, data, function calls, etc.).
     pub parts: Vec<Part>,
 }
 
+/// A single part of a [`Content`] message.
+///
+/// Parts can be text, binary data, file references, function calls/responses,
+/// thinking traces, or server-side tool interactions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Part {
@@ -181,15 +195,22 @@ pub enum Part {
     /// Must be placed before `Text` in the enum so that `#[serde(untagged)]`
     /// deserialization matches `{"thinking": "..."}` before falling through to `Text`.
     Thinking {
+        /// The reasoning/thinking text.
         thinking: String,
+        /// Optional cryptographic signature for thought verification.
         #[serde(skip_serializing_if = "Option::is_none")]
         signature: Option<String>,
     },
+    /// Plain text content.
     Text {
+        /// The text content.
         text: String,
     },
+    /// Inline binary data (images, audio, etc.).
     InlineData {
+        /// MIME type of the data.
         mime_type: String,
+        /// Raw binary data.
         data: Vec<u8>,
     },
     /// File data referenced by URI (URL or cloud storage path).
@@ -213,8 +234,11 @@ pub enum Part {
         /// URI to the file (URL, gs://, etc.)
         file_uri: String,
     },
+    /// A function (tool) call from the model.
     FunctionCall {
+        /// Name of the function to call.
         name: String,
+        /// Arguments as a JSON value.
         args: serde_json::Value,
         /// Tool call ID for OpenAI-style providers. None for Gemini.
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -225,8 +249,10 @@ pub enum Part {
         #[serde(skip_serializing_if = "Option::is_none")]
         thought_signature: Option<String>,
     },
+    /// A function (tool) response.
     #[serde(rename_all = "camelCase")]
     FunctionResponse {
+        /// The function response data.
         function_response: FunctionResponseData,
         /// Tool call ID for OpenAI-style providers. None for Gemini.
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -235,20 +261,24 @@ pub enum Part {
     /// Server-side tool call data from Gemini 3 built-in tool invocations.
     /// Stored as opaque JSON to avoid coupling core types to provider-specific schemas.
     ServerToolCall {
+        /// Opaque JSON payload for the server tool call.
         server_tool_call: serde_json::Value,
     },
     /// Server-side tool response data from Gemini 3 built-in tool invocations.
     /// Stored as opaque JSON to avoid coupling core types to provider-specific schemas.
     ServerToolResponse {
+        /// Opaque JSON payload for the server tool response.
         server_tool_response: serde_json::Value,
     },
 }
 
 impl Content {
+    /// Creates a new empty content with the given role.
     pub fn new(role: impl Into<String>) -> Self {
         Self { role: role.into(), parts: Vec::new() }
     }
 
+    /// Appends a text part to this content.
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.parts.push(Part::Text { text: text.into() });
         self

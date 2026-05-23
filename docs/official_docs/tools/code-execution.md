@@ -99,17 +99,17 @@ User code must provide `fn run(input: serde_json::Value) -> serde_json::Value`. 
 
 ## Migration from Previous API
 
-The previous `adk-code` types (`CodeExecutor`, `ExecutionRequest`, `RustSandboxExecutor`) and `adk-tool`'s `RustCodeTool` are deprecated. Use the new types instead:
+The previous `adk-code` types (`CodeExecutor`, `ExecutionRequest`, `RustSandboxExecutor`) and `adk-tool`'s `RustCodeTool` have been removed. Use the new types instead:
 
-| Deprecated | Replacement | Crate |
-|------------|-------------|-------|
-| `RustCodeTool` | `CodeTool` | `adk-code` |
+| Removed | Replacement | Crate |
+|---------|-------------|-------|
+| `RustCodeTool` (removed in 0.8.0) | `CodeTool` | `adk-code` |
 | `RustSandboxExecutor` | `RustExecutor` | `adk-code` |
 | `ExecutionRequest` | `ExecRequest` | `adk-sandbox` |
 | `ExecutionResult` | `ExecResult` | `adk-sandbox` |
 | `CodeExecutor` | `SandboxBackend` | `adk-sandbox` |
 
-See `adk_code::compat` for the full migration guide. Deprecated aliases compile with warnings for one release cycle.
+See `adk_code::compat` for the full migration guide.
 
 ## Browser JavaScript
 

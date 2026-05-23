@@ -1,16 +1,21 @@
 use adk_core::{Llm, LlmRequest, LlmResponse, LlmResponseStream, Result};
 use async_trait::async_trait;
 
+/// A mock LLM implementation for testing without real API calls.
+///
+/// Returns pre-configured responses in order when `generate_content` is called.
 pub struct MockLlm {
     name: String,
     responses: Vec<LlmResponse>,
 }
 
 impl MockLlm {
+    /// Create a new mock LLM with the given name.
     pub fn new(name: impl Into<String>) -> Self {
         Self { name: name.into(), responses: vec![] }
     }
 
+    /// Add a response to the queue of responses returned by this mock.
     pub fn with_response(mut self, response: LlmResponse) -> Self {
         self.responses.push(response);
         self

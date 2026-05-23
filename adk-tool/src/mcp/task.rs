@@ -139,13 +139,28 @@ pub enum TaskError {
     /// Task polling failed
     PollFailed(String),
     /// Task timed out
-    Timeout { task_id: String, elapsed_ms: u64 },
+    Timeout {
+        /// ID of the timed-out task.
+        task_id: String,
+        /// Elapsed time in milliseconds before timeout.
+        elapsed_ms: u64,
+    },
     /// Task was cancelled
     Cancelled(String),
     /// Task failed with error
-    TaskFailed { task_id: String, error: String },
+    TaskFailed {
+        /// ID of the failed task.
+        task_id: String,
+        /// Error message from the task.
+        error: String,
+    },
     /// Maximum poll attempts exceeded
-    MaxAttemptsExceeded { task_id: String, attempts: u32 },
+    MaxAttemptsExceeded {
+        /// ID of the task that exceeded attempts.
+        task_id: String,
+        /// Number of attempts made.
+        attempts: u32,
+    },
 }
 
 impl std::fmt::Display for TaskError {

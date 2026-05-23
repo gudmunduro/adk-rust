@@ -219,11 +219,11 @@ fn arb_chain_referencing_schema() -> impl Strategy<Value = (Value, Map<String, V
 fn max_depth(value: &Value) -> usize {
     match value {
         Value::Object(map) => {
-            let child_max = map.values().map(|v| max_depth(v)).max().unwrap_or(0);
+            let child_max = map.values().map(max_depth).max().unwrap_or(0);
             1 + child_max
         }
         Value::Array(arr) => {
-            let child_max = arr.iter().map(|v| max_depth(v)).max().unwrap_or(0);
+            let child_max = arr.iter().map(max_depth).max().unwrap_or(0);
             1 + child_max
         }
         _ => 1,

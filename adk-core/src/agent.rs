@@ -4,14 +4,25 @@ use futures::stream::Stream;
 use std::pin::Pin;
 use std::sync::Arc;
 
+/// A pinned, boxed stream of [`Event`] results emitted by an agent during execution.
 pub type EventStream = Pin<Box<dyn Stream<Item = Result<Event>> + Send>>;
 
+/// The fundamental trait for all ADK agents.
+///
+/// Every agent — whether a simple LLM wrapper, a multi-step workflow, or a
+/// composite orchestrator — implements this trait. The runtime invokes
+/// [`run`](Self::run) with an [`InvocationContext`] and consumes the returned
+/// [`EventStream`].
 #[async_trait]
 pub trait Agent: Send + Sync {
+    /// Returns the unique name of this agent.
     fn name(&self) -> &str;
+    /// Returns a human-readable description of this agent's purpose.
     fn description(&self) -> &str;
+    /// Returns the child agents managed by this agent.
     fn sub_agents(&self) -> &[Arc<dyn Agent>];
 
+    /// Executes the agent and returns a stream of events.
     async fn run(&self, ctx: Arc<dyn InvocationContext>) -> Result<EventStream>;
 }
 

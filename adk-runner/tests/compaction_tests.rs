@@ -4,7 +4,7 @@ use adk_core::{
     Agent, BaseEventsSummarizer, Content, Event, EventActions, EventCompaction, EventStream,
     EventsCompactionConfig, InvocationContext, Part, Result, SessionId, UserId,
 };
-use adk_runner::{MutableSession, Runner, RunnerConfig};
+use adk_runner::{MutableSession, Runner};
 use adk_session::{Events, GetRequest, Session, SessionService, State};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
@@ -335,23 +335,13 @@ async fn test_runner_triggers_compaction_at_interval() {
         summarizer: summarizer.clone(),
     };
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent,
-        session_service: session_service.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: Some(compaction_config),
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(agent as Arc<dyn Agent>)
+        .session_service(session_service.clone() as Arc<dyn SessionService>)
+        .compaction_config(compaction_config)
+        .build()
+        .unwrap();
 
     let content = Content::new("user").with_text("Hello");
     let mut stream = runner
@@ -399,23 +389,13 @@ async fn test_runner_no_compaction_before_interval() {
         summarizer: summarizer.clone(),
     };
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent,
-        session_service: session_service.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: Some(compaction_config),
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(agent as Arc<dyn Agent>)
+        .session_service(session_service.clone() as Arc<dyn SessionService>)
+        .compaction_config(compaction_config)
+        .build()
+        .unwrap();
 
     let content = Content::new("user").with_text("Hello");
     let mut stream = runner

@@ -21,8 +21,8 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tracing::{debug, info};
 
-use crate::audit::{AuditEvent, AuditEventType, AuditFilter, AuditOutcome, AuditSink};
 use crate::AuthError;
+use crate::audit::{AuditEvent, AuditEventType, AuditFilter, AuditOutcome, AuditSink};
 
 /// PostgreSQL-backed audit sink.
 ///
@@ -147,7 +147,10 @@ impl AuditSink for PostgresAuditSink {
             return Ok(());
         }
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| AuthError::AuditError(format!("transaction begin failed: {e}")))?;
 
         for event in &events {
@@ -188,7 +191,8 @@ impl AuditSink for PostgresAuditSink {
             .map_err(|e| AuthError::AuditError(format!("batch insert failed: {e}")))?;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| AuthError::AuditError(format!("transaction commit failed: {e}")))?;
 
         debug!(count = events.len(), "audit batch logged to postgres");
@@ -338,15 +342,14 @@ struct AuditRow {
 
 impl AuditRow {
     fn into_event(self) -> AuditEvent {
-        let event_type = serde_json::from_value::<AuditEventType>(
-            serde_json::Value::String(self.event_type.clone()),
-        )
+        let event_type = serde_json::from_value::<AuditEventType>(serde_json::Value::String(
+            self.event_type.clone(),
+        ))
         .unwrap_or(AuditEventType::Custom(self.event_type));
 
-        let outcome = serde_json::from_value::<AuditOutcome>(
-            serde_json::Value::String(self.outcome.clone()),
-        )
-        .unwrap_or(AuditOutcome::Error);
+        let outcome =
+            serde_json::from_value::<AuditOutcome>(serde_json::Value::String(self.outcome.clone()))
+                .unwrap_or(AuditOutcome::Error);
 
         AuditEvent {
             timestamp: self.timestamp,

@@ -22,11 +22,15 @@ pub type AfterToolCallback = Box<
     dyn Fn(Arc<dyn CallbackContext>) -> BoxFuture<'static, Result<Option<Content>>> + Send + Sync,
 >;
 
-/// Collection of all callback types
+/// Collection of all callback types for intercepting model and tool execution.
 pub struct Callbacks {
+    /// Callbacks invoked before each model call.
     pub before_model: Vec<BeforeModelCallback>,
+    /// Callbacks invoked after each model call.
     pub after_model: Vec<AfterModelCallback>,
+    /// Callbacks invoked before each tool execution.
     pub before_tool: Vec<BeforeToolCallback>,
+    /// Callbacks invoked after each tool execution.
     pub after_tool: Vec<AfterToolCallback>,
 }
 
@@ -37,6 +41,7 @@ impl Default for Callbacks {
 }
 
 impl Callbacks {
+    /// Create an empty callback collection.
     pub fn new() -> Self {
         Self {
             before_model: Vec::new(),
@@ -46,18 +51,22 @@ impl Callbacks {
         }
     }
 
+    /// Register a callback to run before each model call.
     pub fn add_before_model(&mut self, callback: BeforeModelCallback) {
         self.before_model.push(callback);
     }
 
+    /// Register a callback to run after each model call.
     pub fn add_after_model(&mut self, callback: AfterModelCallback) {
         self.after_model.push(callback);
     }
 
+    /// Register a callback to run before each tool execution.
     pub fn add_before_tool(&mut self, callback: BeforeToolCallback) {
         self.before_tool.push(callback);
     }
 
+    /// Register a callback to run after each tool execution.
     pub fn add_after_tool(&mut self, callback: AfterToolCallback) {
         self.after_tool.push(callback);
     }

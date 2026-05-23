@@ -522,7 +522,7 @@ impl McpToolset<super::elicitation::AdkClientHandler> {
     /// [`SamplingHandler`](crate::sampling::SamplingHandler).
     ///
     /// An elicitation handler is also required because `AdkClientHandler` always
-    /// advertises elicitation. Use [`AutoDeclineElicitationHandler`] if you don't
+    /// advertises elicitation. Use [`AutoDeclineElicitationHandler`](super::elicitation::AutoDeclineElicitationHandler) if you don't
     /// need custom elicitation behavior.
     ///
     /// # Example

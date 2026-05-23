@@ -16,14 +16,24 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
 
+/// Configuration for constructing a [`Runner`].
+///
+/// Use [`Runner::builder()`] for a compile-time-safe way to construct this.
+#[non_exhaustive]
 pub struct RunnerConfig {
+    /// Application name used for session scoping.
     pub app_name: String,
+    /// The root agent to execute.
     pub agent: Arc<dyn Agent>,
+    /// Session persistence backend.
     pub session_service: Arc<dyn SessionService>,
     #[cfg(feature = "artifacts")]
+    /// Optional artifact storage service.
     pub artifact_service: Option<Arc<dyn ArtifactService>>,
+    /// Optional memory/RAG service.
     pub memory_service: Option<Arc<dyn Memory>>,
     #[cfg(feature = "plugins")]
+    /// Optional plugin manager for lifecycle hooks.
     pub plugin_manager: Option<Arc<PluginManager>>,
     /// Optional run configuration (streaming mode, etc.)
     /// If not provided, uses default (SSE streaming)
@@ -57,8 +67,22 @@ pub struct RunnerConfig {
     /// Optional summarizer for intra-invocation compaction.
     /// Required when `intra_compaction_config` is set.
     pub intra_compaction_summarizer: Option<Arc<dyn adk_core::BaseEventsSummarizer>>,
+    /// Optional context compaction configuration for token-budget overflow handling.
+    ///
+    /// When set, the runner applies the configured [`CompactionStrategy`](crate::compaction::CompactionStrategy)
+    /// to shrink the event history when the context exceeds the token budget,
+    /// retrying the model request up to `max_retries` times.
+    ///
+    /// This field is only available when the `context-compaction` feature is enabled.
+    #[cfg(feature = "context-compaction")]
+    pub context_compaction: Option<crate::compaction::CompactionConfig>,
 }
 
+/// Agent execution runtime.
+///
+/// Orchestrates session retrieval, agent dispatch, event streaming, context
+/// caching, and compaction. Construct via [`Runner::builder()`] or
+/// [`Runner::new()`].
 pub struct Runner {
     app_name: String,
     root_agent: Arc<dyn Agent>,
@@ -78,6 +102,9 @@ pub struct Runner {
     request_context: Option<adk_core::RequestContext>,
     cancellation_token: Option<CancellationToken>,
     intra_compactor: Option<Arc<crate::intra_compaction::IntraInvocationCompactor>>,
+    /// Optional context compaction configuration for token-budget overflow handling.
+    #[cfg(feature = "context-compaction")]
+    context_compaction: Option<Arc<crate::compaction::CompactionConfig>>,
     /// Per-session cancellation tokens for the interrupt API.
     /// Each `run()` call registers a token here; `interrupt()` cancels it.
     active_sessions: Arc<std::sync::Mutex<std::collections::HashMap<String, CancellationToken>>>,
@@ -107,6 +134,9 @@ impl Runner {
         crate::builder::RunnerConfigBuilder::new()
     }
 
+    /// Create a new runner from a [`RunnerConfig`].
+    ///
+    /// Prefer [`Runner::builder()`] for a compile-time-safe construction API.
     pub fn new(config: RunnerConfig) -> Result<Self> {
         let run_config = config.run_config.unwrap_or_default();
 
@@ -148,6 +178,8 @@ impl Runner {
             request_context: config.request_context,
             cancellation_token: config.cancellation_token,
             intra_compactor,
+            #[cfg(feature = "context-compaction")]
+            context_compaction: config.context_compaction.map(Arc::new),
             active_sessions: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         })
     }
@@ -189,6 +221,10 @@ impl Runner {
         Ok(())
     }
 
+    /// Execute the root agent for the given user and session, returning an event stream.
+    ///
+    /// Retrieves (or creates) the session, resolves the target agent, runs
+    /// plugins/skills, and streams events as the agent executes.
     pub async fn run(
         &self,
         user_id: UserId,
@@ -214,6 +250,8 @@ impl Runner {
         let request_context = self.request_context.clone();
         let cancellation_token = self.cancellation_token.clone();
         let intra_compactor = self.intra_compactor.clone();
+        #[cfg(feature = "context-compaction")]
+        let context_compaction = self.context_compaction.clone();
 
         // Register a per-session cancellation token for the interrupt API.
         // If a global token is configured, create a child token so that
@@ -580,6 +618,34 @@ impl Runner {
                 }
             }
 
+            // ===== CONTEXT COMPACTION (TOKEN BUDGET) =====
+            // If context-compaction is configured, proactively check the estimated
+            // token count before calling the agent. If it exceeds the budget,
+            // apply compaction to bring it under the limit.
+            #[cfg(feature = "context-compaction")]
+            if let Some(ref cc_config) = context_compaction {
+                let session_events = ctx.mutable_session().events_snapshot();
+                let estimated = crate::compaction::estimate_event_tokens(&session_events);
+                if estimated > cc_config.context_budget {
+                    tracing::info!(
+                        estimated_tokens = estimated,
+                        budget = cc_config.context_budget,
+                        "context exceeds budget, applying proactive compaction"
+                    );
+                    match crate::compaction::apply_compaction_with_retry(cc_config, session_events).await {
+                        Ok(compacted) => {
+                            ctx.mutable_session().replace_events(compacted);
+                            tracing::info!("proactive context compaction succeeded");
+                        }
+                        Err(e) => {
+                            // Proactive compaction failed — proceed anyway and let the
+                            // model reject the request if it's truly too large.
+                            tracing::warn!(error = %e, "proactive context compaction failed, proceeding with full context");
+                        }
+                    }
+                }
+            }
+
             // Run the agent with instrumentation (ADK-Go style attributes)
             let agent_span = tracing::info_span!(
                 "agent.execute",
@@ -594,8 +660,44 @@ impl Runner {
                 "adk.skills.selected_id" = %selected_skill_id
             );
 
-            let mut agent_stream = match agent_to_run.run(ctx.clone()).instrument(agent_span).await {
+            let mut agent_stream = match agent_to_run.run(ctx.clone()).instrument(agent_span.clone()).await {
                 Ok(s) => s,
+                #[cfg(feature = "context-compaction")]
+                Err(e) if context_compaction.is_some() && crate::compaction::is_token_limit_error(&e) => {
+                    // Token limit error on agent.run() — apply compaction and retry
+                    let cc_config = context_compaction.as_ref().unwrap();
+                    tracing::warn!(
+                        error = %e,
+                        "agent execution failed with token limit error, attempting compaction"
+                    );
+                    let session_events = ctx.mutable_session().events_snapshot();
+                    match crate::compaction::apply_compaction_with_retry(cc_config, session_events).await {
+                        Ok(compacted) => {
+                            ctx.mutable_session().replace_events(compacted);
+                            tracing::info!("context compaction succeeded after token limit error, retrying agent");
+                            // Retry the agent call with compacted context
+                            match agent_to_run.run(ctx.clone()).instrument(agent_span).await {
+                                Ok(s) => s,
+                                Err(retry_err) => {
+                                    #[cfg(feature = "plugins")]
+                                    if let Some(manager) = plugin_manager.as_ref() {
+                                        manager.run_after_run(ctx.clone() as Arc<dyn adk_core::InvocationContext>).await;
+                                    }
+                                    yield Err(retry_err);
+                                    return;
+                                }
+                            }
+                        }
+                        Err(compaction_err) => {
+                            #[cfg(feature = "plugins")]
+                            if let Some(manager) = plugin_manager.as_ref() {
+                                manager.run_after_run(ctx.clone() as Arc<dyn adk_core::InvocationContext>).await;
+                            }
+                            yield Err(compaction_err);
+                            return;
+                        }
+                    }
+                }
                 Err(e) => {
                     #[cfg(feature = "plugins")]
                     if let Some(manager) = plugin_manager.as_ref() {
@@ -1001,6 +1103,15 @@ impl Runner {
     pub fn active_session_ids(&self) -> Vec<String> {
         let sessions = self.active_sessions.lock().unwrap();
         sessions.keys().cloned().collect()
+    }
+
+    /// Returns a reference to the context compaction configuration, if set.
+    ///
+    /// This is used by the runner's generate_content loop to detect token limit
+    /// errors and apply compaction strategies before retrying.
+    #[cfg(feature = "context-compaction")]
+    pub fn context_compaction(&self) -> Option<&crate::compaction::CompactionConfig> {
+        self.context_compaction.as_deref()
     }
 
     /// Find which agent should handle the request based on session history

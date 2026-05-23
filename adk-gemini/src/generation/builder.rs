@@ -15,6 +15,7 @@ use crate::{
 /// Builder for content generation requests
 pub struct ContentBuilder {
     client: Arc<GeminiClient>,
+    /// The conversation contents accumulated so far.
     pub contents: Vec<Content>,
     generation_config: Option<GenerationConfig>,
     tools: Option<Vec<Tool>>,

@@ -6,11 +6,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::pin::Pin;
 
+/// A pinned, boxed stream of [`LlmResponse`] results from a model.
 pub type LlmResponseStream = Pin<Box<dyn Stream<Item = Result<LlmResponse>> + Send>>;
 
+/// The core trait for all LLM providers.
+///
+/// Implementations wrap a specific model API (Gemini, OpenAI, Anthropic, etc.)
+/// and produce a stream of responses for a given request.
 #[async_trait]
 pub trait Llm: Send + Sync {
+    /// Returns the model identifier (e.g., "gemini-2.5-flash").
     fn name(&self) -> &str;
+    /// Generates content from the given request, optionally streaming.
     async fn generate_content(&self, req: LlmRequest, stream: bool) -> Result<LlmResponseStream>;
 
     /// Returns the schema adapter for this provider.
@@ -27,31 +34,47 @@ pub trait Llm: Send + Sync {
     }
 }
 
+/// A request to an LLM provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmRequest {
+    /// The model identifier to use for generation.
     pub model: String,
+    /// The conversation contents (system, user, model messages).
     pub contents: Vec<Content>,
+    /// Optional generation configuration (temperature, tokens, etc.).
     pub config: Option<GenerateContentConfig>,
+    /// Tool declarations keyed by tool name.
     #[serde(skip)]
     pub tools: HashMap<String, serde_json::Value>,
 }
 
+/// Configuration for LLM content generation.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GenerateContentConfig {
+    /// Sampling temperature (0.0 = deterministic, higher = more random).
     pub temperature: Option<f32>,
+    /// Nucleus sampling threshold.
     pub top_p: Option<f32>,
+    /// Top-k sampling parameter.
     pub top_k: Option<i32>,
+    /// Frequency penalty to reduce repetition.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub frequency_penalty: Option<f32>,
+    /// Presence penalty to encourage topic diversity.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub presence_penalty: Option<f32>,
+    /// Maximum number of output tokens to generate.
     pub max_output_tokens: Option<i32>,
+    /// Random seed for reproducible generation.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub seed: Option<i64>,
+    /// Number of top log probabilities to return per token.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub top_logprobs: Option<u8>,
+    /// Sequences that stop generation when encountered.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stop_sequences: Vec<String>,
+    /// JSON Schema for structured output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response_schema: Option<serde_json::Value>,
 
@@ -65,18 +88,29 @@ pub struct GenerateContentConfig {
     pub extensions: serde_json::Map<String, serde_json::Value>,
 }
 
+/// A response from an LLM provider.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LlmResponse {
+    /// The generated content (text, function calls, etc.).
     pub content: Option<Content>,
+    /// Token usage statistics.
     pub usage_metadata: Option<UsageMetadata>,
+    /// Reason the model stopped generating.
     pub finish_reason: Option<FinishReason>,
+    /// Citation sources referenced in the response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub citation_metadata: Option<CitationMetadata>,
+    /// Whether this is a partial streaming chunk.
     pub partial: bool,
+    /// Whether the model has finished its turn.
     pub turn_complete: bool,
+    /// Whether the response was interrupted.
     pub interrupted: bool,
+    /// Error code from the provider, if any.
     pub error_code: Option<String>,
+    /// Error message from the provider, if any.
     pub error_message: Option<String>,
+    /// Provider-specific metadata (e.g., response IDs, routing info).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub provider_metadata: Option<serde_json::Value>,
 }
@@ -158,33 +192,45 @@ impl Default for ContextCacheConfig {
     }
 }
 
+/// Token usage statistics from an LLM response.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UsageMetadata {
+    /// Number of tokens in the prompt.
     pub prompt_token_count: i32,
+    /// Number of tokens in the generated response.
     pub candidates_token_count: i32,
+    /// Total tokens (prompt + response).
     pub total_token_count: i32,
 
+    /// Tokens read from cache (Gemini/Anthropic).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cache_read_input_token_count: Option<i32>,
 
+    /// Tokens written to cache during this request.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cache_creation_input_token_count: Option<i32>,
 
+    /// Tokens used for thinking/reasoning (thinking models).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub thinking_token_count: Option<i32>,
 
+    /// Audio input tokens (multimodal models).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub audio_input_token_count: Option<i32>,
 
+    /// Audio output tokens (multimodal models).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub audio_output_token_count: Option<i32>,
 
+    /// Estimated cost in USD for this request.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cost: Option<f64>,
 
+    /// Whether this request used a bring-your-own-key provider.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub is_byok: Option<bool>,
 
+    /// Provider-specific usage details (e.g., server tool use, video tokens).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub provider_usage: Option<serde_json::Value>,
 }
@@ -193,6 +239,7 @@ pub struct UsageMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CitationMetadata {
+    /// The list of citation sources in this response.
     #[serde(default)]
     pub citation_sources: Vec<CitationSource>,
 }
@@ -201,24 +248,37 @@ pub struct CitationMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CitationSource {
+    /// URI of the cited source.
     pub uri: Option<String>,
+    /// Title of the cited source.
     pub title: Option<String>,
+    /// Start character index in the response text.
     pub start_index: Option<i32>,
+    /// End character index in the response text.
     pub end_index: Option<i32>,
+    /// License of the cited source.
     pub license: Option<String>,
+    /// Publication date of the cited source.
     pub publication_date: Option<String>,
 }
 
+/// Reason the model stopped generating content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FinishReason {
+    /// Natural stop (end of response).
     Stop,
+    /// Hit the maximum token limit.
     MaxTokens,
+    /// Content filtered for safety.
     Safety,
+    /// Content blocked due to recitation/copyright.
     Recitation,
+    /// Other/unknown reason.
     Other,
 }
 
 impl LlmRequest {
+    /// Creates a new request with the given model and contents.
     pub fn new(model: impl Into<String>, contents: Vec<Content>) -> Self {
         Self { model: model.into(), contents, config: None, tools: HashMap::new() }
     }
@@ -238,6 +298,7 @@ impl LlmRequest {
 }
 
 impl LlmResponse {
+    /// Creates a complete (non-streaming) response with the given content.
     pub fn new(content: Content) -> Self {
         Self {
             content: Some(content),

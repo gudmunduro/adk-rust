@@ -16,7 +16,7 @@ use adk_core::{
     Agent, Content, EventStream, InvocationContext, Part, Result, Tool, ToolContext,
     ToolExecutionStrategy,
 };
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::InMemorySessionService;
 use adk_tool::{FunctionTool, SimpleToolContext, StatefulTool};
 use async_trait::async_trait;
@@ -207,25 +207,14 @@ async fn validate_runner_builder() {
         );
     }
 
-    // Old-style struct literal still works (backward compat)
-    let _runner_old = Runner::new(RunnerConfig {
-        app_name: "old-style".to_string(),
-        agent: Arc::new(EchoAgent) as Arc<dyn Agent>,
-        session_service: session_service.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
+    // Builder pattern is the recommended way to construct a Runner
+    let _runner_via_builder = Runner::builder()
+        .app_name("builder-style")
+        .agent(Arc::new(EchoAgent) as Arc<dyn Agent>)
+        .session_service(session_service.clone())
+        .build()
     .unwrap();
-    println!("  ✓ Runner::new(RunnerConfig {{ ... }}) still works (backward compat)");
+    println!("  ✓ Runner::builder().app_name(...).agent(...).session_service(...).build() works");
 
     drop(runner);
 }

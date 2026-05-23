@@ -5,7 +5,7 @@
 //!
 //! ## Available Tools
 //!
-//! - [`RustCodeTool`] — Primary Rust-first code execution tool using [`RustSandboxExecutor`].
+//! - [`CodeTool`] — Recommended Rust code execution tool using `RustExecutor` + `SandboxBackend`.
 //! - [`FrontendCodeTool`] — Placeholder frontend preset for collaborative workspace examples.
 //! - [`JavaScriptCodeTool`] — Secondary scripting preset for lightweight transforms.
 //! - [`PythonCodeTool`] — Container-backed Python execution preset.
@@ -13,13 +13,13 @@
 //! ## Scope Model
 //!
 //! Each tool declares the authorization scopes it requires via
-//! [`Tool::required_scopes()`].  When a [`ScopeGuard`](adk_auth::ScopeGuard)
+//! `Tool::required_scopes()`.  When a `ScopeGuard` (from `adk_auth`)
 //! is active, the framework checks that the calling user possesses **all**
 //! declared scopes before dispatching execution.
 //!
 //! | Tool | Required Scopes | Rationale |
 //! |------|----------------|-----------|
-//! | [`RustCodeTool`] | `code:execute`, `code:execute:rust` | Sandboxed Rust execution with strict defaults |
+//! | [`CodeTool`] | `code:execute`, `code:execute:rust` | Sandboxed Rust execution with strict defaults |
 //! | [`JavaScriptCodeTool`] | `code:execute` | In-process embedded JS, no elevated access |
 //! | [`PythonCodeTool`] | `code:execute`, `code:execute:container` | Container-backed, elevated mode |
 //! | [`FrontendCodeTool`] | `code:execute`, `code:execute:container` | Container-backed, elevated mode |
@@ -46,11 +46,11 @@
 //! ## Quick Start
 //!
 //! ```rust,ignore
-//! use adk_tool::{RustCodeTool, FrontendCodeTool, JavaScriptCodeTool, PythonCodeTool};
+//! use adk_tool::{CodeTool, FrontendCodeTool, JavaScriptCodeTool, PythonCodeTool};
 //! use std::sync::Arc;
 //!
-//! // Backend specialist
-//! let backend_tool = Arc::new(RustCodeTool::backend());
+//! // Rust code execution (recommended)
+//! let rust_tool = Arc::new(CodeTool::new());
 //!
 //! // Frontend specialist (placeholder until container backend ships)
 //! let frontend_tool = Arc::new(FrontendCodeTool::react());
@@ -65,15 +65,11 @@
 mod frontend_code_tool;
 mod javascript_code_tool;
 mod python_code_tool;
-mod rust_code_tool;
 
 pub use frontend_code_tool::FrontendCodeTool;
 pub use javascript_code_tool::JavaScriptCodeTool;
 pub use python_code_tool::PythonCodeTool;
-#[allow(deprecated)]
-pub use rust_code_tool::RustCodeTool;
 
-/// Re-export [`adk_code::CodeTool`] as the recommended replacement for
-/// the deprecated [`RustCodeTool`].
+/// Re-export [`adk_code::CodeTool`] as the recommended code execution tool.
 #[cfg(feature = "code")]
 pub use adk_code::CodeTool;

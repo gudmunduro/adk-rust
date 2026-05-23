@@ -57,13 +57,18 @@
 //! let toolset = McpToolset::new(client);
 //! ```
 
+#![deny(missing_docs)]
+
 mod agent_tool;
+/// Built-in tool wrappers for Gemini, OpenAI, and Anthropic hosted tools.
 pub mod builtin;
 mod function_tool;
 #[cfg(feature = "mcp")]
+/// Model Context Protocol (MCP) integration: toolsets, server management, and resources.
 pub mod mcp;
 mod simple_context;
 mod stateful_tool;
+/// Toolset combinators: basic, filtered, merged, and prefixed toolsets.
 pub mod toolset;
 
 #[cfg(feature = "code")]
@@ -113,10 +118,6 @@ pub use stateful_tool::StatefulTool;
 pub use toolset::{
     BasicToolset, FilteredToolset, MergedToolset, PrefixedToolset, string_predicate,
 };
-
-#[cfg(feature = "code")]
-#[allow(deprecated)]
-pub use code_execution::RustCodeTool;
 
 #[cfg(feature = "code")]
 pub use code_execution::CodeTool;

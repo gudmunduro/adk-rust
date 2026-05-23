@@ -16,6 +16,11 @@ type AsyncHandler = Box<
         + Sync,
 >;
 
+/// A tool created from an async Rust function.
+///
+/// `FunctionTool` wraps an async closure and exposes it as a [`Tool`] that
+/// LLM agents can invoke. Use the builder methods to configure schema,
+/// execution flags, and required scopes.
 pub struct FunctionTool {
     name: String,
     description: String,
@@ -29,6 +34,7 @@ pub struct FunctionTool {
 }
 
 impl FunctionTool {
+    /// Create a new `FunctionTool` from an async handler function.
     pub fn new<F, Fut>(name: impl Into<String>, description: impl Into<String>, handler: F) -> Self
     where
         F: Fn(Arc<dyn ToolContext>, Value) -> Fut + Send + Sync + 'static,
@@ -47,21 +53,25 @@ impl FunctionTool {
         }
     }
 
+    /// Mark this tool as long-running (prevents duplicate invocations).
     pub fn with_long_running(mut self, long_running: bool) -> Self {
         self.long_running = long_running;
         self
     }
 
+    /// Mark this tool as read-only (safe for parallel dispatch).
     pub fn with_read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
     }
 
+    /// Mark this tool as concurrency-safe (can run in parallel with other tools).
     pub fn with_concurrency_safe(mut self, concurrency_safe: bool) -> Self {
         self.concurrency_safe = concurrency_safe;
         self
     }
 
+    /// Derive the parameters JSON Schema from a type implementing `JsonSchema`.
     pub fn with_parameters_schema<T>(mut self) -> Self
     where
         T: JsonSchema + Serialize,
@@ -70,6 +80,7 @@ impl FunctionTool {
         self
     }
 
+    /// Derive the response JSON Schema from a type implementing `JsonSchema`.
     pub fn with_response_schema<T>(mut self) -> Self
     where
         T: JsonSchema + Serialize,
@@ -94,10 +105,12 @@ impl FunctionTool {
         self
     }
 
+    /// Get the parameters schema, if set.
     pub fn parameters_schema(&self) -> Option<&Value> {
         self.parameters_schema.as_ref()
     }
 
+    /// Get the response schema, if set.
     pub fn response_schema(&self) -> Option<&Value> {
         self.response_schema.as_ref()
     }

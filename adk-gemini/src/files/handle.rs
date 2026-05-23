@@ -15,6 +15,7 @@ impl FileHandle {
         Self { inner, client }
     }
 
+    /// Returns the resource name of the file.
     pub fn name(&self) -> &str {
         &self.inner.name
     }

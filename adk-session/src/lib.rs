@@ -1,5 +1,6 @@
 //! # adk-session
 #![allow(clippy::result_large_err)]
+#![deny(missing_docs)]
 //!
 //! Session management and state persistence for ADK agents.
 //!
@@ -34,31 +35,47 @@
 //! | `app:` | [`KEY_PREFIX_APP`] | Application state |
 //! | `temp:` | [`KEY_PREFIX_TEMP`] | Temporary data |
 
+/// Event types and the [`Events`] trait for accessing session event history.
 pub mod event;
+/// In-memory session backend for testing and lightweight use cases.
 pub mod inmemory;
+/// Schema migration utilities for database-backed session stores.
 pub mod migration;
+/// Session service trait and request/response types.
 pub mod service;
+/// The [`Session`] trait and state key prefix constants.
 pub mod session;
+/// State access traits ([`State`] and [`ReadonlyState`]).
 pub mod state;
+/// Shared utilities for extracting and merging state deltas across backends.
 pub mod state_utils;
 
 #[cfg(feature = "encrypted-session")]
+/// AES-256-GCM encrypted session wrapper with key rotation.
 pub mod encrypted;
 #[cfg(feature = "encrypted-session")]
+/// Encryption key management for encrypted sessions.
 pub mod encryption_key;
 #[cfg(feature = "firestore")]
+/// Google Cloud Firestore session backend.
 pub mod firestore;
 #[cfg(feature = "mongodb")]
+/// MongoDB session backend.
 pub mod mongodb;
 #[cfg(feature = "neo4j")]
+/// Neo4j graph database session backend.
 pub mod neo4j;
 #[cfg(feature = "postgres")]
+/// PostgreSQL session backend.
 pub mod postgres;
 #[cfg(feature = "redis")]
+/// Redis session backend with TTL support.
 pub mod redis;
 #[cfg(feature = "sqlite")]
+/// SQLite session backend.
 pub mod sqlite;
 #[cfg(feature = "vertex-session")]
+/// Vertex AI Session API backend.
 pub mod vertex;
 
 pub use event::{Event, EventActions, Events};
@@ -73,10 +90,6 @@ pub use state_utils::{extract_state_deltas, merge_states};
 #[cfg(feature = "sqlite")]
 pub use sqlite::SqliteSessionService;
 
-/// Deprecated alias — use [`SqliteSessionService`] instead.
-#[cfg(feature = "sqlite")]
-#[deprecated(since = "0.4.0", note = "renamed to SqliteSessionService")]
-pub type DatabaseSessionService = SqliteSessionService;
 #[cfg(feature = "encrypted-session")]
 pub use encrypted::EncryptedSession;
 #[cfg(feature = "encrypted-session")]

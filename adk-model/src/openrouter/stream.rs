@@ -1,4 +1,5 @@
 //! Shared SSE frame decoding for OpenRouter-native streaming APIs.
+#![allow(missing_docs)]
 
 use super::chat::OpenRouterChatResponse;
 use super::responses::{OpenRouterResponse, OpenRouterResponseOutputItem};

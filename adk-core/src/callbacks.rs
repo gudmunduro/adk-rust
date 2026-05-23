@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 // Agent callbacks
+/// Callback invoked before an agent runs. Return `Ok(Some(content))` to short-circuit.
 pub type BeforeAgentCallback = Box<
     dyn Fn(
             Arc<dyn CallbackContext>,
@@ -11,6 +12,7 @@ pub type BeforeAgentCallback = Box<
         + Send
         + Sync,
 >;
+/// Callback invoked after an agent completes. Return `Ok(Some(content))` to override.
 pub type AfterAgentCallback = Box<
     dyn Fn(
             Arc<dyn CallbackContext>,
@@ -30,6 +32,7 @@ pub enum BeforeModelResult {
 
 // Model callbacks
 // BeforeModelCallback can modify the request or skip the model call entirely
+/// Callback invoked before a model call. Can modify the request or skip the call entirely.
 pub type BeforeModelCallback = Box<
     dyn Fn(
             Arc<dyn CallbackContext>,
@@ -38,6 +41,7 @@ pub type BeforeModelCallback = Box<
         + Send
         + Sync,
 >;
+/// Callback invoked after a model call. Return `Ok(Some(response))` to override.
 pub type AfterModelCallback = Box<
     dyn Fn(
             Arc<dyn CallbackContext>,
@@ -48,6 +52,7 @@ pub type AfterModelCallback = Box<
 >;
 
 // Tool callbacks
+/// Callback invoked before a tool executes. Return `Ok(Some(content))` to skip execution.
 pub type BeforeToolCallback = Box<
     dyn Fn(
             Arc<dyn CallbackContext>,
@@ -55,6 +60,7 @@ pub type BeforeToolCallback = Box<
         + Send
         + Sync,
 >;
+/// Callback invoked after a tool executes. Return `Ok(Some(content))` to override the result.
 pub type AfterToolCallback = Box<
     dyn Fn(
             Arc<dyn CallbackContext>,
@@ -88,11 +94,13 @@ pub type AfterToolCallbackFull = Box<
 >;
 
 // Instruction providers - dynamic instruction generation
+/// Async function that generates dynamic instructions from context.
 pub type InstructionProvider = Box<
     dyn Fn(Arc<dyn ReadonlyContext>) -> Pin<Box<dyn Future<Output = Result<String>> + Send>>
         + Send
         + Sync,
 >;
+/// Alias for [`InstructionProvider`] used at the global (runner) level.
 pub type GlobalInstructionProvider = InstructionProvider;
 
 // ===== Error Callbacks =====

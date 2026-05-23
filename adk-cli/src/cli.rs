@@ -73,6 +73,75 @@ pub enum Commands {
         #[command(subcommand)]
         command: DeployCommands,
     },
+
+    /// Graph time-travel debugging commands
+    Graph {
+        #[command(subcommand)]
+        command: GraphCommands,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum GraphCommands {
+    /// List all checkpoints for a thread
+    Steps {
+        /// Thread identifier to inspect
+        thread_id: String,
+
+        /// Path to a SQLite checkpoint database
+        #[arg(long)]
+        db: Option<String>,
+    },
+
+    /// Replay execution between two steps, printing state transitions
+    Replay {
+        /// Thread identifier to replay
+        thread_id: String,
+
+        /// Step number to start replaying from
+        #[arg(long)]
+        from: usize,
+
+        /// Step number to stop at (inclusive). Omit to replay to the last step.
+        #[arg(long)]
+        to: Option<usize>,
+
+        /// Path to a SQLite checkpoint database
+        #[arg(long)]
+        db: Option<String>,
+    },
+
+    /// Fork execution at a step into a new thread
+    Fork {
+        /// Thread identifier to fork from
+        thread_id: String,
+
+        /// Step number to fork at
+        #[arg(long)]
+        at: usize,
+
+        /// New thread identifier for the forked execution
+        #[arg(long)]
+        new_thread: String,
+
+        /// Path to a SQLite checkpoint database
+        #[arg(long)]
+        db: Option<String>,
+    },
+
+    /// Resume execution from a specific step
+    Resume {
+        /// Thread identifier to resume
+        thread_id: String,
+
+        /// Step number to resume from
+        #[arg(long)]
+        from: usize,
+
+        /// Path to a SQLite checkpoint database
+        #[arg(long)]
+        db: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Clone)]

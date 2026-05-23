@@ -37,7 +37,7 @@ use std::time::Duration;
 use adk_agent::LlmAgentBuilder;
 use adk_core::{Content, Event, Part, Tool, ToolContext};
 use adk_model::gemini::GeminiModel;
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_sandbox::{
     ExecRequest, Language, ProcessBackend, ProcessConfig, SandboxBackend, SandboxPolicyBuilder,
     get_enforcer,
@@ -415,22 +415,11 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "sandbox-agent-demo".to_string(),
-        agent: Arc::new(agent),
-        session_service: session_service.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })?;
+    let runner = Runner::builder()
+        .app_name("sandbox-agent-demo")
+        .agent(Arc::new(agent))
+        .session_service(session_service.clone())
+        .build()?;
 
     // -----------------------------------------------------------------------
     // 7. First prompt — successful code execution
@@ -575,22 +564,11 @@ async fn run_agent_unsandboxed(api_key: &str) -> anyhow::Result<()> {
         })
         .await?;
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "sandbox-agent-demo".to_string(),
-        agent: Arc::new(agent),
-        session_service,
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })?;
+    let runner = Runner::builder()
+        .app_name("sandbox-agent-demo")
+        .agent(Arc::new(agent))
+        .session_service(session_service)
+        .build()?;
 
     let mut stream = runner
         .run_str(

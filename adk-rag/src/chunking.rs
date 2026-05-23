@@ -8,6 +8,19 @@
 
 use crate::document::{Chunk, Document};
 
+/// MSRV-compatible replacement for `str::floor_char_boundary` (stable since 1.91.0).
+/// Returns the largest byte index `<= index` that is a valid char boundary.
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 /// A strategy for splitting documents into chunks.
 ///
 /// Implementations produce [`Chunk`]s with text and metadata but no embeddings.
@@ -63,7 +76,7 @@ impl Chunker for FixedSizeChunker {
         let mut chunk_index = 0;
 
         while start < text.len() {
-            let end = text.floor_char_boundary((start + self.chunk_size).min(text.len()));
+            let end = floor_char_boundary(text, (start + self.chunk_size).min(text.len()));
             let chunk_text = &text[start..end];
 
             let mut metadata = document.metadata.clone();
@@ -82,7 +95,7 @@ impl Chunker for FixedSizeChunker {
             if step == 0 {
                 break;
             }
-            start = text.floor_char_boundary(start + step);
+            start = floor_char_boundary(text, start + step);
         }
 
         chunks
@@ -213,13 +226,13 @@ fn split_by_size(text: &str, chunk_size: usize, chunk_overlap: usize) -> Vec<Str
     let mut start = 0;
 
     while start < text.len() {
-        let end = text.floor_char_boundary((start + chunk_size).min(text.len()));
+        let end = floor_char_boundary(text, (start + chunk_size).min(text.len()));
         chunks.push(text[start..end].to_string());
         let step = chunk_size.saturating_sub(chunk_overlap);
         if step == 0 {
             break;
         }
-        start = text.floor_char_boundary(start + step);
+        start = floor_char_boundary(text, start + step);
     }
 
     chunks

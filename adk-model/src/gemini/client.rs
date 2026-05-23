@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use futures::TryStreamExt;
 
+/// Gemini model client wrapping the `adk-gemini` crate for the `Llm` trait.
 pub struct GeminiModel {
     client: Gemini,
     model_name: String,
@@ -79,6 +80,7 @@ impl GeminiModel {
         value.get("thoughtSignature").and_then(serde_json::Value::as_str).map(str::to_string)
     }
 
+    /// Create a new Gemini model client with an API key and model name.
     pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Result<Self> {
         let model_name = model.into();
         let client = Gemini::with_model(api_key.into(), model_name.clone())
@@ -173,16 +175,19 @@ impl GeminiModel {
         Ok(Self { client, model_name, retry_config: RetryConfig::default(), thinking_config: None })
     }
 
+    /// Set the retry configuration (builder pattern).
     #[must_use]
     pub fn with_retry_config(mut self, retry_config: RetryConfig) -> Self {
         self.retry_config = retry_config;
         self
     }
 
+    /// Set the retry configuration (mutable reference).
     pub fn set_retry_config(&mut self, retry_config: RetryConfig) {
         self.retry_config = retry_config;
     }
 
+    /// Returns the current retry configuration.
     pub fn retry_config(&self) -> &RetryConfig {
         &self.retry_config
     }

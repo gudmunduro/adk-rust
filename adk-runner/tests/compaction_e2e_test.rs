@@ -7,7 +7,7 @@ use adk_core::{
     Agent, BaseEventsSummarizer, Content, Event, EventActions, EventCompaction, EventStream,
     EventsCompactionConfig, InvocationContext, Part, Result, SessionId, UserId,
 };
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::{InMemorySessionService, SessionService};
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -115,27 +115,17 @@ async fn test_e2e_compaction_with_inmemory_session() {
         .await
         .unwrap();
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent: agent.clone(),
-        session_service: session_service.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: Some(EventsCompactionConfig {
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(agent.clone() as Arc<dyn Agent>)
+        .session_service(session_service.clone() as Arc<dyn SessionService>)
+        .compaction_config(EventsCompactionConfig {
             compaction_interval: 2, // Compact every 2 invocations
             overlap_size: 0,
             summarizer: summarizer.clone(),
-        }),
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+        })
+        .build()
+        .unwrap();
 
     // Invocation 1
     let content1 = Content::new("user").with_text("Hello");

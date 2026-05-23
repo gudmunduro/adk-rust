@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use adk_core::{Agent, Content, EventStream, InvocationContext, Part, Result, SessionId, UserId};
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::{Event, Events, GetRequest, Session, SessionService, State};
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -198,23 +198,15 @@ proptest! {
             .collect();
 
         let session_service = Arc::new(TrackingSessionService::new());
-        let runner = Runner::new(RunnerConfig {
-            app_name: "test-app".to_string(),
-            agent: Arc::new(MockAgent {
+        let runner = Runner::builder()
+            .app_name("test-app")
+            .agent(Arc::new(MockAgent {
                 name: "test-agent".to_string(),
                 events_to_yield: agent_events.clone(),
-            }),
-            session_service: session_service.clone(),
-            artifact_service: None,
-            memory_service: None,
-            plugin_manager: None,
-            run_config: None,
-            compaction_config: None,
-            context_cache_config: None,
-            cache_capable: None,
-            request_context: None,
-            cancellation_token: None, intra_compaction_config: None, intra_compaction_summarizer: None,
-        }).unwrap();
+            }) as Arc<dyn Agent>)
+            .session_service(session_service.clone() as Arc<dyn SessionService>)
+            .build()
+            .unwrap();
 
         let user_id = UserId::new(&user_id_str).unwrap();
         let session_id = SessionId::new(&session_id_str).unwrap();
@@ -243,22 +235,12 @@ proptest! {
 /// Verify RunnerConfig still accepts app_name as String (Requirement 3.7).
 #[test]
 fn runner_config_accepts_string_app_name() {
-    let config = RunnerConfig {
-        app_name: "my-app".to_string(), // String, not AppName
-        agent: Arc::new(MockAgent { name: "a".to_string(), events_to_yield: vec![] }),
-        session_service: Arc::new(TrackingSessionService::new()),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    };
+    let config = Runner::builder()
+        .app_name("my-app".to_string())
+        .agent(Arc::new(MockAgent { name: "a".to_string(), events_to_yield: vec![] })
+            as Arc<dyn Agent>)
+        .session_service(Arc::new(TrackingSessionService::new()) as Arc<dyn SessionService>)
+        .build_config();
     let runner = Runner::new(config);
     assert!(runner.is_ok());
 }
@@ -272,26 +254,15 @@ async fn runner_applies_state_deltas_from_events() {
     let agent_event = make_agent_event_with_state_delta("test-agent", "done", delta);
 
     let session_service = Arc::new(TrackingSessionService::new());
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test-app".to_string(),
-        agent: Arc::new(MockAgent {
+    let runner = Runner::builder()
+        .app_name("test-app")
+        .agent(Arc::new(MockAgent {
             name: "test-agent".to_string(),
             events_to_yield: vec![agent_event],
-        }),
-        session_service: session_service.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+        }) as Arc<dyn Agent>)
+        .session_service(session_service.clone() as Arc<dyn SessionService>)
+        .build()
+        .unwrap();
 
     let user_id = UserId::new("user1").unwrap();
     let session_id = SessionId::new("sess1").unwrap();

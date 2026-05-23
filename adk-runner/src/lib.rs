@@ -1,5 +1,6 @@
 //! # adk-runner
 #![allow(clippy::result_large_err)]
+#![deny(missing_docs)]
 //!
 //! Agent execution runtime for ADK.
 //!
@@ -44,10 +45,13 @@
 pub mod builder;
 mod cache;
 mod callbacks;
+#[cfg(feature = "context-compaction")]
+pub mod compaction;
 mod context;
 pub mod intra_compaction;
 mod launcher;
 mod runner;
+pub mod tool_concurrency;
 
 pub use builder::RunnerConfigBuilder;
 pub use callbacks::{

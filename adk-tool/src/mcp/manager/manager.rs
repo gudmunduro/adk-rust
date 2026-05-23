@@ -451,7 +451,7 @@ impl McpServerManager {
     /// Spawns a `tokio::spawn` task that periodically checks each `Running`
     /// server by calling [`McpToolset::is_closed()`](super::super::McpToolset::is_closed).
     /// If a server's connection is closed, the monitor sets its status to
-    /// `Crashed` and, if a [`RestartPolicy`] is configured, attempts auto-restart
+    /// `Crashed` and, if a [`RestartPolicy`](super::config::RestartPolicy) is configured, attempts auto-restart
     /// with exponential backoff.
     ///
     /// The monitoring loop runs until [`stop_monitoring`](Self::stop_monitoring)

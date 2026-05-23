@@ -1,4 +1,5 @@
 //! Typed OpenRouter error payloads.
+#![allow(missing_docs)]
 
 use crate::openrouter::stream::OpenRouterStreamError;
 use adk_core::{AdkError, ErrorCategory, ErrorComponent};

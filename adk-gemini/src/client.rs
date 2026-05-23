@@ -45,62 +45,86 @@ static V1_BASE_URL: LazyLock<Url> = LazyLock::new(|| {
 // Model enum
 // ══════════════════════════════════════════════════════════════════════
 
+/// Available Gemini model identifiers.
+///
+/// Each variant maps to a specific model version on the Gemini API.
+/// Use [`Model::Custom`] for model IDs not yet represented as variants.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Model {
     // ── Gemini 3.1 (newest generation) ────────────────────────────
+    /// Gemini 3.1 Pro preview — strongest reasoning.
     #[serde(rename = "models/gemini-3.1-pro-preview")]
     Gemini31ProPreview,
+    /// Gemini 3.1 Flash Lite preview — cheapest and fastest.
     #[serde(rename = "models/gemini-3.1-flash-lite-preview")]
     Gemini31FlashLitePreview,
 
     // ── Gemini 3 ─────────────────────────────────────────────────
+    /// Gemini 3 Pro preview.
     #[serde(rename = "models/gemini-3-pro-preview")]
     Gemini3ProPreview,
+    /// Gemini 3 Pro Image preview — multimodal output.
     #[serde(rename = "models/gemini-3-pro-image-preview")]
     Gemini3ProImagePreview,
+    /// Gemini 3 Flash preview — good balance of speed and capability.
     #[serde(rename = "models/gemini-3-flash-preview")]
     Gemini3FlashPreview,
 
     // ── Gemini 2.5 ───────────────────────────────────────────────
+    /// Gemini 2.5 Pro — advanced reasoning.
     #[serde(rename = "models/gemini-2.5-pro")]
     Gemini25Pro,
+    /// Gemini 2.5 Pro preview with TTS support.
     #[serde(rename = "models/gemini-2.5-pro-preview-tts")]
     Gemini25ProPreviewTts,
+    /// Gemini 2.5 Flash — default model.
     #[default]
     #[serde(rename = "models/gemini-2.5-flash")]
     Gemini25Flash,
+    /// Gemini 2.5 Flash preview (September 2025).
     #[serde(rename = "models/gemini-2.5-flash-preview-09-2025")]
     Gemini25FlashPreview092025,
+    /// Gemini 2.5 Flash with image generation.
     #[serde(rename = "models/gemini-2.5-flash-image")]
     Gemini25FlashImage,
     /// Deprecated: use `Gemini25FlashImage` instead.
     #[deprecated(note = "Use Model::Gemini25FlashImage instead")]
     #[serde(rename = "models/gemini-2.5-flash-image-preview")]
     Gemini25FlashImagePreview,
+    /// Gemini 2.5 Flash native audio preview (December 2025).
     #[serde(rename = "models/gemini-2.5-flash-native-audio-preview-12-2025")]
     Gemini25FlashLive122025,
+    /// Gemini 2.5 Flash native audio preview (September 2025).
     #[serde(rename = "models/gemini-2.5-flash-native-audio-preview-09-2025")]
     Gemini25FlashLive092025,
+    /// Gemini 2.5 Flash preview with TTS support.
     #[serde(rename = "models/gemini-2.5-flash-preview-tts")]
     Gemini25FlashPreviewTts,
+    /// Gemini 2.5 Flash Lite — cost-efficient.
     #[serde(rename = "models/gemini-2.5-flash-lite")]
     Gemini25FlashLite,
+    /// Gemini 2.5 Flash Lite preview (September 2025).
     #[serde(rename = "models/gemini-2.5-flash-lite-preview-09-2025")]
     Gemini25FlashLitePreview092025,
 
     // ── Gemini 2.0 (deprecated, shutting down March 31, 2026) ────
+    /// Gemini 2.0 Flash (deprecated).
     #[deprecated(note = "Gemini 2.0 models shut down March 31, 2026")]
     #[serde(rename = "models/gemini-2.0-flash")]
     Gemini20Flash,
+    /// Gemini 2.0 Flash 001 (deprecated).
     #[deprecated(note = "Gemini 2.0 models shut down March 31, 2026")]
     #[serde(rename = "models/gemini-2.0-flash-001")]
     Gemini20Flash001,
+    /// Gemini 2.0 Flash experimental (deprecated).
     #[deprecated(note = "Gemini 2.0 models shut down March 31, 2026")]
     #[serde(rename = "models/gemini-2.0-flash-exp")]
     Gemini20FlashExp,
+    /// Gemini 2.0 Flash Lite (deprecated).
     #[deprecated(note = "Gemini 2.0 models shut down March 31, 2026")]
     #[serde(rename = "models/gemini-2.0-flash-lite")]
     Gemini20FlashLite,
+    /// Gemini 2.0 Flash Lite 001 (deprecated).
     #[deprecated(note = "Gemini 2.0 models shut down March 31, 2026")]
     #[serde(rename = "models/gemini-2.0-flash-lite-001")]
     Gemini20FlashLite001,
@@ -115,11 +139,13 @@ pub enum Model {
     TextEmbedding004,
 
     // ── Custom ───────────────────────────────────────────────────
+    /// A custom model identifier string (e.g. `"models/my-tuned-model"`).
     #[serde(untagged)]
     Custom(String),
 }
 
 impl Model {
+    /// Returns the model identifier as a string slice.
     pub fn as_str(&self) -> &str {
         #[allow(deprecated)]
         match self {
@@ -154,6 +180,7 @@ impl Model {
         }
     }
 
+    /// Returns the Vertex AI model resource path for this model.
     pub fn vertex_model_path(&self, project_id: &str, location: &str) -> String {
         #[allow(deprecated)]
         let model_id = match self {
@@ -256,150 +283,207 @@ impl fmt::Display for Model {
 // Error enum
 // ══════════════════════════════════════════════════════════════════════
 
+/// Errors that can occur when interacting with the Gemini API.
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum Error {
+    /// The provided API key is not a valid HTTP header value.
     #[snafu(display("failed to parse API key"))]
     InvalidApiKey {
+        /// The underlying header value error.
         source: InvalidHeaderValue,
     },
 
+    /// Failed to construct a request URL (likely an incorrect model name).
     #[snafu(display("failed to construct URL (probably incorrect model name): {suffix}"))]
     ConstructUrl {
+        /// The underlying URL parse error.
         source: url::ParseError,
+        /// The URL suffix that failed to parse.
         suffix: String,
     },
 
+    /// An HTTP request failed before reaching the server.
     #[snafu(display("failed to perform request: {source}"))]
     PerformRequestNew {
+        /// The underlying reqwest error.
         source: reqwest::Error,
     },
 
+    /// An HTTP request to a specific URL failed.
     #[snafu(display("failed to perform request to '{url}'"))]
     PerformRequest {
+        /// The underlying reqwest error.
         source: reqwest::Error,
+        /// The URL that was being requested.
         url: Url,
     },
 
+    /// The server returned a non-success HTTP status code.
     #[snafu(display("bad response from server; code {code}; description: {}", description.as_deref().unwrap_or("none")))]
     BadResponse {
+        /// The HTTP status code.
         code: u16,
+        /// An optional error description from the server.
         description: Option<String>,
     },
 
+    /// A required response header was missing.
     MissingResponseHeader {
+        /// The name of the missing header.
         header: String,
     },
 
+    /// Failed to read a Server-Sent Events (SSE) part from the stream.
     #[snafu(display("failed to obtain stream SSE part"))]
     BadPart {
+        /// The underlying event stream error.
         source: EventStreamError<reqwest::Error>,
     },
 
+    /// Failed to deserialize a JSON response body.
     #[snafu(display("failed to deserialize JSON response"))]
     Deserialize {
+        /// The underlying serde_json error.
         source: serde_json::Error,
     },
 
+    /// Failed to decode the response body.
     #[snafu(display("failed to generate content"))]
     DecodeResponse {
+        /// The underlying reqwest error.
         source: reqwest::Error,
     },
 
+    /// Failed to parse a URL string.
     #[snafu(display("failed to parse URL"))]
     UrlParse {
+        /// The underlying URL parse error.
         source: url::ParseError,
     },
 
+    /// Failed to build Google Cloud credentials.
     #[snafu(display("failed to build google cloud credentials"))]
     #[cfg(feature = "vertex")]
     GoogleCloudAuth {
+        /// The underlying credentials build error.
         source: google_cloud_auth::build_errors::Error,
     },
 
+    /// Failed to obtain Google Cloud auth headers.
     #[snafu(display("failed to obtain google cloud auth headers"))]
     #[cfg(feature = "vertex")]
     GoogleCloudCredentialHeaders {
+        /// The underlying credentials error.
         source: google_cloud_auth::errors::CredentialsError,
     },
 
+    /// Google Cloud credentials returned NotModified without cached headers.
     #[snafu(display("google cloud credentials returned NotModified without cached headers"))]
     GoogleCloudCredentialHeadersUnavailable,
 
+    /// Failed to parse Google Cloud credentials JSON.
     #[snafu(display("failed to parse google cloud credentials JSON"))]
     GoogleCloudCredentialParse {
+        /// The underlying JSON parse error.
         source: serde_json::Error,
     },
 
+    /// Failed to build the Google Cloud Vertex AI client.
     #[snafu(display("failed to build google cloud vertex client"))]
     #[cfg(feature = "vertex")]
     GoogleCloudClientBuild {
+        /// The underlying client builder error.
         source: google_cloud_gax::client_builder::Error,
     },
 
+    /// Failed to send a request via the Google Cloud Vertex AI client.
     #[snafu(display("failed to send google cloud vertex request"))]
     #[cfg(feature = "vertex")]
     GoogleCloudRequest {
+        /// The underlying Vertex AI error.
         source: google_cloud_aiplatform_v1::Error,
     },
 
+    /// Failed to serialize a Google Cloud request payload.
     #[snafu(display("failed to serialize google cloud request"))]
     GoogleCloudRequestSerialize {
+        /// The underlying serialization error.
         source: serde_json::Error,
     },
 
+    /// Failed to deserialize a Google Cloud request payload.
     #[snafu(display("failed to deserialize google cloud request"))]
     GoogleCloudRequestDeserialize {
+        /// The underlying deserialization error.
         source: serde_json::Error,
     },
 
+    /// Failed to serialize a Google Cloud response.
     #[snafu(display("failed to serialize google cloud response"))]
     GoogleCloudResponseSerialize {
+        /// The underlying serialization error.
         source: serde_json::Error,
     },
 
+    /// Failed to deserialize a Google Cloud response.
     #[snafu(display("failed to deserialize google cloud response"))]
     GoogleCloudResponseDeserialize {
+        /// The underlying deserialization error.
         source: serde_json::Error,
     },
 
+    /// The Google Cloud request payload is not a JSON object.
     #[snafu(display("google cloud request payload is not an object"))]
     GoogleCloudRequestNotObject,
 
+    /// Google Cloud configuration is required for this authentication mode.
     #[snafu(display("google cloud configuration is required for this authentication mode"))]
     MissingGoogleCloudConfig,
 
+    /// Google Cloud authentication is required for this configuration.
     #[snafu(display("google cloud authentication is required for this configuration"))]
     MissingGoogleCloudAuth,
 
+    /// The service account JSON is missing the `project_id` field.
     #[snafu(display("service account JSON is missing required field 'project_id'"))]
     MissingGoogleCloudProjectId,
 
+    /// An API key is required for this configuration.
     #[snafu(display("api key is required for this configuration"))]
     MissingApiKey,
 
+    /// The requested operation is not supported by the Vertex AI backend.
     #[snafu(display(
         "operation '{operation}' is not supported with the google cloud sdk backend (PredictionService currently exposes generateContent/embedContent only)"
     ))]
     GoogleCloudUnsupported {
+        /// The unsupported operation name.
         operation: &'static str,
     },
 
+    /// Failed to create a tokio runtime for the Google Cloud client.
     #[snafu(display("failed to create tokio runtime for google cloud client"))]
     TokioRuntime {
+        /// The underlying I/O error.
         source: std::io::Error,
     },
 
+    /// The Google Cloud client initialization thread panicked.
     #[snafu(display("google cloud client initialization thread panicked"))]
     GoogleCloudInitThreadPanicked,
 
+    /// An I/O error occurred during file operations.
     #[snafu(display("I/O error during file operations"))]
     Io {
+        /// The underlying I/O error.
         source: std::io::Error,
     },
 
+    /// The generation config is invalid.
     #[snafu(display("invalid generation config: {message}"))]
     InvalidGenerationConfig {
+        /// Description of the validation failure.
         message: String,
     },
 }
@@ -413,6 +497,7 @@ pub enum Error {
 /// Delegates all operations to a [`GeminiBackend`](backend::GeminiBackend)
 /// trait object (AI Studio REST or Vertex AI).
 pub struct GeminiClient {
+    /// The model this client is configured to use.
     pub model: Model,
     backend: Box<dyn backend::GeminiBackend>,
 }
@@ -761,6 +846,7 @@ pub struct GeminiBuilder {
 }
 
 impl GeminiBuilder {
+    /// Create a new builder with the given API key.
     pub fn new<K: Into<String>>(key: K) -> Self {
         Self {
             model: Model::default(),
@@ -774,16 +860,19 @@ impl GeminiBuilder {
         }
     }
 
+    /// Set the model to use.
     pub fn with_model<M: Into<Model>>(mut self, model: M) -> Self {
         self.model = model.into();
         self
     }
 
+    /// Set a custom HTTP client builder.
     pub fn with_http_client(mut self, client_builder: ClientBuilder) -> Self {
         self.client_builder = client_builder;
         self
     }
 
+    /// Set a custom base URL (overrides Google Cloud config).
     pub fn with_base_url(mut self, base_url: Url) -> Self {
         self.base_url = base_url;
         #[cfg(feature = "vertex")]
@@ -794,6 +883,7 @@ impl GeminiBuilder {
         self
     }
 
+    /// Authenticate with a service account JSON key (Vertex AI).
     #[cfg(feature = "vertex")]
     pub fn with_service_account_json(mut self, service_account_json: &str) -> Result<Self, Error> {
         let value =
@@ -805,6 +895,7 @@ impl GeminiBuilder {
         Ok(self)
     }
 
+    /// Set the Google Cloud project and location for Vertex AI.
     #[cfg(feature = "vertex")]
     pub fn with_google_cloud<P: Into<String>, L: Into<String>>(
         mut self,
@@ -816,6 +907,7 @@ impl GeminiBuilder {
         self
     }
 
+    /// Use Application Default Credentials (ADC) for Vertex AI authentication.
     #[cfg(feature = "vertex")]
     pub fn with_google_cloud_adc(mut self) -> Result<Self, Error> {
         let credentials = google_cloud_auth::credentials::Builder::default()
@@ -825,6 +917,7 @@ impl GeminiBuilder {
         Ok(self)
     }
 
+    /// Use Workload Identity Federation JSON for Vertex AI authentication.
     #[cfg(feature = "vertex")]
     pub fn with_google_cloud_wif_json(mut self, wif_json: &str) -> Result<Self, Error> {
         let value = serde_json::from_str(wif_json).context(GoogleCloudCredentialParseSnafu)?;
@@ -888,6 +981,10 @@ impl GeminiBuilder {
 // Gemini — the main public-facing client
 // ══════════════════════════════════════════════════════════════════════
 
+/// The main public-facing Gemini API client.
+///
+/// Provides methods for content generation, embeddings, batch processing,
+/// file management, caching, and model discovery.
 pub struct Gemini {
     client: Arc<GeminiClient>,
 }

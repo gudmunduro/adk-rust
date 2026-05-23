@@ -42,10 +42,16 @@ impl From<BatchGenerateContentResponseItem> for Result<GenerationResponse, Indiv
 pub enum BatchOperationResponse {
     /// Response with inlined responses
     #[serde(rename_all = "camelCase")]
-    InlinedResponses { inlined_responses: InlinedResponses },
+    InlinedResponses {
+        /// The inlined response container.
+        inlined_responses: InlinedResponses,
+    },
     /// Response with a file containing results
     #[serde(rename_all = "camelCase")]
-    ResponsesFile { responses_file: String },
+    ResponsesFile {
+        /// The file name containing the batch results.
+        responses_file: String,
+    },
 }
 
 /// A container for inlined responses.

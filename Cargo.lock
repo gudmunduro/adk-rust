@@ -41,7 +41,7 @@ dependencies = [
 
 [[package]]
 name = "adk-acp"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-runner",
@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "adk-action"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "proptest",
@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "adk-agent"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-guardrail",
@@ -87,6 +87,7 @@ dependencies = [
  "async-trait",
  "dotenvy",
  "futures",
+ "proptest",
  "serde",
  "serde_json",
  "tempfile",
@@ -96,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "adk-anthropic"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -113,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "adk-artifact"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -124,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "adk-audio"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-realtime",
@@ -161,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "adk-auth"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-server",
@@ -177,11 +178,17 @@ dependencies = [
  "dashmap",
  "google-cloud-gax 1.9.0",
  "google-cloud-secretmanager-v1",
+ "hex",
  "jsonwebtoken 10.3.0",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
  "proptest",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha2",
+ "sqlx",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -189,7 +196,7 @@ dependencies = [
 
 [[package]]
 name = "adk-awp"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "arc-swap",
@@ -218,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "adk-browser"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -234,12 +241,13 @@ dependencies = [
 
 [[package]]
 name = "adk-cli"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-agent",
  "adk-artifact",
  "adk-core",
  "adk-deploy",
+ "adk-graph",
  "adk-model",
  "adk-runner",
  "adk-server",
@@ -266,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "adk-code"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-sandbox",
@@ -286,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "adk-core"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -304,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "adk-deploy"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "anyhow",
  "chrono",
@@ -326,7 +334,7 @@ dependencies = [
 
 [[package]]
 name = "adk-eval"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-model",
@@ -348,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "adk-gemini"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-stream",
@@ -380,19 +388,22 @@ dependencies = [
 
 [[package]]
 name = "adk-graph"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-action",
  "adk-core",
  "async-stream",
  "async-trait",
+ "blake3",
  "chrono",
+ "fred",
  "futures",
  "proptest",
  "regex",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "similar",
  "sqlx",
  "thiserror 2.0.18",
  "tokio",
@@ -403,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "adk-guardrail"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -419,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "adk-memory"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -438,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "adk-model"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-anthropic",
  "adk-core",
@@ -468,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "adk-payments"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-artifact",
  "adk-auth",
@@ -497,7 +508,7 @@ dependencies = [
 
 [[package]]
 name = "adk-plugin"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "serde_json",
@@ -507,7 +518,7 @@ dependencies = [
 
 [[package]]
 name = "adk-rag"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-gemini",
@@ -531,7 +542,7 @@ dependencies = [
 
 [[package]]
 name = "adk-realtime"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-gemini",
@@ -568,7 +579,7 @@ dependencies = [
 
 [[package]]
 name = "adk-retry-reflect"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-plugin",
@@ -582,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "adk-runner"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-artifact",
  "adk-core",
@@ -597,7 +608,9 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.18",
  "tokio",
+ "tokio-test",
  "tokio-util",
  "tracing",
  "uuid 1.23.0",
@@ -605,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "adk-rust"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-acp",
  "adk-action",
@@ -645,7 +658,7 @@ dependencies = [
 
 [[package]]
 name = "adk-rust-macros"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -660,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "adk-sandbox"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -678,7 +691,7 @@ dependencies = [
 
 [[package]]
 name = "adk-server"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "a2a-protocol-types",
  "adk-agent",
@@ -709,6 +722,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+ "tokio-test",
  "tokio-util",
  "tower 0.4.13",
  "tower-http",
@@ -719,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "adk-session"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "aes-gcm",
@@ -745,7 +759,7 @@ dependencies = [
 
 [[package]]
 name = "adk-skill"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-plugin",
@@ -762,7 +776,7 @@ dependencies = [
 
 [[package]]
 name = "adk-telemetry"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
@@ -777,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "adk-tool"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-code",
  "adk-core",
@@ -1880,7 +1894,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "awp-types"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "chrono",
  "proptest",
@@ -3342,15 +3356,21 @@ dependencies = [
 
 [[package]]
 name = "cargo-adk"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "adk-deploy",
+ "chrono",
  "clap",
  "flate2",
  "hex",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
  "sha2",
+ "syn 2.0.117",
  "tar",
  "tokio",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -13808,6 +13828,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_yaml_ng"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b4db627b98b36d4203a7b458cf3573730f2bb591b28871d916dfa9efabfd41f"
+dependencies = [
+ "indexmap 2.14.0",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13887,6 +13920,12 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "similar"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 
 [[package]]
 name = "simple_asn1"

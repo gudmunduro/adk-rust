@@ -4,11 +4,17 @@ use std::str::FromStr;
 /// Canonical provider identifiers and metadata shared across ADK crates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ModelProvider {
+    /// Google Gemini models.
     Gemini,
+    /// OpenAI models (GPT, o-series).
     Openai,
+    /// Anthropic Claude models.
     Anthropic,
+    /// DeepSeek models.
     Deepseek,
+    /// Groq ultra-fast inference.
     Groq,
+    /// Ollama local models.
     Ollama,
 }
 

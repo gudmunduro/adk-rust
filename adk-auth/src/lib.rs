@@ -61,13 +61,16 @@ pub mod sso;
 pub mod secrets;
 
 // Enterprise audit sinks (feature-gated)
-#[cfg(feature = "postgres-audit")]
-pub mod audit_postgres;
 #[cfg(feature = "otlp-audit")]
 pub mod audit_otlp;
+#[cfg(feature = "postgres-audit")]
+pub mod audit_postgres;
 
 pub use access_control::{AccessControl, AccessControlBuilder};
-pub use audit::{AuditEvent, AuditEventType, AuditFilter, AuditOutcome, AuditSink, FileAuditSink, InMemoryAuditSink};
+pub use audit::{
+    AuditEvent, AuditEventType, AuditFilter, AuditOutcome, AuditSink, FileAuditSink,
+    InMemoryAuditSink,
+};
 pub use error::{AccessDenied, AuthError};
 pub use middleware::{AuthMiddleware, ProtectedTool, ProtectedToolDyn, ToolExt};
 pub use permission::Permission;
@@ -80,7 +83,7 @@ pub use scope::{
 #[cfg(feature = "auth-bridge")]
 pub use auth_bridge::{JwtRequestContextExtractor, JwtRequestContextExtractorBuilder};
 
-#[cfg(feature = "postgres-audit")]
-pub use audit_postgres::PostgresAuditSink;
 #[cfg(feature = "otlp-audit")]
 pub use audit_otlp::OtlpAuditSink;
+#[cfg(feature = "postgres-audit")]
+pub use audit_postgres::PostgresAuditSink;

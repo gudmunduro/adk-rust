@@ -1,6 +1,6 @@
 use adk_core::{Agent, Content, EventStream, InvocationContext, Part, Result, SessionId, UserId};
 use adk_plugin::{Plugin, PluginConfig, PluginManager};
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::{Event, Events, GetRequest, Session, SessionService, State};
 use adk_skill::{SelectionPolicy, SkillInjector, SkillInjectorConfig};
 use async_trait::async_trait;
@@ -150,22 +150,11 @@ fn test_runner_creation() {
 
     let session_service = Arc::new(MockSessionService);
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent,
-        session_service,
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    });
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(agent as Arc<dyn Agent>)
+        .session_service(session_service as Arc<dyn SessionService>)
+        .build();
 
     assert!(runner.is_ok());
 }
@@ -176,23 +165,12 @@ async fn test_runner_run() {
 
     let session_service = Arc::new(MockSessionService);
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent,
-        session_service,
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(agent as Arc<dyn Agent>)
+        .session_service(session_service as Arc<dyn SessionService>)
+        .build()
+        .unwrap();
 
     let content =
         Content { role: "user".to_string(), parts: vec![Part::Text { text: "Hello".to_string() }] };
@@ -403,23 +381,13 @@ async fn test_plugin_callback_order_and_mutation() {
         ..Default::default()
     });
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent: Arc::new(EchoUserContentAgent),
-        session_service: Arc::new(MockSessionService),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: Some(Arc::new(PluginManager::new(vec![plugin]))),
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(Arc::new(EchoUserContentAgent) as Arc<dyn Agent>)
+        .session_service(Arc::new(MockSessionService) as Arc<dyn SessionService>)
+        .plugin_manager(Arc::new(PluginManager::new(vec![plugin])))
+        .build()
+        .unwrap();
 
     let content = Content::new("user").with_text("hello");
     let mut stream = runner
@@ -465,23 +433,13 @@ async fn test_plugin_error_propagates_from_on_user_message() {
         ..Default::default()
     });
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent: Arc::new(EchoUserContentAgent),
-        session_service: Arc::new(MockSessionService),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: Some(Arc::new(PluginManager::new(vec![plugin]))),
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(Arc::new(EchoUserContentAgent) as Arc<dyn Agent>)
+        .session_service(Arc::new(MockSessionService) as Arc<dyn SessionService>)
+        .plugin_manager(Arc::new(PluginManager::new(vec![plugin])))
+        .build()
+        .unwrap();
 
     let mut stream = runner
         .run(
@@ -518,23 +476,13 @@ async fn test_skill_injector_plugin_mutates_user_prompt() {
     .unwrap();
 
     let plugin_manager = Arc::new(injector.build_plugin_manager("skills"));
-    let runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent: Arc::new(EchoUserContentAgent),
-        session_service: Arc::new(MockSessionService),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: Some(plugin_manager),
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+    let runner = Runner::builder()
+        .app_name("test_app")
+        .agent(Arc::new(EchoUserContentAgent) as Arc<dyn Agent>)
+        .session_service(Arc::new(MockSessionService) as Arc<dyn SessionService>)
+        .plugin_manager(plugin_manager)
+        .build()
+        .unwrap();
 
     let mut stream = runner
         .run(
@@ -571,23 +519,12 @@ async fn test_runner_with_auto_skills_mutates_user_prompt() {
     )
     .unwrap();
 
-    let mut runner = Runner::new(RunnerConfig {
-        app_name: "test_app".to_string(),
-        agent: Arc::new(EchoUserContentAgent),
-        session_service: Arc::new(MockSessionService),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap();
+    let mut runner = Runner::builder()
+        .app_name("test_app")
+        .agent(Arc::new(EchoUserContentAgent) as Arc<dyn Agent>)
+        .session_service(Arc::new(MockSessionService) as Arc<dyn SessionService>)
+        .build()
+        .unwrap();
     runner
         .with_auto_skills_mut(
             root,

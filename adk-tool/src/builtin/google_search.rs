@@ -11,6 +11,7 @@ use std::sync::Arc;
 pub struct GoogleSearchTool;
 
 impl GoogleSearchTool {
+    /// Create a new `GoogleSearchTool`.
     pub fn new() -> Self {
         Self
     }

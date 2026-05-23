@@ -15,6 +15,11 @@ type RunHandler = Box<
         + Sync,
 >;
 
+/// An agent with a user-defined async handler function.
+///
+/// `CustomAgent` allows you to implement arbitrary agent logic without
+/// conforming to the LLM request/response loop. Use the builder to configure
+/// the handler, sub-agents, and lifecycle callbacks.
 pub struct CustomAgent {
     name: String,
     description: String,
@@ -25,6 +30,7 @@ pub struct CustomAgent {
 }
 
 impl CustomAgent {
+    /// Create a new builder for `CustomAgent` with the given name.
     pub fn builder(name: impl Into<String>) -> CustomAgentBuilder {
         CustomAgentBuilder::new(name)
     }
@@ -110,6 +116,7 @@ impl Agent for CustomAgent {
     }
 }
 
+/// Builder for constructing a [`CustomAgent`].
 pub struct CustomAgentBuilder {
     name: String,
     description: String,
@@ -120,6 +127,7 @@ pub struct CustomAgentBuilder {
 }
 
 impl CustomAgentBuilder {
+    /// Create a new builder with the given agent name.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -131,31 +139,37 @@ impl CustomAgentBuilder {
         }
     }
 
+    /// Set the agent description.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
 
+    /// Add a sub-agent.
     pub fn sub_agent(mut self, agent: Arc<dyn Agent>) -> Self {
         self.sub_agents.push(agent);
         self
     }
 
+    /// Set all sub-agents, replacing any previously added.
     pub fn sub_agents(mut self, agents: Vec<Arc<dyn Agent>>) -> Self {
         self.sub_agents = agents;
         self
     }
 
+    /// Add a before-agent callback.
     pub fn before_callback(mut self, callback: BeforeAgentCallback) -> Self {
         self.before_callbacks.push(callback);
         self
     }
 
+    /// Add an after-agent callback.
     pub fn after_callback(mut self, callback: AfterAgentCallback) -> Self {
         self.after_callbacks.push(callback);
         self
     }
 
+    /// Set the async handler function that implements the agent's logic.
     pub fn handler<F, Fut>(mut self, handler: F) -> Self
     where
         F: Fn(Arc<dyn InvocationContext>) -> Fut + Send + Sync + 'static,
@@ -165,6 +179,7 @@ impl CustomAgentBuilder {
         self
     }
 
+    /// Build the [`CustomAgent`], returning an error if no handler was set.
     pub fn build(self) -> Result<CustomAgent> {
         let handler = self
             .handler

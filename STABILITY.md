@@ -26,16 +26,16 @@ The table below assigns one stability tier to every public `adk-*` crate in the 
 | `adk-runner` | **Stable** | Agent execution runtime with event streaming |
 | `adk-session` | **Stable** | Session management and state persistence |
 | `adk-rust` | **Stable** | Umbrella crate re-exporting the workspace |
-| `adk-server` | **Beta** | HTTP server (Axum) and A2A protocol |
-| `adk-graph` | **Beta** | Graph-based workflow orchestration with checkpoints |
-| `adk-memory` | **Beta** | Semantic memory and RAG search |
+| `adk-server` | **Stable** | HTTP server (Axum) and A2A protocol |
+| `adk-graph` | **Stable** | Graph-based workflow orchestration with checkpoints |
+| `adk-memory` | **Stable** | Semantic memory and RAG search |
+| `adk-anthropic` | **Stable** | Dedicated Anthropic client and tool search |
 | `adk-artifact` | **Beta** | Binary artifact storage for agents |
 | `adk-auth` | **Beta** | Authentication: API keys, JWT, OAuth2, OIDC, SSO |
 | `adk-telemetry` | **Beta** | OpenTelemetry integration for agent observability |
 | `adk-guardrail` | **Beta** | Input/output guardrails: validation, content filtering, PII redaction |
 | `adk-plugin` | **Beta** | Plugin system for agent lifecycle hooks |
 | `adk-skill` | **Beta** | Skill discovery, parsing, and convention-based agent capabilities |
-| `adk-anthropic` | **Beta** | Dedicated Anthropic client and tool search |
 | `adk-cli` | **Beta** | Command-line launcher for agents |
 | `adk-rag` | **Beta** | Retrieval-augmented generation pipelines |
 | `adk-action` | **Beta** | Action node execution for deterministic workflow operations |
@@ -95,7 +95,7 @@ Public structs in Stable-tier crates that are constructed by downstream consumer
    - Session service request structs in `adk-session`
    - Any future configuration or request structs added to Stable-tier crates
 
-4. **`#[non_exhaustive]` roadmap.** Key configuration structs (starting with `RunnerConfig`) are planned to adopt `#[non_exhaustive]` in a future release (target: **0.7.0**), following the N+2 deprecation lifecycle. Once applied, `#[non_exhaustive]` will prevent struct literal construction entirely, making the builder pattern the only supported construction path. Consumers SHOULD migrate to builder patterns proactively to prepare for this transition.
+4. **`#[non_exhaustive]` applied.** Key configuration structs (`RunnerConfig` and `RunConfig`) now carry `#[non_exhaustive]`, preventing struct literal construction from downstream crates. The builder pattern (`Runner::builder()` and `RunConfig::builder()`) is the only supported construction path. This was completed as part of the 1.0 readiness work.
 
 ## 1.0 Milestone
 

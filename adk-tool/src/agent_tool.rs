@@ -411,9 +411,8 @@ impl InvocationContext for AgentToolInvocationContext {
         // before being returned. SSE mode yields partial chunks which makes
         // extract_response unable to capture the complete text.
         static AGENT_TOOL_CONFIG: std::sync::OnceLock<RunConfig> = std::sync::OnceLock::new();
-        AGENT_TOOL_CONFIG.get_or_init(|| RunConfig {
-            streaming_mode: adk_core::StreamingMode::None,
-            ..RunConfig::default()
+        AGENT_TOOL_CONFIG.get_or_init(|| {
+            RunConfig::builder().streaming_mode(adk_core::StreamingMode::None).build()
         })
     }
 

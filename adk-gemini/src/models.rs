@@ -54,6 +54,7 @@ pub enum Part {
         #[serde(rename = "thoughtSignature", default, skip_serializing_if = "Option::is_none")]
         thought_signature: Option<String>,
     },
+    /// Inline binary data (base64-encoded with MIME type).
     InlineData {
         /// The blob data
         #[serde(rename = "inlineData")]
@@ -61,6 +62,7 @@ pub enum Part {
     },
     /// File data referenced by URI
     FileData {
+        /// The file data reference.
         #[serde(rename = "fileData")]
         file_data: FileDataRef,
     },
@@ -86,6 +88,7 @@ pub enum Part {
     },
     /// Server-side tool call from Gemini 3 (built-in tool invocation)
     ToolCall {
+        /// The tool call payload.
         #[serde(rename = "toolCall")]
         tool_call: serde_json::Value,
         /// The thought signature (Gemini 3.x thinking models).
@@ -95,6 +98,7 @@ pub enum Part {
     },
     /// Server-side tool response from Gemini 3 (built-in tool result)
     ToolResponse {
+        /// The tool response payload.
         #[serde(rename = "toolResponse")]
         tool_response: serde_json::Value,
         /// The thought signature (Gemini 3.x thinking models).
@@ -104,6 +108,7 @@ pub enum Part {
     },
     /// Generated code emitted by Gemini code execution.
     ExecutableCode {
+        /// The executable code payload.
         #[serde(rename = "executableCode")]
         executable_code: serde_json::Value,
         /// The thought signature (Gemini 3.x thinking models).
@@ -113,6 +118,7 @@ pub enum Part {
     },
     /// Result emitted by Gemini code execution.
     CodeExecutionResult {
+        /// The code execution result payload.
         #[serde(rename = "codeExecutionResult")]
         code_execution_result: serde_json::Value,
         /// The thought signature (Gemini 3.x thinking models).
@@ -154,7 +160,9 @@ impl Blob {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FileDataRef {
+    /// The MIME type of the referenced file.
     pub mime_type: String,
+    /// The URI of the file (e.g. `gs://bucket/path` or a Gemini file URI).
     pub file_uri: String,
 }
 

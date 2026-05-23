@@ -18,19 +18,33 @@ use std::time::Duration;
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ErrorComponent {
+    /// Error originated in agent logic.
     Agent,
+    /// Error originated in model/LLM interaction.
     Model,
+    /// Error originated in tool execution.
     Tool,
+    /// Error originated in session management.
     Session,
+    /// Error originated in artifact storage.
     Artifact,
+    /// Error originated in memory/RAG operations.
     Memory,
+    /// Error originated in graph workflow execution.
     Graph,
+    /// Error originated in realtime audio/video streaming.
     Realtime,
+    /// Error originated in code execution.
     Code,
+    /// Error originated in the HTTP server.
     Server,
+    /// Error originated in authentication/authorization.
     Auth,
+    /// Error originated in guardrail validation.
     Guardrail,
+    /// Error originated in evaluation framework.
     Eval,
+    /// Error originated in deployment operations.
     Deploy,
 }
 
@@ -73,15 +87,25 @@ impl fmt::Display for ErrorComponent {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ErrorCategory {
+    /// Caller provided bad data (config, request body, parameters).
     InvalidInput,
+    /// Missing or invalid credentials.
     Unauthorized,
+    /// Valid credentials but insufficient permissions.
     Forbidden,
+    /// Requested resource does not exist.
     NotFound,
+    /// Upstream rate limit hit (retryable by default).
     RateLimited,
+    /// Operation exceeded time limit (retryable by default).
     Timeout,
+    /// Upstream service temporarily down (retryable by default).
     Unavailable,
+    /// Operation was cancelled by caller or system.
     Cancelled,
+    /// Unexpected internal error (bugs, invariant violations).
     Internal,
+    /// Requested feature or operation is not supported.
     Unsupported,
 }
 
@@ -106,9 +130,12 @@ impl fmt::Display for ErrorCategory {
 /// Structured retry guidance attached to every [`AdkError`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RetryHint {
+    /// Whether the operation should be retried.
     pub should_retry: bool,
+    /// Suggested delay before retrying, in milliseconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retry_after_ms: Option<u64>,
+    /// Maximum number of retry attempts suggested.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_attempts: Option<u32>,
 }
@@ -139,12 +166,16 @@ impl RetryHint {
 /// Optional structured metadata carried by an [`AdkError`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ErrorDetails {
+    /// HTTP status code from the upstream service, if applicable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upstream_status_code: Option<u16>,
+    /// Request ID from the upstream service for correlation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
+    /// Name of the provider that produced the error (e.g., "openai", "gemini").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    /// Additional key-value metadata for debugging.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub metadata: HashMap<String, Value>,
 }
@@ -179,11 +210,17 @@ pub struct ErrorDetails {
 /// assert!(err.is_model());
 /// ```
 pub struct AdkError {
+    /// The subsystem that produced the error.
     pub component: ErrorComponent,
+    /// The kind of failure.
     pub category: ErrorCategory,
+    /// Machine-readable error code (e.g., "model.openai.rate_limited").
     pub code: &'static str,
+    /// Human-readable error message.
     pub message: String,
+    /// Retry guidance for this error.
     pub retry: RetryHint,
+    /// Additional structured metadata.
     pub details: Box<ErrorDetails>,
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
@@ -226,6 +263,7 @@ const _: () = {
 };
 
 impl AdkError {
+    /// Creates a new `AdkError` with the given component, category, code, and message.
     pub fn new(
         component: ErrorComponent,
         category: ErrorCategory,
@@ -243,31 +281,37 @@ impl AdkError {
         }
     }
 
+    /// Attaches a source error for error chaining.
     pub fn with_source(mut self, source: impl std::error::Error + Send + Sync + 'static) -> Self {
         self.source = Some(Box::new(source));
         self
     }
 
+    /// Overrides the default retry hint.
     pub fn with_retry(mut self, retry: RetryHint) -> Self {
         self.retry = retry;
         self
     }
 
+    /// Replaces the error details.
     pub fn with_details(mut self, details: ErrorDetails) -> Self {
         self.details = Box::new(details);
         self
     }
 
+    /// Sets the upstream HTTP status code in details.
     pub fn with_upstream_status(mut self, status_code: u16) -> Self {
         self.details.upstream_status_code = Some(status_code);
         self
     }
 
+    /// Sets the upstream request ID in details.
     pub fn with_request_id(mut self, request_id: impl Into<String>) -> Self {
         self.details.request_id = Some(request_id.into());
         self
     }
 
+    /// Sets the provider name in details.
     pub fn with_provider(mut self, provider: impl Into<String>) -> Self {
         self.details.provider = Some(provider.into());
         self
@@ -275,6 +319,7 @@ impl AdkError {
 }
 
 impl AdkError {
+    /// Creates a `NotFound` error for the given component.
     pub fn not_found(
         component: ErrorComponent,
         code: &'static str,
@@ -283,6 +328,7 @@ impl AdkError {
         Self::new(component, ErrorCategory::NotFound, code, message)
     }
 
+    /// Creates a `RateLimited` error for the given component.
     pub fn rate_limited(
         component: ErrorComponent,
         code: &'static str,
@@ -291,6 +337,7 @@ impl AdkError {
         Self::new(component, ErrorCategory::RateLimited, code, message)
     }
 
+    /// Creates an `Unauthorized` error for the given component.
     pub fn unauthorized(
         component: ErrorComponent,
         code: &'static str,
@@ -299,6 +346,7 @@ impl AdkError {
         Self::new(component, ErrorCategory::Unauthorized, code, message)
     }
 
+    /// Creates an `Internal` error for the given component.
     pub fn internal(
         component: ErrorComponent,
         code: &'static str,
@@ -307,6 +355,7 @@ impl AdkError {
         Self::new(component, ErrorCategory::Internal, code, message)
     }
 
+    /// Creates a `Timeout` error for the given component.
     pub fn timeout(
         component: ErrorComponent,
         code: &'static str,
@@ -315,6 +364,7 @@ impl AdkError {
         Self::new(component, ErrorCategory::Timeout, code, message)
     }
 
+    /// Creates an `Unavailable` error for the given component.
     pub fn unavailable(
         component: ErrorComponent,
         code: &'static str,
@@ -325,78 +375,98 @@ impl AdkError {
 }
 
 impl AdkError {
+    /// Legacy convenience constructor for agent errors.
     pub fn agent(message: impl Into<String>) -> Self {
         Self::new(ErrorComponent::Agent, ErrorCategory::Internal, "agent.legacy", message)
     }
 
+    /// Legacy convenience constructor for model errors.
     pub fn model(message: impl Into<String>) -> Self {
         Self::new(ErrorComponent::Model, ErrorCategory::Internal, "model.legacy", message)
     }
 
+    /// Legacy convenience constructor for tool errors.
     pub fn tool(message: impl Into<String>) -> Self {
         Self::new(ErrorComponent::Tool, ErrorCategory::Internal, "tool.legacy", message)
     }
 
+    /// Legacy convenience constructor for session errors.
     pub fn session(message: impl Into<String>) -> Self {
         Self::new(ErrorComponent::Session, ErrorCategory::Internal, "session.legacy", message)
     }
 
+    /// Legacy convenience constructor for memory errors.
     pub fn memory(message: impl Into<String>) -> Self {
         Self::new(ErrorComponent::Memory, ErrorCategory::Internal, "memory.legacy", message)
     }
 
+    /// Legacy convenience constructor for configuration errors.
     pub fn config(message: impl Into<String>) -> Self {
         Self::new(ErrorComponent::Server, ErrorCategory::InvalidInput, "config.legacy", message)
     }
 
+    /// Legacy convenience constructor for artifact errors.
     pub fn artifact(message: impl Into<String>) -> Self {
         Self::new(ErrorComponent::Artifact, ErrorCategory::Internal, "artifact.legacy", message)
     }
 }
 
 impl AdkError {
+    /// Returns `true` if this error originated in agent logic.
     pub fn is_agent(&self) -> bool {
         self.component == ErrorComponent::Agent
     }
+    /// Returns `true` if this error originated in model interaction.
     pub fn is_model(&self) -> bool {
         self.component == ErrorComponent::Model
     }
+    /// Returns `true` if this error originated in tool execution.
     pub fn is_tool(&self) -> bool {
         self.component == ErrorComponent::Tool
     }
+    /// Returns `true` if this error originated in session management.
     pub fn is_session(&self) -> bool {
         self.component == ErrorComponent::Session
     }
+    /// Returns `true` if this error originated in artifact storage.
     pub fn is_artifact(&self) -> bool {
         self.component == ErrorComponent::Artifact
     }
+    /// Returns `true` if this error originated in memory operations.
     pub fn is_memory(&self) -> bool {
         self.component == ErrorComponent::Memory
     }
+    /// Returns `true` if this is a configuration error (legacy code path).
     pub fn is_config(&self) -> bool {
         self.code == "config.legacy"
     }
 }
 
 impl AdkError {
+    /// Returns `true` if this error should be retried.
     pub fn is_retryable(&self) -> bool {
         self.retry.should_retry
     }
+    /// Returns `true` if this is a not-found error.
     pub fn is_not_found(&self) -> bool {
         self.category == ErrorCategory::NotFound
     }
+    /// Returns `true` if this is an unauthorized error.
     pub fn is_unauthorized(&self) -> bool {
         self.category == ErrorCategory::Unauthorized
     }
+    /// Returns `true` if this is a rate-limited error.
     pub fn is_rate_limited(&self) -> bool {
         self.category == ErrorCategory::RateLimited
     }
+    /// Returns `true` if this is a timeout error.
     pub fn is_timeout(&self) -> bool {
         self.category == ErrorCategory::Timeout
     }
 }
 
 impl AdkError {
+    /// Maps the error category to an appropriate HTTP status code.
     #[allow(unreachable_patterns)]
     pub fn http_status_code(&self) -> u16 {
         match self.category {
@@ -416,6 +486,7 @@ impl AdkError {
 }
 
 impl AdkError {
+    /// Serializes the error as a JSON Problem Details object.
     pub fn to_problem_json(&self) -> Value {
         json!({
             "error": {

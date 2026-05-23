@@ -75,6 +75,7 @@ pub struct LlmConditionalAgent {
     after_callbacks: Arc<Vec<AfterAgentCallback>>,
 }
 
+/// Builder for constructing an [`LlmConditionalAgent`].
 pub struct LlmConditionalAgentBuilder {
     name: String,
     description: Option<String>,
@@ -137,17 +138,20 @@ impl LlmConditionalAgentBuilder {
         self
     }
 
+    /// Set a preloaded skills index for this agent.
     #[cfg(feature = "skills")]
     pub fn with_skills(mut self, index: SkillIndex) -> Self {
         self.skills_index = Some(Arc::new(index));
         self
     }
 
+    /// Auto-load skills from `.skills/` in the current working directory.
     #[cfg(feature = "skills")]
     pub fn with_auto_skills(self) -> Result<Self> {
         self.with_skills_from_root(".")
     }
 
+    /// Auto-load skills from `.skills/` under a custom root directory.
     #[cfg(feature = "skills")]
     pub fn with_skills_from_root(mut self, root: impl AsRef<std::path::Path>) -> Result<Self> {
         let index = load_skill_index(root).map_err(|e| adk_core::AdkError::agent(e.to_string()))?;
@@ -155,12 +159,14 @@ impl LlmConditionalAgentBuilder {
         Ok(self)
     }
 
+    /// Customize skill selection behavior.
     #[cfg(feature = "skills")]
     pub fn with_skill_policy(mut self, policy: SelectionPolicy) -> Self {
         self.skill_policy = policy;
         self
     }
 
+    /// Limit injected skill content length.
     #[cfg(feature = "skills")]
     pub fn with_skill_budget(mut self, max_chars: usize) -> Self {
         self.max_skill_chars = max_chars;

@@ -10,6 +10,7 @@ use sqlx::{Row, sqlite::SqlitePool};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+/// SQLite-backed session service using `sqlx`.
 pub struct SqliteSessionService {
     pool: SqlitePool,
 }
@@ -96,6 +97,7 @@ CREATE TABLE IF NOT EXISTS user_states (\
 );",
     )];
 
+    /// Run all pending schema migrations for this backend.
     pub async fn migrate(&self) -> Result<()> {
         let pool = &self.pool;
         crate::migration::sqlite_runner::run_sql_migrations(

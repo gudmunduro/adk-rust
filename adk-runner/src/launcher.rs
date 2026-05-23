@@ -131,6 +131,8 @@ impl Launcher {
                 cancellation_token: None,
                 intra_compaction_config: None,
                 intra_compaction_summarizer: None,
+                #[cfg(feature = "context-compaction")]
+                context_compaction: None,
             })?;
 
             let mut stream = runner

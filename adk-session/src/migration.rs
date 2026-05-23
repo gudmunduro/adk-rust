@@ -63,6 +63,7 @@ impl std::error::Error for MigrationError {}
 #[cfg(any(feature = "sqlite", feature = "postgres"))]
 macro_rules! impl_sql_migration_runner {
     ($mod_name:ident, $pool_ty:ty, $int_type:expr) => {
+        /// SQL migration runner for this database backend.
         pub mod $mod_name {
             use super::MigrationError;
             use chrono::Utc;

@@ -9,10 +9,19 @@ use futures::StreamExt;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
+#[cfg(feature = "a2a-interceptors")]
+use crate::a2a::interceptor::{A2aDelegationContext, InterceptorChain, InterceptorDecision};
+
 pub struct ExecutorConfig {
     pub app_name: String,
     pub runner_config: Arc<RunnerConfig>,
     pub cancellation_token: Option<CancellationToken>,
+    /// Optional interceptor chain for A2A request/response middleware.
+    ///
+    /// When set, the chain's `run_before` is called before processing a request,
+    /// and `run_after` is called after the executor produces a response.
+    #[cfg(feature = "a2a-interceptors")]
+    pub interceptor_chain: Option<Arc<InterceptorChain>>,
 }
 
 pub struct Executor {
@@ -30,6 +39,67 @@ impl Executor {
         task_id: &str,
         message: &Message,
     ) -> Result<Vec<UpdateEvent>> {
+        // --- Interceptor: before delegation ---
+        #[cfg(feature = "a2a-interceptors")]
+        let interceptor_ctx = {
+            if let Some(chain) = &self.config.interceptor_chain {
+                let params = serde_json::to_value(message).unwrap_or(serde_json::Value::Null);
+
+                let metadata_map = message
+                    .metadata
+                    .as_ref()
+                    .map(|m| {
+                        m.iter()
+                            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                let mut ctx = A2aDelegationContext {
+                    method: "message/send".to_string(),
+                    params,
+                    caller_id: message
+                        .metadata
+                        .as_ref()
+                        .and_then(|m| m.get("caller_id"))
+                        .and_then(|v| v.as_str())
+                        .map(String::from),
+                    metadata: metadata_map,
+                };
+
+                let decision = chain
+                    .run_before(&mut ctx)
+                    .await
+                    .map_err(|e| adk_core::AdkError::agent(e.to_string()))?;
+
+                match decision {
+                    InterceptorDecision::Continue => {}
+                    InterceptorDecision::ShortCircuit(response) => {
+                        // Return the short-circuited response as a completed task
+                        let results = vec![UpdateEvent::TaskStatusUpdate(TaskStatusUpdateEvent {
+                            task_id: task_id.to_string(),
+                            context_id: Some(context_id.to_string()),
+                            status: TaskStatus {
+                                state: TaskState::Completed,
+                                message: response.as_str().map(String::from),
+                            },
+                            final_update: true,
+                        })];
+                        return Ok(results);
+                    }
+                    InterceptorDecision::Reject { code, message: msg } => {
+                        return Err(adk_core::AdkError::agent(format!(
+                            "A2A request rejected (code {code}): {msg}"
+                        )));
+                    }
+                }
+
+                Some(ctx)
+            } else {
+                None
+            }
+        };
+
         let meta = to_invocation_meta(&self.config.app_name, context_id, None);
         let cancellation_token = self.config.cancellation_token.clone();
 
@@ -41,22 +111,38 @@ impl Executor {
         let event = message_to_event(message, invocation_id)?;
 
         // Create runner
-        let runner = Runner::new(RunnerConfig {
-            app_name: self.config.runner_config.app_name.clone(),
-            agent: self.config.runner_config.agent.clone(),
-            session_service: self.config.runner_config.session_service.clone(),
-            artifact_service: self.config.runner_config.artifact_service.clone(),
-            memory_service: self.config.runner_config.memory_service.clone(),
-            plugin_manager: self.config.runner_config.plugin_manager.clone(),
-            run_config: self.config.runner_config.run_config.clone(),
-            compaction_config: self.config.runner_config.compaction_config.clone(),
-            context_cache_config: self.config.runner_config.context_cache_config.clone(),
-            cache_capable: self.config.runner_config.cache_capable.clone(),
-            request_context: self.config.runner_config.request_context.clone(),
-            cancellation_token: cancellation_token.clone(),
-            intra_compaction_config: None,
-            intra_compaction_summarizer: None,
-        })?;
+        let mut runner_builder = Runner::builder()
+            .app_name(self.config.runner_config.app_name.clone())
+            .agent(self.config.runner_config.agent.clone())
+            .session_service(self.config.runner_config.session_service.clone());
+        if let Some(ref artifact_service) = self.config.runner_config.artifact_service {
+            runner_builder = runner_builder.artifact_service(artifact_service.clone());
+        }
+        if let Some(ref memory_service) = self.config.runner_config.memory_service {
+            runner_builder = runner_builder.memory_service(memory_service.clone());
+        }
+        if let Some(ref plugin_manager) = self.config.runner_config.plugin_manager {
+            runner_builder = runner_builder.plugin_manager(plugin_manager.clone());
+        }
+        if let Some(ref run_config) = self.config.runner_config.run_config {
+            runner_builder = runner_builder.run_config(run_config.clone());
+        }
+        if let Some(ref compaction_config) = self.config.runner_config.compaction_config {
+            runner_builder = runner_builder.compaction_config(compaction_config.clone());
+        }
+        if let Some(ref context_cache_config) = self.config.runner_config.context_cache_config {
+            runner_builder = runner_builder.context_cache_config(context_cache_config.clone());
+        }
+        if let Some(ref cache_capable) = self.config.runner_config.cache_capable {
+            runner_builder = runner_builder.cache_capable(cache_capable.clone());
+        }
+        if let Some(ref request_context) = self.config.runner_config.request_context {
+            runner_builder = runner_builder.request_context(request_context.clone());
+        }
+        if let Some(cancellation_token) = cancellation_token.clone() {
+            runner_builder = runner_builder.cancellation_token(cancellation_token);
+        }
+        let runner = runner_builder.build()?;
 
         // Create processor
         let mut processor =
@@ -141,6 +227,19 @@ impl Executor {
         // Send terminal events
         for terminal_event in processor.make_terminal_events() {
             results.push(UpdateEvent::TaskStatusUpdate(terminal_event));
+        }
+
+        // --- Interceptor: after delegation ---
+        #[cfg(feature = "a2a-interceptors")]
+        if let Some(chain) = &self.config.interceptor_chain {
+            if let Some(ctx) = &interceptor_ctx {
+                let mut response_value =
+                    serde_json::to_value(&results).unwrap_or(serde_json::Value::Null);
+                chain
+                    .run_after(ctx, &mut response_value)
+                    .await
+                    .map_err(|e| adk_core::AdkError::agent(e.to_string()))?;
+            }
         }
 
         Ok(results)

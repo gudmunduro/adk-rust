@@ -6,6 +6,7 @@ use crate::error::Result;
 use crate::interrupt::Interrupt;
 use crate::state::State;
 use crate::stream::StreamEvent;
+use crate::timeout::ProgressHandle;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -70,12 +71,15 @@ pub struct NodeContext {
     pub config: ExecutionConfig,
     /// Current step number
     pub step: usize,
+    /// Optional progress handle for idle timeout tracking.
+    /// When present, calling [`report_progress()`](Self::report_progress) resets the idle timeout counter.
+    progress_handle: Option<ProgressHandle>,
 }
 
 impl NodeContext {
     /// Create a new node context
     pub fn new(state: State, config: ExecutionConfig, step: usize) -> Self {
-        Self { state, config, step }
+        Self { state, config, step, progress_handle: None }
     }
 
     /// Get a value from state
@@ -86,6 +90,42 @@ impl NodeContext {
     /// Get a value from state as a specific type
     pub fn get_as<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {
         self.state.get(key).and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Report progress, resetting the idle timeout counter.
+    ///
+    /// Nodes performing long-running work should call this periodically to
+    /// prevent the idle timeout from firing. If no progress handle is attached
+    /// (e.g., when no idle timeout is configured), this is a no-op.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// async fn execute(&self, ctx: &NodeContext) -> Result<NodeOutput> {
+    ///     for chunk in large_dataset.chunks(100) {
+    ///         process(chunk).await;
+    ///         ctx.report_progress(); // reset idle timeout
+    ///     }
+    ///     Ok(NodeOutput::new())
+    /// }
+    /// ```
+    pub fn report_progress(&self) {
+        if let Some(handle) = &self.progress_handle {
+            handle.report_progress();
+        }
+    }
+
+    /// Attach a progress handle for idle timeout tracking.
+    ///
+    /// This is called by the executor before running a node with an idle timeout
+    /// policy. Nodes do not need to call this directly.
+    pub fn set_progress_handle(&mut self, handle: ProgressHandle) {
+        self.progress_handle = Some(handle);
+    }
+
+    /// Get a reference to the attached progress handle, if any.
+    pub fn progress_handle(&self) -> Option<&ProgressHandle> {
+        self.progress_handle.as_ref()
     }
 }
 
@@ -201,8 +241,10 @@ impl Node for FunctionNode {
     }
 
     async fn execute(&self, ctx: &NodeContext) -> Result<NodeOutput> {
-        let ctx_owned =
-            NodeContext { state: ctx.state.clone(), config: ctx.config.clone(), step: ctx.step };
+        let mut ctx_owned = NodeContext::new(ctx.state.clone(), ctx.config.clone(), ctx.step);
+        if let Some(handle) = ctx.progress_handle() {
+            ctx_owned.set_progress_handle(handle.clone());
+        }
         (self.func)(ctx_owned).await
     }
 }

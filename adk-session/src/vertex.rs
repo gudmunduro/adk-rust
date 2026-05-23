@@ -15,15 +15,21 @@ use std::sync::{Arc, RwLock};
 const SESSION_API_VERSION: &str = "v1beta1";
 const CLOUD_PLATFORM_SCOPE: &str = "https://www.googleapis.com/auth/cloud-platform";
 
+/// Configuration for the Vertex AI Session API backend.
 #[derive(Debug, Clone)]
 pub struct VertexAiSessionConfig {
+    /// Google Cloud project ID.
     pub project_id: String,
+    /// GCP region (e.g. `us-central1`).
     pub location: String,
+    /// Optional reasoning engine resource name.
     pub reasoning_engine: Option<String>,
+    /// Optional custom API endpoint URL.
     pub endpoint: Option<String>,
 }
 
 impl VertexAiSessionConfig {
+    /// Creates a new config with the given project ID and location.
     pub fn new(project_id: impl Into<String>, location: impl Into<String>) -> Self {
         Self {
             project_id: project_id.into(),
@@ -33,11 +39,13 @@ impl VertexAiSessionConfig {
         }
     }
 
+    /// Sets the reasoning engine resource name.
     pub fn with_reasoning_engine(mut self, reasoning_engine: impl Into<String>) -> Self {
         self.reasoning_engine = Some(reasoning_engine.into());
         self
     }
 
+    /// Sets a custom API endpoint URL.
     pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint = Some(endpoint.into());
         self
@@ -66,6 +74,7 @@ struct SessionScope {
     user_id: String,
 }
 
+/// Vertex AI Session API service implementation.
 pub struct VertexAiSessionService {
     http_client: Client,
     endpoint: String,
@@ -78,6 +87,7 @@ pub struct VertexAiSessionService {
 }
 
 impl VertexAiSessionService {
+    /// Creates a new service using Application Default Credentials (ADC).
     pub fn new_with_adc(config: VertexAiSessionConfig) -> Result<Self> {
         let credentials = credentials::Builder::default()
             .with_scopes([CLOUD_PLATFORM_SCOPE])
@@ -89,6 +99,7 @@ impl VertexAiSessionService {
         Ok(Self::with_credentials(config, credentials))
     }
 
+    /// Creates a new service with explicit credentials.
     pub fn with_credentials(config: VertexAiSessionConfig, credentials: Credentials) -> Self {
         Self {
             http_client: Client::new(),

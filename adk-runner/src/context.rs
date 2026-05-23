@@ -224,6 +224,11 @@ impl adk_core::State for MutableSession {
     }
 }
 
+/// Runtime context for a single agent invocation.
+///
+/// Holds the agent, session, identity, and optional services (artifacts, memory,
+/// secrets) needed during execution. Created by the [`Runner`](crate::Runner) for
+/// each `run()` call.
 pub struct InvocationContext {
     identity: ExecutionIdentity,
     agent: Arc<dyn Agent>,
@@ -279,6 +284,10 @@ impl InvocationContext {
         })
     }
 
+    /// Create a new invocation context from raw string identifiers.
+    ///
+    /// Validates and converts the string identifiers into typed wrappers.
+    /// Prefer [`new_typed`](Self::new_typed) when you already have validated types.
     pub fn new(
         invocation_id: String,
         agent: Arc<dyn Agent>,
@@ -354,21 +363,25 @@ impl InvocationContext {
         )
     }
 
+    /// Set the event branch identifier for this context.
     pub fn with_branch(mut self, branch: String) -> Self {
         self.identity.branch = branch;
         self
     }
 
+    /// Attach an artifact storage service to this context.
     pub fn with_artifacts(mut self, artifacts: Arc<dyn Artifacts>) -> Self {
         self.artifacts = Some(artifacts);
         self
     }
 
+    /// Attach a memory service for RAG/semantic search.
     pub fn with_memory(mut self, memory: Arc<dyn Memory>) -> Self {
         self.memory = Some(memory);
         self
     }
 
+    /// Set the run configuration (streaming mode, history limits, etc.).
     pub fn with_run_config(mut self, config: RunConfig) -> Self {
         self.run_config = config;
         self

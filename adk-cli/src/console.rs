@@ -5,7 +5,7 @@
 //! streaming mode, etc.).
 
 use adk_core::{Agent, SessionId, UserId};
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::{CreateRequest, InMemorySessionService, SessionService};
 use anyhow::Result;
 use futures::StreamExt;
@@ -31,22 +31,11 @@ pub async fn run_console(agent: Arc<dyn Agent>, app_name: String, user_id: Strin
         })
         .await?;
 
-    let runner = Runner::new(RunnerConfig {
-        app_name,
-        agent: agent.clone(),
-        session_service: session_service.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })?;
+    let runner = Runner::builder()
+        .app_name(app_name)
+        .agent(agent.clone())
+        .session_service(session_service.clone())
+        .build()?;
 
     let mut rl = DefaultEditor::new()?;
 

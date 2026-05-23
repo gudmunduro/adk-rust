@@ -1187,23 +1187,29 @@ pub async fn run_sse(
             .map_err(adk_err_to_runtime)?;
 
         // Create runner
-        let runner = adk_runner::Runner::new(adk_runner::RunnerConfig {
-            app_name: app_name.clone(),
-            agent,
-            session_service: controller.config.session_service.clone(),
-            artifact_service: controller.config.artifact_service.clone(),
-            memory_service: controller.config.memory_service.clone(),
-            plugin_manager: None,
-            run_config: None,
-            compaction_config: controller.config.compaction_config.clone(),
-            context_cache_config: controller.config.context_cache_config.clone(),
-            cache_capable: controller.config.cache_capable.clone(),
-            request_context,
-            cancellation_token: None,
-            intra_compaction_config: None,
-            intra_compaction_summarizer: None,
-        })
-        .map_err(adk_err_to_runtime)?;
+        let mut runner_builder = adk_runner::Runner::builder()
+            .app_name(app_name.clone())
+            .agent(agent)
+            .session_service(controller.config.session_service.clone());
+        if let Some(ref artifact_service) = controller.config.artifact_service {
+            runner_builder = runner_builder.artifact_service(artifact_service.clone());
+        }
+        if let Some(ref memory_service) = controller.config.memory_service {
+            runner_builder = runner_builder.memory_service(memory_service.clone());
+        }
+        if let Some(ref compaction_config) = controller.config.compaction_config {
+            runner_builder = runner_builder.compaction_config(compaction_config.clone());
+        }
+        if let Some(ref context_cache_config) = controller.config.context_cache_config {
+            runner_builder = runner_builder.context_cache_config(context_cache_config.clone());
+        }
+        if let Some(ref cache_capable) = controller.config.cache_capable {
+            runner_builder = runner_builder.cache_capable(cache_capable.clone());
+        }
+        if let Some(request_context) = request_context {
+            runner_builder = runner_builder.request_context(request_context);
+        }
+        let runner = runner_builder.build().map_err(adk_err_to_runtime)?;
 
         // Build content with attachments
         let content = build_content_with_attachments(&req.new_message, &req.attachments)?;
@@ -1372,23 +1378,30 @@ pub async fn run_sse_compat(
     let streaming_mode =
         if req.streaming { adk_core::StreamingMode::SSE } else { adk_core::StreamingMode::None };
 
-    let runner = adk_runner::Runner::new(adk_runner::RunnerConfig {
-        app_name,
-        agent,
-        session_service: controller.config.session_service.clone(),
-        artifact_service: controller.config.artifact_service.clone(),
-        memory_service: controller.config.memory_service.clone(),
-        plugin_manager: None,
-        run_config: Some(adk_core::RunConfig { streaming_mode, ..adk_core::RunConfig::default() }),
-        compaction_config: controller.config.compaction_config.clone(),
-        context_cache_config: controller.config.context_cache_config.clone(),
-        cache_capable: controller.config.cache_capable.clone(),
-        request_context,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .map_err(adk_err_to_runtime)?;
+    let mut runner_builder = adk_runner::Runner::builder()
+        .app_name(app_name)
+        .agent(agent)
+        .session_service(controller.config.session_service.clone())
+        .run_config(adk_core::RunConfig::builder().streaming_mode(streaming_mode).build());
+    if let Some(ref artifact_service) = controller.config.artifact_service {
+        runner_builder = runner_builder.artifact_service(artifact_service.clone());
+    }
+    if let Some(ref memory_service) = controller.config.memory_service {
+        runner_builder = runner_builder.memory_service(memory_service.clone());
+    }
+    if let Some(ref compaction_config) = controller.config.compaction_config {
+        runner_builder = runner_builder.compaction_config(compaction_config.clone());
+    }
+    if let Some(ref context_cache_config) = controller.config.context_cache_config {
+        runner_builder = runner_builder.context_cache_config(context_cache_config.clone());
+    }
+    if let Some(ref cache_capable) = controller.config.cache_capable {
+        runner_builder = runner_builder.cache_capable(cache_capable.clone());
+    }
+    if let Some(request_context) = request_context {
+        runner_builder = runner_builder.request_context(request_context);
+    }
+    let runner = runner_builder.build().map_err(adk_err_to_runtime)?;
 
     // Run agent with full content (text + inline data)
     let typed_user_id =

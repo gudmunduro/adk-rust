@@ -1,4 +1,5 @@
 //! Typed models for the OpenRouter chat-completions API.
+#![allow(missing_docs)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

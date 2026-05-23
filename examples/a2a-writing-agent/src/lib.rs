@@ -8,7 +8,7 @@ use std::sync::Arc;
 use a2a_protocol_types::{AgentCapabilities, AgentSkill};
 use adk_agent::LlmAgentBuilder;
 use adk_core::{Agent, Llm};
-use adk_runner::RunnerConfig;
+use adk_runner::Runner;
 use adk_server::a2a::v1::card::{CachedAgentCard, build_v1_agent_card};
 use adk_server::a2a::v1::executor::V1Executor;
 use adk_server::a2a::v1::jsonrpc_handler::jsonrpc_handler;
@@ -92,22 +92,11 @@ pub fn build_server(agent: Arc<dyn Agent>, base_url: &str) -> Router {
     );
     let cached_card = Arc::new(RwLock::new(CachedAgentCard::new(card)));
 
-    let runner_config = Arc::new(RunnerConfig {
-        app_name: agent.name().to_string(),
-        agent,
-        session_service,
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-        request_context: None,
-        cancellation_token: None,
-    });
+    let runner_config = Arc::new(Runner::builder()
+        .app_name(agent.name())
+        .agent(agent)
+        .session_service(session_service)
+        .build_config());
 
     let handler = Arc::new(RequestHandler::with_runner(
         executor,

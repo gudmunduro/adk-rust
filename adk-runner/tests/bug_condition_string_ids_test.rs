@@ -14,7 +14,7 @@
 use std::sync::Arc;
 
 use adk_core::{Agent, Content, EventStream, InvocationContext, Part, Result, SessionId, UserId};
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::{Event, Events, GetRequest, Session, SessionService, State};
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -145,23 +145,12 @@ impl SessionService for MockSessionService {
 // ---------------------------------------------------------------------------
 
 fn make_runner() -> Runner {
-    Runner::new(RunnerConfig {
-        app_name: "test-app".to_string(),
-        agent: Arc::new(MockAgent),
-        session_service: Arc::new(MockSessionService),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
-    .unwrap()
+    Runner::builder()
+        .app_name("test-app")
+        .agent(Arc::new(MockAgent) as Arc<dyn Agent>)
+        .session_service(Arc::new(MockSessionService) as Arc<dyn SessionService>)
+        .build()
+        .unwrap()
 }
 
 // ---------------------------------------------------------------------------

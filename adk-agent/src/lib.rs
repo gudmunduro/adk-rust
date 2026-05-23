@@ -1,5 +1,6 @@
 //! # adk-agent
 #![allow(clippy::result_large_err)]
+#![deny(missing_docs)]
 //!
 //! Agent implementations for ADK (LLM, Custom, Workflow agents).
 //!

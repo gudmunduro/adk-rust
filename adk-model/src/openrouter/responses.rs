@@ -1,4 +1,5 @@
 //! Typed models for the OpenRouter Responses API.
+#![allow(missing_docs)]
 
 use crate::openrouter::chat::{
     OpenRouterImageConfig, OpenRouterPlugin, OpenRouterProviderPreferences,

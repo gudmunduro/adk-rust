@@ -4,7 +4,7 @@ use crate::a2a::{
     MessageSendParams, Task, TaskState, TaskStatus, TaskStatusUpdateEvent, TasksCancelParams,
     TasksGetParams, UpdateEvent, build_agent_card, jsonrpc,
 };
-use adk_runner::RunnerConfig;
+use adk_runner::{Runner, RunnerConfig};
 use axum::{
     extract::State,
     http::StatusCode,
@@ -85,22 +85,29 @@ fn build_runner_config(
     root_agent: Arc<dyn adk_core::Agent>,
     cancellation_token: Option<CancellationToken>,
 ) -> Arc<RunnerConfig> {
-    Arc::new(RunnerConfig {
-        app_name: root_agent.name().to_string(),
-        agent: root_agent,
-        session_service: controller.config.session_service.clone(),
-        artifact_service: controller.config.artifact_service.clone(),
-        memory_service: controller.config.memory_service.clone(),
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: controller.config.compaction_config.clone(),
-        context_cache_config: controller.config.context_cache_config.clone(),
-        cache_capable: controller.config.cache_capable.clone(),
-        request_context: None,
-        cancellation_token,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })
+    let mut builder = Runner::builder()
+        .app_name(root_agent.name())
+        .agent(root_agent)
+        .session_service(controller.config.session_service.clone());
+    if let Some(ref artifact_service) = controller.config.artifact_service {
+        builder = builder.artifact_service(artifact_service.clone());
+    }
+    if let Some(ref memory_service) = controller.config.memory_service {
+        builder = builder.memory_service(memory_service.clone());
+    }
+    if let Some(ref compaction_config) = controller.config.compaction_config {
+        builder = builder.compaction_config(compaction_config.clone());
+    }
+    if let Some(ref context_cache_config) = controller.config.context_cache_config {
+        builder = builder.context_cache_config(context_cache_config.clone());
+    }
+    if let Some(ref cache_capable) = controller.config.cache_capable {
+        builder = builder.cache_capable(cache_capable.clone());
+    }
+    if let Some(cancellation_token) = cancellation_token {
+        builder = builder.cancellation_token(cancellation_token);
+    }
+    Arc::new(builder.build_config())
 }
 
 fn build_task_from_events(task_id: &str, context_id: &str, events: &[UpdateEvent]) -> Task {
@@ -178,6 +185,8 @@ async fn start_task(
         app_name: root_agent.name().to_string(),
         runner_config: build_runner_config(controller, root_agent, Some(token.clone())),
         cancellation_token: Some(token.clone()),
+        #[cfg(feature = "a2a-interceptors")]
+        interceptor_chain: controller.config.interceptor_chain.clone(),
     });
 
     let controller_clone = controller.clone();

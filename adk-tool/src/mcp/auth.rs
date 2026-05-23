@@ -16,7 +16,12 @@ pub enum McpAuth {
     /// Static bearer token
     Bearer(String),
     /// API key in header
-    ApiKey { header: String, key: String },
+    ApiKey {
+        /// HTTP header name for the API key.
+        header: String,
+        /// The API key value.
+        key: String,
+    },
     /// OAuth2 with automatic token refresh
     OAuth2(Arc<OAuth2Config>),
 }

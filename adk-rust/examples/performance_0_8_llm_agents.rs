@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
             user_prompt: "Load only the recent turns for a support chat handoff.",
             recommendation_focus: "Set RunConfig.history_max_events to bound startup work while preserving recent context.",
             validation_marker: "ADK08-09",
-            run_config: RunConfig { history_max_events: Some(12), ..RunConfig::default() },
+            run_config: RunConfig::builder().history_max_events(Some(12)).build(),
         },
         UseCase {
             finding: "10. payload-safe tracing",
@@ -104,15 +104,20 @@ async fn main() -> Result<()> {
             user_prompt: "Trace enough to debug without leaking long customer payloads.",
             recommendation_focus: "Keep record_payloads off and use trace_payload_max_bytes to cap recorded payload fields.",
             validation_marker: "ADK08-10",
-            run_config: RunConfig { trace_payload_max_bytes: 256, ..RunConfig::default() },
+            run_config: RunConfig::builder().trace_payload_max_bytes(256).build(),
         },
         UseCase {
             finding: "11. bounded parallel tools",
             agent_name: "operations_dispatcher",
             user_prompt: "Call several read-only inventory tools without flooding the backend.",
-            recommendation_focus: "Set RunConfig.max_tool_concurrency to cap parallel tool execution.",
+            recommendation_focus: "Set RunConfig.tool_concurrency.max_concurrency to cap parallel tool execution.",
             validation_marker: "ADK08-11",
-            run_config: RunConfig { max_tool_concurrency: Some(4), ..RunConfig::default() },
+            run_config: RunConfig::builder()
+                .tool_concurrency(adk_rust::ToolConcurrencyConfig {
+                    max_concurrency: Some(4),
+                    ..Default::default()
+                })
+                .build(),
         },
         UseCase {
             finding: "12. cache lifecycle without mutex-held network waits",

@@ -32,7 +32,7 @@ use std::sync::Arc;
 use adk_agent::LlmAgentBuilder;
 use adk_core::{Content, Part, SessionId, Toolset, UserId};
 use adk_model::GeminiModel;
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::{CreateRequest, InMemorySessionService, SessionService};
 use adk_tool::spanner::SpannerToolset;
 use futures::StreamExt;
@@ -71,22 +71,11 @@ async fn make_runner(
             state: HashMap::new(),
         })
         .await?;
-    Ok(Runner::new(RunnerConfig {
-        app_name: APP_NAME.into(),
-        agent,
-        session_service: sessions,
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })?)
+    Ok(Runner::builder()
+        .app_name(APP_NAME)
+        .agent(agent)
+        .session_service(sessions)
+        .build()?)
 }
 
 // ---------------------------------------------------------------------------

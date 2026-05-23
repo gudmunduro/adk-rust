@@ -70,6 +70,8 @@ pub struct RunnerConfigBuilder<A, G, S> {
     cancellation_token: Option<CancellationToken>,
     intra_compaction_config: Option<adk_core::IntraCompactionConfig>,
     intra_compaction_summarizer: Option<Arc<dyn adk_core::BaseEventsSummarizer>>,
+    #[cfg(feature = "context-compaction")]
+    context_compaction: Option<crate::compaction::CompactionConfig>,
     _marker: PhantomData<(A, G, S)>,
 }
 
@@ -93,6 +95,8 @@ impl RunnerConfigBuilder<NoAppName, NoAgent, NoSessionService> {
             cancellation_token: None,
             intra_compaction_config: None,
             intra_compaction_summarizer: None,
+            #[cfg(feature = "context-compaction")]
+            context_compaction: None,
             _marker: PhantomData,
         }
     }
@@ -128,6 +132,8 @@ impl<A, G, S> RunnerConfigBuilder<A, G, S> {
             cancellation_token: self.cancellation_token,
             intra_compaction_config: self.intra_compaction_config,
             intra_compaction_summarizer: self.intra_compaction_summarizer,
+            #[cfg(feature = "context-compaction")]
+            context_compaction: self.context_compaction,
             _marker: PhantomData,
         }
     }
@@ -151,6 +157,8 @@ impl<A, G, S> RunnerConfigBuilder<A, G, S> {
             cancellation_token: self.cancellation_token,
             intra_compaction_config: self.intra_compaction_config,
             intra_compaction_summarizer: self.intra_compaction_summarizer,
+            #[cfg(feature = "context-compaction")]
+            context_compaction: self.context_compaction,
             _marker: PhantomData,
         }
     }
@@ -177,6 +185,8 @@ impl<A, G, S> RunnerConfigBuilder<A, G, S> {
             cancellation_token: self.cancellation_token,
             intra_compaction_config: self.intra_compaction_config,
             intra_compaction_summarizer: self.intra_compaction_summarizer,
+            #[cfg(feature = "context-compaction")]
+            context_compaction: self.context_compaction,
             _marker: PhantomData,
         }
     }
@@ -257,6 +267,16 @@ impl<A, G, S> RunnerConfigBuilder<A, G, S> {
         self.intra_compaction_summarizer = Some(summarizer);
         self
     }
+
+    /// Set the context compaction configuration for token-budget overflow handling (optional).
+    ///
+    /// When configured, the runner applies the given [`CompactionStrategy`](crate::compaction::CompactionStrategy)
+    /// to shrink the event history when the context exceeds the token budget.
+    #[cfg(feature = "context-compaction")]
+    pub fn context_compaction(mut self, config: crate::compaction::CompactionConfig) -> Self {
+        self.context_compaction = Some(config);
+        self
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +284,34 @@ impl<A, G, S> RunnerConfigBuilder<A, G, S> {
 // ---------------------------------------------------------------------------
 
 impl RunnerConfigBuilder<HasAppName, HasAgent, HasSessionService> {
+    /// Consume the builder and produce a [`RunnerConfig`] without creating a [`Runner`].
+    ///
+    /// Use this when you need the raw config (e.g. to wrap in `Arc` for A2A handlers).
+    pub fn build_config(self) -> RunnerConfig {
+        RunnerConfig {
+            app_name: self.app_name.expect("typestate guarantees app_name is set"),
+            agent: self.agent.expect("typestate guarantees agent is set"),
+            session_service: self
+                .session_service
+                .expect("typestate guarantees session_service is set"),
+            #[cfg(feature = "artifacts")]
+            artifact_service: self.artifact_service,
+            memory_service: self.memory_service,
+            #[cfg(feature = "plugins")]
+            plugin_manager: self.plugin_manager,
+            run_config: self.run_config,
+            compaction_config: self.compaction_config,
+            context_cache_config: self.context_cache_config,
+            cache_capable: self.cache_capable,
+            request_context: self.request_context,
+            cancellation_token: self.cancellation_token,
+            intra_compaction_config: self.intra_compaction_config,
+            intra_compaction_summarizer: self.intra_compaction_summarizer,
+            #[cfg(feature = "context-compaction")]
+            context_compaction: self.context_compaction,
+        }
+    }
+
     /// Consume the builder and create a [`Runner`].
     ///
     /// Delegates to [`Runner::new()`] internally.
@@ -292,6 +340,8 @@ impl RunnerConfigBuilder<HasAppName, HasAgent, HasSessionService> {
             cancellation_token: self.cancellation_token,
             intra_compaction_config: self.intra_compaction_config,
             intra_compaction_summarizer: self.intra_compaction_summarizer,
+            #[cfg(feature = "context-compaction")]
+            context_compaction: self.context_compaction,
         };
         Runner::new(config)
     }

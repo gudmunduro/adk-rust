@@ -11,6 +11,7 @@ use std::sync::Arc;
 pub struct UrlContextTool;
 
 impl UrlContextTool {
+    /// Create a new `UrlContextTool`.
     pub fn new() -> Self {
         Self
     }

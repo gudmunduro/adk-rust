@@ -55,6 +55,8 @@ a2a-v1 = ["dep:a2a-protocol-types"]
 yaml-agent = ["dep:serde_yaml", "dep:notify", "dep:regex"]
 # Enable Agent Registry REST API
 agent-registry = []
+# Enable built-in A2A interceptors (auth, rate-limit, audit)
+a2a-interceptors = []
 
 [dev-dependencies]
 async-stream.workspace = true
@@ -66,3 +68,4 @@ hyper = "1.8.1"
 http-body-util = "0.1.3"
 proptest = "1.4"
 tempfile = "3"
+tokio-test = "0.4"

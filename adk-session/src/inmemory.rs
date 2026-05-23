@@ -21,6 +21,9 @@ struct SessionData {
     updated_at: DateTime<Utc>,
 }
 
+/// In-memory session service for testing and lightweight deployments.
+///
+/// All data is stored in process memory and lost on restart.
 pub struct InMemorySessionService {
     sessions: Arc<RwLock<HashMap<AdkIdentity, SessionData>>>,
     app_state: Arc<RwLock<HashMap<String, StateMap>>>,
@@ -28,6 +31,7 @@ pub struct InMemorySessionService {
 }
 
 impl InMemorySessionService {
+    /// Creates a new empty in-memory session service.
     pub fn new() -> Self {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),

@@ -28,6 +28,7 @@ pub struct LoopAgent {
 }
 
 impl LoopAgent {
+    /// Create a new loop agent with the given name and sub-agents.
     pub fn new(name: impl Into<String>, sub_agents: Vec<Arc<dyn Agent>>) -> Self {
         Self {
             name: name.into(),
@@ -42,27 +43,32 @@ impl LoopAgent {
         }
     }
 
+    /// Set the agent description.
     pub fn with_description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
     }
 
+    /// Set the maximum number of loop iterations.
     pub fn with_max_iterations(mut self, max: u32) -> Self {
         self.max_iterations = max;
         self
     }
 
+    /// Set a preloaded skills index for this agent.
     #[cfg(feature = "skills")]
     pub fn with_skills(mut self, index: SkillIndex) -> Self {
         self.skills_index = Some(Arc::new(index));
         self
     }
 
+    /// Auto-load skills from `.skills/` in the current working directory.
     #[cfg(feature = "skills")]
     pub fn with_auto_skills(self) -> Result<Self> {
         self.with_skills_from_root(".")
     }
 
+    /// Auto-load skills from `.skills/` under a custom root directory.
     #[cfg(feature = "skills")]
     pub fn with_skills_from_root(mut self, root: impl AsRef<std::path::Path>) -> Result<Self> {
         let index = load_skill_index(root).map_err(|e| adk_core::AdkError::agent(e.to_string()))?;
@@ -70,18 +76,21 @@ impl LoopAgent {
         Ok(self)
     }
 
+    /// Customize skill selection behavior.
     #[cfg(feature = "skills")]
     pub fn with_skill_policy(mut self, policy: SelectionPolicy) -> Self {
         self.skill_policy = policy;
         self
     }
 
+    /// Limit injected skill content length.
     #[cfg(feature = "skills")]
     pub fn with_skill_budget(mut self, max_chars: usize) -> Self {
         self.max_skill_chars = max_chars;
         self
     }
 
+    /// Add a before-agent callback.
     pub fn before_callback(mut self, callback: BeforeAgentCallback) -> Self {
         if let Some(callbacks) = Arc::get_mut(&mut self.before_callbacks) {
             callbacks.push(callback);
@@ -89,6 +98,7 @@ impl LoopAgent {
         self
     }
 
+    /// Add an after-agent callback.
     pub fn after_callback(mut self, callback: AfterAgentCallback) -> Self {
         if let Some(callbacks) = Arc::get_mut(&mut self.after_callbacks) {
             callbacks.push(callback);

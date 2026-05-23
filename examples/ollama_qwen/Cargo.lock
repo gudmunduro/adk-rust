@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "adk-agent"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-skill",
@@ -19,8 +19,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "adk-anthropic"
+version = "0.8.5"
+dependencies = [
+ "base64",
+ "bytes",
+ "futures",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "adk-artifact"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -30,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "adk-auth"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -44,7 +60,7 @@ dependencies = [
 
 [[package]]
 name = "adk-core"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "async-trait",
  "chrono",
@@ -53,12 +69,13 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
 [[package]]
 name = "adk-eval"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-model",
@@ -76,8 +93,9 @@ dependencies = [
 
 [[package]]
 name = "adk-gemini"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
+ "adk-core",
  "async-stream",
  "async-trait",
  "base64",
@@ -101,7 +119,7 @@ dependencies = [
 
 [[package]]
 name = "adk-graph"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-stream",
@@ -118,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "adk-guardrail"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -133,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "adk-memory"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -145,8 +163,9 @@ dependencies = [
 
 [[package]]
 name = "adk-model"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
+ "adk-anthropic",
  "adk-core",
  "adk-gemini",
  "adk-telemetry",
@@ -168,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "adk-plugin"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "serde_json",
@@ -178,7 +197,7 @@ dependencies = [
 
 [[package]]
 name = "adk-runner"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-artifact",
  "adk-core",
@@ -190,6 +209,7 @@ dependencies = [
  "futures",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "tracing",
@@ -198,9 +218,10 @@ dependencies = [
 
 [[package]]
 name = "adk-rust"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-agent",
+ "adk-anthropic",
  "adk-artifact",
  "adk-auth",
  "adk-core",
@@ -226,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "adk-rust-macros"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -235,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "adk-server"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-agent",
  "adk-artifact",
@@ -267,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "adk-session"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -280,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "adk-skill"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-plugin",
@@ -294,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "adk-telemetry"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "thiserror 2.0.18",
  "tracing",
@@ -303,7 +324,7 @@ dependencies = [
 
 [[package]]
 name = "adk-tool"
-version = "0.8.0"
+version = "0.8.5"
 dependencies = [
  "adk-core",
  "adk-rust-macros",

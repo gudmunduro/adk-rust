@@ -285,23 +285,48 @@ impl RequestHandler {
         let content = adk_core::Content { role: "user".to_string(), parts: adk_parts };
 
         // Create runner and execute
-        let runner = adk_runner::Runner::new(adk_runner::RunnerConfig {
-            app_name: runner_config.app_name.clone(),
-            agent: runner_config.agent.clone(),
-            session_service: runner_config.session_service.clone(),
-            artifact_service: runner_config.artifact_service.clone(),
-            memory_service: runner_config.memory_service.clone(),
-            plugin_manager: runner_config.plugin_manager.clone(),
-            run_config: runner_config.run_config.clone(),
-            compaction_config: runner_config.compaction_config.clone(),
-            context_cache_config: runner_config.context_cache_config.clone(),
-            cache_capable: runner_config.cache_capable.clone(),
-            intra_compaction_config: runner_config.intra_compaction_config.clone(),
-            intra_compaction_summarizer: runner_config.intra_compaction_summarizer.clone(),
-            request_context: runner_config.request_context.clone(),
-            cancellation_token: runner_config.cancellation_token.clone(),
-        })
-        .map_err(|e| A2aError::Internal { message: format!("runner create: {e}") })?;
+        let mut runner_builder = adk_runner::Runner::builder()
+            .app_name(runner_config.app_name.clone())
+            .agent(runner_config.agent.clone())
+            .session_service(runner_config.session_service.clone());
+        if let Some(ref artifact_service) = runner_config.artifact_service {
+            runner_builder = runner_builder.artifact_service(artifact_service.clone());
+        }
+        if let Some(ref memory_service) = runner_config.memory_service {
+            runner_builder = runner_builder.memory_service(memory_service.clone());
+        }
+        if let Some(ref plugin_manager) = runner_config.plugin_manager {
+            runner_builder = runner_builder.plugin_manager(plugin_manager.clone());
+        }
+        if let Some(ref run_config) = runner_config.run_config {
+            runner_builder = runner_builder.run_config(run_config.clone());
+        }
+        if let Some(ref compaction_config) = runner_config.compaction_config {
+            runner_builder = runner_builder.compaction_config(compaction_config.clone());
+        }
+        if let Some(ref context_cache_config) = runner_config.context_cache_config {
+            runner_builder = runner_builder.context_cache_config(context_cache_config.clone());
+        }
+        if let Some(ref cache_capable) = runner_config.cache_capable {
+            runner_builder = runner_builder.cache_capable(cache_capable.clone());
+        }
+        if let Some(ref intra_compaction_config) = runner_config.intra_compaction_config {
+            runner_builder =
+                runner_builder.intra_compaction_config(intra_compaction_config.clone());
+        }
+        if let Some(ref intra_compaction_summarizer) = runner_config.intra_compaction_summarizer {
+            runner_builder =
+                runner_builder.intra_compaction_summarizer(intra_compaction_summarizer.clone());
+        }
+        if let Some(ref request_context) = runner_config.request_context {
+            runner_builder = runner_builder.request_context(request_context.clone());
+        }
+        if let Some(ref cancellation_token) = runner_config.cancellation_token {
+            runner_builder = runner_builder.cancellation_token(cancellation_token.clone());
+        }
+        let runner = runner_builder
+            .build()
+            .map_err(|e| A2aError::Internal { message: format!("runner create: {e}") })?;
 
         let mut event_stream = runner
             .run(

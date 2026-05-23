@@ -1,6 +1,6 @@
 //! Backend abstraction for Gemini API providers.
 //!
-//! This module defines the [`GeminiBackend`] trait that abstracts over different
+//! This module defines the `GeminiBackend` trait that abstracts over different
 //! Gemini API backends (AI Studio REST vs Vertex AI). Each backend handles
 //! authentication, URL construction, and request dispatch independently.
 //!
@@ -64,6 +64,7 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
 
     // ── Batch embeddings ────────────────────────────────────────────────
 
+    /// Embed multiple contents in a single request.
     async fn batch_embed_contents(
         &self,
         _request: BatchEmbedContentsRequest,
@@ -73,6 +74,7 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
 
     // ── Batch generation ────────────────────────────────────────────────
 
+    /// Submit a batch content generation request.
     async fn batch_generate_content(
         &self,
         _request: BatchGenerateContentRequest,
@@ -80,10 +82,12 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
         Err(Error::GoogleCloudUnsupported { operation: "batchGenerateContent" })
     }
 
+    /// Get the status of a batch operation by name.
     async fn get_batch_operation(&self, _name: &str) -> Result<serde_json::Value, Error> {
         Err(Error::GoogleCloudUnsupported { operation: "getBatchOperation" })
     }
 
+    /// List batch operations with pagination.
     async fn list_batch_operations(
         &self,
         _page_size: Option<u32>,
@@ -92,16 +96,19 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
         Err(Error::GoogleCloudUnsupported { operation: "listBatchOperations" })
     }
 
+    /// Cancel a running batch operation.
     async fn cancel_batch_operation(&self, _name: &str) -> Result<(), Error> {
         Err(Error::GoogleCloudUnsupported { operation: "cancelBatchOperation" })
     }
 
+    /// Delete a batch operation resource.
     async fn delete_batch_operation(&self, _name: &str) -> Result<(), Error> {
         Err(Error::GoogleCloudUnsupported { operation: "deleteBatchOperation" })
     }
 
     // ── File operations ─────────────────────────────────────────────────
 
+    /// Upload a file to the Gemini API.
     async fn upload_file(
         &self,
         _display_name: Option<String>,
@@ -111,14 +118,17 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
         Err(Error::GoogleCloudUnsupported { operation: "uploadFile" })
     }
 
+    /// Get file metadata by name.
     async fn get_file(&self, _name: &str) -> Result<File, Error> {
         Err(Error::GoogleCloudUnsupported { operation: "getFile" })
     }
 
+    /// Download file content by name.
     async fn download_file(&self, _name: &str) -> Result<Vec<u8>, Error> {
         Err(Error::GoogleCloudUnsupported { operation: "downloadFile" })
     }
 
+    /// List files with pagination.
     async fn list_files(
         &self,
         _page_size: Option<u32>,
@@ -127,12 +137,14 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
         Err(Error::GoogleCloudUnsupported { operation: "listFiles" })
     }
 
+    /// Delete a file by name.
     async fn delete_file(&self, _name: &str) -> Result<(), Error> {
         Err(Error::GoogleCloudUnsupported { operation: "deleteFile" })
     }
 
     // ── Cache operations ────────────────────────────────────────────────
 
+    /// Create cached content.
     async fn create_cached_content(
         &self,
         _request: CreateCachedContentRequest,
@@ -140,10 +152,12 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
         Err(Error::GoogleCloudUnsupported { operation: "createCachedContent" })
     }
 
+    /// Get cached content by name.
     async fn get_cached_content(&self, _name: &str) -> Result<CachedContent, Error> {
         Err(Error::GoogleCloudUnsupported { operation: "getCachedContent" })
     }
 
+    /// List cached contents with pagination.
     async fn list_cached_contents(
         &self,
         _page_size: Option<i32>,
@@ -152,6 +166,7 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
         Err(Error::GoogleCloudUnsupported { operation: "listCachedContents" })
     }
 
+    /// Update cached content expiration.
     async fn update_cached_content(
         &self,
         _name: &str,
@@ -160,6 +175,7 @@ pub trait GeminiBackend: Send + Sync + std::fmt::Debug {
         Err(Error::GoogleCloudUnsupported { operation: "updateCachedContent" })
     }
 
+    /// Delete cached content by name.
     async fn delete_cached_content(&self, _name: &str) -> Result<(), Error> {
         Err(Error::GoogleCloudUnsupported { operation: "deleteCachedContent" })
     }

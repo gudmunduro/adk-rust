@@ -374,7 +374,7 @@ pub fn sampling_request_to_llm_request(request: &SamplingRequest, model_name: &s
     }
 }
 
-/// Convert an [`LlmResponse`] into a [`SamplingResponse`].
+/// Convert an [`LlmResponse`](adk_core::model::LlmResponse) into a [`SamplingResponse`].
 ///
 /// Preserves content text, model identifier, and maps finish reason to MCP
 /// stop reason strings.

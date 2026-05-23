@@ -145,6 +145,7 @@ impl MongoSessionService {
         Ok(())
     }
 
+    /// Returns the highest applied migration version, or 0 if no migrations have been applied.
     pub async fn schema_version(&self) -> Result<i64> {
         let collections = self.db.list_collection_names().await.map_err(|e| {
             adk_core::AdkError::session(format!("schema version query failed: {e}"))

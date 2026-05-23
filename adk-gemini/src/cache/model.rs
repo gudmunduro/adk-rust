@@ -66,13 +66,17 @@ pub enum CacheExpirationRequest {
     /// Timestamp in UTC of when this resource is considered expired.
     /// Uses RFC 3339 format.
     ExpireTime {
+        /// The expiration timestamp.
         #[serde(with = "time::serde::rfc3339")]
         expire_time: OffsetDateTime,
     },
     /// New TTL for this resource, input only.
     /// A duration in seconds with up to nine fractional digits, ending with 's'.
     /// Example: "3.5s" or "86400s".
-    Ttl { ttl: String },
+    Ttl {
+        /// The TTL string (e.g. `"86400s"`).
+        ttl: String,
+    },
 }
 
 impl CacheExpirationRequest {

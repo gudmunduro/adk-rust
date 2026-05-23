@@ -1,5 +1,7 @@
 //! Error types for adk-graph
 
+use std::time::Duration;
+
 use crate::interrupt::Interrupt;
 use thiserror::Error;
 
@@ -36,6 +38,14 @@ pub enum GraphError {
     /// Node execution failed
     #[error("Node '{node}' execution failed: {message}")]
     NodeExecutionFailed { node: String, message: String },
+
+    /// Node timed out
+    #[error("Node '{node}' timed out after {elapsed:?}")]
+    NodeTimedOut { node: String, elapsed: Duration },
+
+    /// Fan-in node timed out waiting for upstream paths
+    #[error("Fan-in node '{node}' timed out: received {received}/{expected} upstream outputs")]
+    FanInTimedOut { node: String, received: usize, expected: usize },
 
     /// State serialization error
     #[error("State serialization error: {0}")]
@@ -108,6 +118,8 @@ impl From<GraphError> for adk_core::AdkError {
             GraphError::NodeExecutionFailed { .. } => {
                 (ErrorCategory::Internal, "graph.node_execution_failed")
             }
+            GraphError::NodeTimedOut { .. } => (ErrorCategory::Timeout, "graph.node_timed_out"),
+            GraphError::FanInTimedOut { .. } => (ErrorCategory::Timeout, "graph.fan_in_timed_out"),
             GraphError::SerializationError(_) => (ErrorCategory::Internal, "graph.serialization"),
             GraphError::CheckpointError(_) => (ErrorCategory::Internal, "graph.checkpoint"),
             GraphError::UnknownRouteTarget(_) => {

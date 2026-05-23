@@ -13,25 +13,30 @@ pub struct OpenAIApproximateLocation {
 }
 
 impl OpenAIApproximateLocation {
+    /// Create a new empty approximate location.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Set the city name.
     pub fn with_city(mut self, city: impl Into<String>) -> Self {
         self.city = Some(city.into());
         self
     }
 
+    /// Set the country name.
     pub fn with_country(mut self, country: impl Into<String>) -> Self {
         self.country = Some(country.into());
         self
     }
 
+    /// Set the region name.
     pub fn with_region(mut self, region: impl Into<String>) -> Self {
         self.region = Some(region.into());
         self
     }
 
+    /// Set the timezone identifier.
     pub fn with_timezone(mut self, timezone: impl Into<String>) -> Self {
         self.timezone = Some(timezone.into());
         self
@@ -75,15 +80,18 @@ pub struct OpenAIWebSearchTool {
 }
 
 impl OpenAIWebSearchTool {
+    /// Create a new `OpenAIWebSearchTool` with default (stable) variant.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Use the preview variant of the web search tool.
     pub fn preview(mut self) -> Self {
         self.variant = OpenAIWebSearchVariant::Preview20250311;
         self
     }
 
+    /// Restrict search results to the specified domains.
     pub fn with_allowed_domains(
         mut self,
         domains: impl IntoIterator<Item = impl Into<String>>,
@@ -92,11 +100,13 @@ impl OpenAIWebSearchTool {
         self
     }
 
+    /// Set the approximate user location for localized results.
     pub fn with_user_location(mut self, user_location: OpenAIApproximateLocation) -> Self {
         self.user_location = Some(user_location);
         self
     }
 
+    /// Set the search context size (e.g., "low", "medium", "high").
     pub fn with_search_context_size(mut self, size: impl Into<String>) -> Self {
         self.search_context_size = Some(size.into());
         self
@@ -149,6 +159,7 @@ pub struct OpenAIFileSearchTool {
 }
 
 impl OpenAIFileSearchTool {
+    /// Create a new `OpenAIFileSearchTool` with the given vector store IDs.
     pub fn new(vector_store_ids: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
             vector_store_ids: vector_store_ids.into_iter().map(Into::into).collect(),
@@ -158,16 +169,19 @@ impl OpenAIFileSearchTool {
         }
     }
 
+    /// Set the maximum number of results to return.
     pub fn with_max_num_results(mut self, max_num_results: u32) -> Self {
         self.max_num_results = Some(max_num_results);
         self
     }
 
+    /// Set metadata filters for the search.
     pub fn with_filters(mut self, filters: Value) -> Self {
         self.filters = Some(filters);
         self
     }
 
+    /// Set ranking options for result ordering.
     pub fn with_ranking_options(mut self, ranking_options: Value) -> Self {
         self.ranking_options = Some(ranking_options);
         self
@@ -220,20 +234,24 @@ pub struct OpenAICodeInterpreterTool {
 }
 
 impl OpenAICodeInterpreterTool {
+    /// Create a new `OpenAICodeInterpreterTool` with default settings.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Attach file IDs to the code interpreter container.
     pub fn with_file_ids(mut self, file_ids: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.file_ids = file_ids.into_iter().map(Into::into).collect();
         self
     }
 
+    /// Set the memory limit in bytes for the container.
     pub fn with_memory_limit(mut self, memory_limit: u64) -> Self {
         self.memory_limit = Some(memory_limit);
         self
     }
 
+    /// Use a specific container ID instead of auto-provisioning.
     pub fn with_container_id(mut self, container_id: impl Into<String>) -> Self {
         self.container_id = Some(container_id.into());
         self
@@ -291,10 +309,12 @@ pub struct OpenAIImageGenerationTool {
 }
 
 impl OpenAIImageGenerationTool {
+    /// Create a new `OpenAIImageGenerationTool` with default settings.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Set a custom option key-value pair for image generation.
     pub fn with_option(mut self, key: impl Into<String>, value: Value) -> Self {
         self.options.insert(key.into(), value);
         self
@@ -337,10 +357,15 @@ impl Tool for OpenAIImageGenerationTool {
 /// OpenAI computer use environment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenAIComputerEnvironment {
+    /// Browser-based environment.
     Browser,
+    /// macOS environment.
     Mac,
+    /// Windows environment.
     Windows,
+    /// Generic Linux environment.
     Linux,
+    /// Ubuntu environment.
     Ubuntu,
 }
 
@@ -365,6 +390,7 @@ pub struct OpenAIComputerUseTool {
 }
 
 impl OpenAIComputerUseTool {
+    /// Create a new `OpenAIComputerUseTool` with the given environment and display dimensions.
     pub fn new(
         environment: OpenAIComputerEnvironment,
         display_width: u32,
@@ -418,6 +444,7 @@ pub struct OpenAIMcpTool {
 }
 
 impl OpenAIMcpTool {
+    /// Create a new `OpenAIMcpTool` connecting to a server by URL.
     pub fn new_with_url(server_label: impl Into<String>, server_url: impl Into<String>) -> Self {
         let server_label = server_label.into();
         let mut definition = Map::new();
@@ -427,6 +454,7 @@ impl OpenAIMcpTool {
         Self { server_label, definition }
     }
 
+    /// Create a new `OpenAIMcpTool` connecting to a server by connector ID.
     pub fn new_with_connector(
         server_label: impl Into<String>,
         connector_id: impl Into<String>,
@@ -439,21 +467,25 @@ impl OpenAIMcpTool {
         Self { server_label, definition }
     }
 
+    /// Restrict which tools the model may invoke on this MCP server.
     pub fn with_allowed_tools(mut self, allowed_tools: Value) -> Self {
         self.definition.insert("allowed_tools".to_string(), allowed_tools);
         self
     }
 
+    /// Set the authorization header value for the MCP server.
     pub fn with_authorization(mut self, authorization: impl Into<String>) -> Self {
         self.definition.insert("authorization".to_string(), Value::String(authorization.into()));
         self
     }
 
+    /// Set custom headers for the MCP server connection.
     pub fn with_headers(mut self, headers: Map<String, Value>) -> Self {
         self.definition.insert("headers".to_string(), Value::Object(headers));
         self
     }
 
+    /// Configure tool approval requirements for this MCP server.
     pub fn with_require_approval(mut self, require_approval: Value) -> Self {
         self.definition.insert("require_approval".to_string(), require_approval);
         self
@@ -496,6 +528,7 @@ impl Tool for OpenAIMcpTool {
 pub struct OpenAILocalShellTool;
 
 impl OpenAILocalShellTool {
+    /// Create a new `OpenAILocalShellTool`.
     pub fn new() -> Self {
         Self
     }
@@ -539,10 +572,12 @@ pub struct OpenAIShellTool {
 }
 
 impl OpenAIShellTool {
+    /// Create a new `OpenAIShellTool` with default settings.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Set the shell environment configuration.
     pub fn with_environment(mut self, environment: Value) -> Self {
         self.environment = Some(environment);
         self
@@ -590,6 +625,7 @@ impl Tool for OpenAIShellTool {
 pub struct OpenAIApplyPatchTool;
 
 impl OpenAIApplyPatchTool {
+    /// Create a new `OpenAIApplyPatchTool`.
     pub fn new() -> Self {
         Self
     }

@@ -13,25 +13,30 @@ pub struct WebSearchUserLocation {
 }
 
 impl WebSearchUserLocation {
+    /// Create a new empty user location.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Set the city name.
     pub fn with_city(mut self, city: impl Into<String>) -> Self {
         self.city = Some(city.into());
         self
     }
 
+    /// Set the country name.
     pub fn with_country(mut self, country: impl Into<String>) -> Self {
         self.country = Some(country.into());
         self
     }
 
+    /// Set the region name.
     pub fn with_region(mut self, region: impl Into<String>) -> Self {
         self.region = Some(region.into());
         self
     }
 
+    /// Set the timezone identifier.
     pub fn with_timezone(mut self, timezone: impl Into<String>) -> Self {
         self.timezone = Some(timezone.into());
         self
@@ -60,10 +65,12 @@ pub struct WebSearchTool {
 }
 
 impl WebSearchTool {
+    /// Create a new `WebSearchTool` with default settings.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Restrict search results to the specified domains.
     pub fn with_allowed_domains(
         mut self,
         domains: impl IntoIterator<Item = impl Into<String>>,
@@ -73,6 +80,7 @@ impl WebSearchTool {
         self
     }
 
+    /// Block search results from the specified domains.
     pub fn with_blocked_domains(
         mut self,
         domains: impl IntoIterator<Item = impl Into<String>>,
@@ -82,11 +90,13 @@ impl WebSearchTool {
         self
     }
 
+    /// Set the maximum number of search invocations per turn.
     pub fn with_max_uses(mut self, max_uses: i32) -> Self {
         self.max_uses = Some(max_uses);
         self
     }
 
+    /// Set the approximate user location for localized results.
     pub fn with_user_location(mut self, user_location: WebSearchUserLocation) -> Self {
         self.user_location = Some(user_location);
         self

@@ -121,6 +121,52 @@ jobs:
           echo "### 🧪 $SUMMARY" >> "$GITHUB_STEP_SUMMARY"
         fi
 
+  # ── Docs: documentation coverage for Stable-tier crates ──────
+  docs:
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: cachix/install-nix-action@v30
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    - uses: cachix/cachix-action@v17
+      with:
+        name: devenv
+    - run: nix profile install nixpkgs#devenv
+
+    - name: Cache cargo artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/sccache
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: docs-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: docs-${{ runner.os }}-
+
+    - name: Check documentation coverage
+      run: |
+        FAILED=0
+        echo "### 📚 Documentation Coverage" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        for crate in adk-core adk-agent adk-model adk-gemini adk-tool adk-runner adk-session adk-server adk-graph adk-memory adk-anthropic adk-rust; do
+          echo "Checking $crate..."
+          OUTPUT=$(CI=true devenv shell cargo doc -p "$crate" --no-deps 2>&1)
+          if echo "$OUTPUT" | grep -q "missing documentation"; then
+            echo "❌ $crate — missing docs" >> "$GITHUB_STEP_SUMMARY"
+            FAILED=1
+          else
+            echo "✅ $crate" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        done
+        if [ "$FAILED" -ne 0 ]; then
+          echo "::error::Documentation coverage check failed"
+          exit 1
+        fi
+
   # ── Scaffolds: cargo-adk generated projects compile ────────────
   templates:
     needs: fmt

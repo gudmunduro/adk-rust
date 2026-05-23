@@ -118,6 +118,13 @@ fn payment_audit_event(
         resource: operation.audit_resource().to_string(),
         outcome: outcome.clone(),
         metadata: Some(metadata),
+        workspace_id: None,
+        tenant_id: request.tenant_id.clone(),
+        request_id: None,
+        ip_address: None,
+        resource_id: None,
+        action: Some("permission_check".to_string()),
+        prev_hash: None,
     }
 }
 
@@ -126,6 +133,7 @@ fn audit_outcome_name(outcome: &AuditOutcome) -> &'static str {
         AuditOutcome::Allowed => "allowed",
         AuditOutcome::Denied => "denied",
         AuditOutcome::Error => "error",
+        _ => "unknown",
     }
 }
 

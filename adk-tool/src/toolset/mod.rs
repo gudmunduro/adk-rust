@@ -14,10 +14,12 @@ pub struct BasicToolset {
 }
 
 impl BasicToolset {
+    /// Create a new `BasicToolset` with the given name and tools.
     pub fn new(name: impl Into<String>, tools: Vec<Arc<dyn Tool>>) -> Self {
         Self { name: name.into(), tools, predicate: None }
     }
 
+    /// Set a predicate to filter which tools are returned.
     pub fn with_predicate(mut self, predicate: ToolPredicate) -> Self {
         self.predicate = Some(predicate);
         self

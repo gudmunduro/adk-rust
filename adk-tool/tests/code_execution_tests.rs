@@ -7,10 +7,12 @@
 //! ```
 #![cfg(feature = "code")]
 
+use adk_code::{CodeTool, RustExecutor, RustExecutorConfig};
 use adk_core::{
     CallbackContext, Content, EventActions, MemoryEntry, ReadonlyContext, Result, Tool, ToolContext,
 };
-use adk_tool::{FrontendCodeTool, JavaScriptCodeTool, PythonCodeTool, RustCodeTool};
+use adk_sandbox::ProcessBackend;
+use adk_tool::{FrontendCodeTool, JavaScriptCodeTool, PythonCodeTool};
 use async_trait::async_trait;
 use proptest::prelude::*;
 use serde_json::json;
@@ -83,6 +85,13 @@ fn mock_ctx() -> Arc<dyn ToolContext> {
     Arc::new(MockToolContext::new()) as Arc<dyn ToolContext>
 }
 
+/// Creates a `CodeTool` instance using a `ProcessBackend` for tests.
+fn make_code_tool() -> CodeTool {
+    let backend = Arc::new(ProcessBackend::default());
+    let executor = RustExecutor::new(backend, RustExecutorConfig::default());
+    CodeTool::new(executor)
+}
+
 // ===========================================================================
 // Property 7: Tool Authorization Gates Elevated Execution
 // ===========================================================================
@@ -115,7 +124,7 @@ fn arb_tool_selection() -> impl Strategy<Value = ToolSelection> {
 /// Instantiate the concrete tool for a given selection.
 fn make_tool(sel: ToolSelection) -> Box<dyn Tool> {
     match sel {
-        ToolSelection::Rust => Box::new(RustCodeTool::new()),
+        ToolSelection::Rust => Box::new(make_code_tool()),
         ToolSelection::JavaScript => Box::new(JavaScriptCodeTool::new()),
         ToolSelection::Python => Box::new(PythonCodeTool::new()),
         ToolSelection::FrontendReact => Box::new(FrontendCodeTool::react()),
@@ -156,16 +165,16 @@ proptest! {
         );
     }
 
-    /// RustCodeTool always includes `code:execute:rust`.
+    /// CodeTool always includes `code:execute:rust`.
     #[test]
     fn prop_rust_tool_requires_rust_scope(
         _dummy in 0..100u32
     ) {
-        let tool = RustCodeTool::new();
+        let tool = make_code_tool();
         let scopes = tool.required_scopes();
         prop_assert!(
             scopes.contains(&"code:execute:rust"),
-            "RustCodeTool missing rust scope. Scopes: {:?}",
+            "CodeTool missing rust scope. Scopes: {:?}",
             scopes,
         );
     }
@@ -194,15 +203,9 @@ proptest! {
 // ===========================================================================
 
 #[test]
-fn test_rust_code_tool_new_name() {
-    let tool = RustCodeTool::new();
-    assert_eq!(tool.name(), "rust_code");
-}
-
-#[test]
-fn test_rust_code_tool_backend_name() {
-    let tool = RustCodeTool::backend();
-    assert_eq!(tool.name(), "rust_code");
+fn test_code_tool_name() {
+    let tool = make_code_tool();
+    assert_eq!(tool.name(), "code_exec");
 }
 
 #[test]
@@ -226,7 +229,7 @@ fn test_frontend_code_tool_react_name() {
 #[test]
 fn test_all_tools_have_nonempty_descriptions() {
     let tools: Vec<Box<dyn Tool>> = vec![
-        Box::new(RustCodeTool::new()),
+        Box::new(make_code_tool()),
         Box::new(JavaScriptCodeTool::new()),
         Box::new(PythonCodeTool::new()),
         Box::new(FrontendCodeTool::react()),
@@ -239,7 +242,7 @@ fn test_all_tools_have_nonempty_descriptions() {
 #[test]
 fn test_all_tools_have_code_required_in_schema() {
     let tools: Vec<Box<dyn Tool>> = vec![
-        Box::new(RustCodeTool::new()),
+        Box::new(make_code_tool()),
         Box::new(JavaScriptCodeTool::new()),
         Box::new(PythonCodeTool::new()),
         Box::new(FrontendCodeTool::react()),
@@ -294,8 +297,8 @@ async fn test_frontend_placeholder_returns_rejected() {
 }
 
 #[tokio::test]
-async fn test_rust_tool_missing_code_returns_rejected() {
-    let tool = RustCodeTool::new();
+async fn test_code_tool_missing_code_returns_error() {
+    let tool = make_code_tool();
     let result = tool.execute(mock_ctx(), json!({})).await.unwrap();
-    assert_eq!(result["status"], "rejected");
+    assert_eq!(result["status"], "error");
 }

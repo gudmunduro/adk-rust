@@ -3,12 +3,14 @@
 //! Provides a builder pattern similar to LlmAgent and RealtimeAgent.
 
 use crate::checkpoint::Checkpointer;
+use crate::deferred::DeferredNodeConfig;
 use crate::edge::{END, Edge, EdgeTarget, START};
 use crate::error::{GraphError, Result};
 use crate::graph::{CompiledGraph, StateGraph};
 use crate::node::{ExecutionConfig, FunctionNode, Node, NodeContext, NodeOutput};
 use crate::state::{State, StateSchema};
 use crate::stream::{StreamEvent, StreamMode};
+use crate::timeout::TimeoutPolicy;
 use adk_core::{Agent, Content, Event, EventStream, InvocationContext};
 use async_trait::async_trait;
 use serde_json::json;
@@ -240,6 +242,11 @@ pub struct GraphAgentBuilder {
     output_mapper: Option<OutputMapper>,
     before_callback: Option<BeforeAgentCallback>,
     after_callback: Option<AfterAgentCallback>,
+    timeout_policies: HashMap<String, TimeoutPolicy>,
+    default_timeout: Option<TimeoutPolicy>,
+    deferred_configs: HashMap<String, DeferredNodeConfig>,
+    #[cfg(feature = "node-cache")]
+    cache_policies: HashMap<String, crate::cache::NodeCachePolicy>,
 }
 
 impl GraphAgentBuilder {
@@ -259,6 +266,11 @@ impl GraphAgentBuilder {
             output_mapper: None,
             before_callback: None,
             after_callback: None,
+            timeout_policies: HashMap::new(),
+            default_timeout: None,
+            deferred_configs: HashMap::new(),
+            #[cfg(feature = "node-cache")]
+            cache_policies: HashMap::new(),
         }
     }
 
@@ -377,6 +389,124 @@ impl GraphAgentBuilder {
     /// Set recursion limit
     pub fn recursion_limit(mut self, limit: usize) -> Self {
         self.recursion_limit = limit;
+        self
+    }
+
+    /// Set a timeout policy for a specific node.
+    ///
+    /// The policy is applied when the named node executes, enforcing
+    /// wall-clock and/or idle timeouts with the configured recovery action.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use std::time::Duration;
+    /// use adk_graph::timeout::{TimeoutPolicy, OnTimeout};
+    ///
+    /// let agent = GraphAgent::builder("my_graph")
+    ///     .node_timeout("slow_node", TimeoutPolicy {
+    ///         run_timeout: Some(Duration::from_secs(10)),
+    ///         idle_timeout: None,
+    ///         on_timeout: OnTimeout::Fail,
+    ///     })
+    ///     .build()?;
+    /// ```
+    pub fn node_timeout(mut self, node_name: &str, policy: TimeoutPolicy) -> Self {
+        self.timeout_policies.insert(node_name.to_string(), policy);
+        self
+    }
+
+    /// Set a default timeout policy applied to all nodes without an explicit override.
+    ///
+    /// Nodes that have a per-node policy set via [`node_timeout`](Self::node_timeout)
+    /// will use their specific policy instead of this default.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use std::time::Duration;
+    /// use adk_graph::timeout::{TimeoutPolicy, OnTimeout};
+    ///
+    /// let agent = GraphAgent::builder("my_graph")
+    ///     .default_timeout(TimeoutPolicy {
+    ///         run_timeout: Some(Duration::from_secs(30)),
+    ///         idle_timeout: Some(Duration::from_secs(5)),
+    ///         on_timeout: OnTimeout::Skip,
+    ///     })
+    ///     .build()?;
+    /// ```
+    pub fn default_timeout(mut self, policy: TimeoutPolicy) -> Self {
+        self.default_timeout = Some(policy);
+        self
+    }
+
+    /// Add a deferred (fan-in barrier) node to the graph.
+    ///
+    /// A deferred node waits for all upstream parallel paths to complete before
+    /// executing. The provided function is wrapped as a [`FunctionNode`] and the
+    /// [`DeferredNodeConfig`] controls how upstream outputs are merged and how
+    /// long the node waits for all paths.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the deferred node.
+    /// * `func` - The async function to execute once all upstream paths complete.
+    /// * `config` - Configuration controlling merge strategy and fan-in timeout.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use std::time::Duration;
+    /// use adk_graph::deferred::{DeferredNodeConfig, MergeStrategy};
+    /// use adk_graph::node::NodeOutput;
+    ///
+    /// let agent = GraphAgent::builder("scatter_gather")
+    ///     .deferred_node("aggregator", |_ctx| async {
+    ///         Ok(NodeOutput::new().with_update("status", serde_json::json!("merged")))
+    ///     }, DeferredNodeConfig {
+    ///         merge_strategy: MergeStrategy::Collect,
+    ///         fan_in_timeout: Some(Duration::from_secs(30)),
+    ///     })
+    ///     .build()?;
+    /// ```
+    pub fn deferred_node<F, Fut>(mut self, name: &str, func: F, config: DeferredNodeConfig) -> Self
+    where
+        F: Fn(NodeContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<NodeOutput>> + Send + 'static,
+    {
+        self.nodes.push(Arc::new(FunctionNode::new(name, func)));
+        self.deferred_configs.insert(name.to_string(), config);
+        self
+    }
+
+    /// Set a cache policy for a specific node.
+    ///
+    /// When a node has a cache policy, its execution results are cached keyed
+    /// by a blake3 hash of the node name and input state. Subsequent executions
+    /// with identical inputs return the cached result without re-executing the
+    /// node.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` — the name of the node to cache
+    /// * `policy` — the cache policy specifying backend and TTL
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use std::time::Duration;
+    /// use adk_graph::cache::{CacheBackend, NodeCachePolicy};
+    ///
+    /// let agent = GraphAgent::builder("cached_graph")
+    ///     .node_cache("expensive_node", NodeCachePolicy {
+    ///         backend: CacheBackend::InMemory { max_entries: 128 },
+    ///         ttl: Some(Duration::from_secs(300)),
+    ///     })
+    ///     .build()?;
+    /// ```
+    #[cfg(feature = "node-cache")]
+    pub fn node_cache(mut self, name: &str, policy: crate::cache::NodeCachePolicy) -> Self {
+        self.cache_policies.insert(name.to_string(), policy);
         self
     }
 
@@ -499,6 +629,14 @@ impl GraphAgentBuilder {
         compiled.interrupt_before = self.interrupt_before.into_iter().collect();
         compiled.interrupt_after = self.interrupt_after.into_iter().collect();
         compiled.recursion_limit = self.recursion_limit;
+        compiled.timeout_policies = self.timeout_policies;
+        compiled.default_timeout = self.default_timeout;
+        compiled.deferred_configs = self.deferred_configs;
+
+        #[cfg(feature = "node-cache")]
+        {
+            compiled.cache_policies = self.cache_policies;
+        }
 
         Ok(GraphAgent {
             name: self.name,

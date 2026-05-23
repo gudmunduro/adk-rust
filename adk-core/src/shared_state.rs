@@ -30,15 +30,26 @@ pub enum SharedStateError {
 
     /// Key exceeds the maximum length.
     #[error("shared state key exceeds 256 bytes: {len} bytes")]
-    KeyTooLong { len: usize },
+    KeyTooLong {
+        /// The actual length of the key in bytes.
+        len: usize,
+    },
 
     /// `wait_for_key` timed out.
     #[error("wait_for_key timed out after {timeout:?} for key \"{key}\"")]
-    Timeout { key: String, timeout: Duration },
+    Timeout {
+        /// The key that was being waited on.
+        key: String,
+        /// The timeout duration that expired.
+        timeout: Duration,
+    },
 
     /// Timeout value is outside the valid range.
     #[error("invalid timeout {timeout:?}: must be between 1ms and 300s")]
-    InvalidTimeout { timeout: Duration },
+    InvalidTimeout {
+        /// The invalid timeout value that was provided.
+        timeout: Duration,
+    },
 }
 
 impl From<SharedStateError> for AdkError {

@@ -31,7 +31,7 @@ use adk_agent::LlmAgentBuilder;
 use adk_core::intra_compaction::estimate_tokens;
 use adk_core::{Content, IntraCompactionConfig, Part, SessionId, UserId};
 use adk_model::GeminiModel;
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::{CreateRequest, InMemorySessionService, SessionService};
 use futures::StreamExt;
 use tracing_subscriber::EnvFilter;
@@ -139,22 +139,13 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: APP_NAME.into(),
-        agent: agent.clone(),
-        session_service: sessions.clone(),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: Some(compaction_config.clone()),
-        intra_compaction_summarizer: Some(summarizer),
-    })?;
+    let runner = Runner::builder()
+        .app_name(APP_NAME)
+        .agent(agent.clone())
+        .session_service(sessions.clone())
+        .intra_compaction_config(compaction_config.clone())
+        .intra_compaction_summarizer(summarizer)
+        .build()?;
 
     println!("  ✓ Runner created with intra-compaction enabled");
 

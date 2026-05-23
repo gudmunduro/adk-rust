@@ -316,6 +316,100 @@ proptest! {
 }
 
 // ---------------------------------------------------------------------------
+// Property 6: Compaction Token Reduction (TruncationCompaction)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "context-compaction")]
+mod truncation_compaction_property {
+    use adk_core::{Content, Event};
+    use adk_runner::compaction::{CompactionStrategy, TruncationCompaction, estimate_event_tokens};
+    use proptest::prelude::*;
+
+    /// Generate a random text string of varying length (20..=200 chars).
+    fn arb_event_text() -> impl Strategy<Value = String> {
+        "[a-zA-Z0-9 ]{20,200}"
+    }
+
+    /// Generate a list of events with random text content.
+    fn arb_event_list(min: usize, max: usize) -> impl Strategy<Value = Vec<Event>> {
+        prop::collection::vec(arb_event_text(), min..=max).prop_map(|texts| {
+            texts
+                .into_iter()
+                .enumerate()
+                .map(|(i, text)| {
+                    let mut event = Event::new("prop-test-inv");
+                    event.author = if i == 0 { "system".to_string() } else { "user".to_string() };
+                    event.set_content(Content::new("user").with_text(text));
+                    event
+                })
+                .collect()
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        /// **Feature: runtime-reliability-sprint, Property 6: Compaction Token Reduction**
+        ///
+        /// *For any* successful compaction via `TruncationCompaction`, the resulting
+        /// event list SHALL have fewer estimated tokens than the input event list
+        /// when events are actually dropped, and the compacted list length SHALL be
+        /// <= preserve_recent + 1 (system prompt + recent events).
+        ///
+        /// **Validates: Requirements 12.2, 12.3**
+        #[test]
+        fn prop_compaction_always_reduces_token_count(
+            events in arb_event_list(5, 50),
+            preserve_recent in 1usize..=4,
+        ) {
+            let strategy = TruncationCompaction { preserve_recent };
+
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
+            let tokens_before = estimate_event_tokens(&events);
+            let original_len = events.len();
+
+            let compacted = rt.block_on(strategy.compact(events, 4096)).unwrap();
+
+            let tokens_after = estimate_event_tokens(&compacted);
+
+            // The compacted list length must be <= preserve_recent + 1
+            prop_assert!(
+                compacted.len() <= preserve_recent + 1,
+                "Compacted list length {} exceeds preserve_recent + 1 = {}",
+                compacted.len(),
+                preserve_recent + 1
+            );
+
+            // When events were actually dropped, tokens must strictly decrease
+            if original_len > preserve_recent + 1 {
+                prop_assert!(
+                    tokens_after < tokens_before,
+                    "Compaction did not reduce tokens: before={}, after={}, \
+                     original_len={}, compacted_len={}, preserve_recent={}",
+                    tokens_before,
+                    tokens_after,
+                    original_len,
+                    compacted.len(),
+                    preserve_recent
+                );
+            } else {
+                // No events dropped — tokens should be equal
+                prop_assert!(
+                    tokens_after <= tokens_before,
+                    "Compaction increased tokens: before={}, after={}",
+                    tokens_before,
+                    tokens_after
+                );
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Additional unit test: summarizer error handling
 // ---------------------------------------------------------------------------
 

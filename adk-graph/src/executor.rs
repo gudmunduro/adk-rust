@@ -2,13 +2,18 @@
 //!
 //! Executes graphs using the Pregel model with super-steps.
 
+#[cfg(feature = "node-cache")]
+use crate::cache::{NodeCache, compute_cache_key};
+use crate::deferred::FanInTracker;
 use crate::error::{GraphError, InterruptedExecution, Result};
 use crate::graph::CompiledGraph;
 use crate::interrupt::Interrupt;
 use crate::node::{ExecutionConfig, NodeContext};
 use crate::state::{Checkpoint, State};
 use crate::stream::{StreamEvent, StreamMode};
+use crate::timeout::{ProgressHandle, execute_with_timeout};
 use futures::stream::{self, StreamExt};
+use std::collections::HashMap;
 use std::time::Instant;
 
 /// Result of a super-step execution
@@ -29,12 +34,36 @@ pub struct PregelExecutor<'a> {
     state: State,
     step: usize,
     pending_nodes: Vec<String>,
+    /// Tracks deferred nodes waiting for all upstream paths to complete.
+    pending_deferred: HashMap<String, FanInTracker>,
+    /// Tracks when each deferred node first entered the pending state (for fan-in timeout).
+    deferred_start_times: HashMap<String, Instant>,
+    /// Per-node caches initialized from `CompiledGraph::cache_policies`.
+    #[cfg(feature = "node-cache")]
+    node_caches: HashMap<String, NodeCache>,
 }
 
 impl<'a> PregelExecutor<'a> {
     /// Create a new executor
     pub fn new(graph: &'a CompiledGraph, config: ExecutionConfig) -> Self {
-        Self { graph, config, state: State::new(), step: 0, pending_nodes: vec![] }
+        #[cfg(feature = "node-cache")]
+        let node_caches = graph
+            .cache_policies
+            .iter()
+            .map(|(name, policy)| (name.clone(), NodeCache::from_policy(policy)))
+            .collect();
+
+        Self {
+            graph,
+            config,
+            state: State::new(),
+            step: 0,
+            pending_nodes: vec![],
+            pending_deferred: HashMap::new(),
+            deferred_start_times: HashMap::new(),
+            #[cfg(feature = "node-cache")]
+            node_caches,
+        }
     }
 
     /// Attempt to resume from an existing checkpoint.
@@ -121,8 +150,10 @@ impl<'a> PregelExecutor<'a> {
                 }
             }
 
-            // Determine next nodes
-            self.pending_nodes = self.graph.get_next_nodes(&result.executed_nodes, &self.state);
+            // Determine next nodes and apply deferred node filtering
+            let next_candidates = self.graph.get_next_nodes(&result.executed_nodes, &self.state);
+            self.pending_nodes =
+                self.filter_deferred_nodes(next_candidates, &result.executed_nodes)?;
             self.step += 1;
         }
 
@@ -186,7 +217,16 @@ impl<'a> PregelExecutor<'a> {
 
                     for node_name in &self.pending_nodes {
                         if let Some(node) = self.graph.nodes.get(node_name) {
-                            let ctx = NodeContext::new(self.state.clone(), self.config.clone(), self.step);
+                            let mut ctx = NodeContext::new(self.state.clone(), self.config.clone(), self.step);
+
+                            // Attach progress handle if idle timeout is configured
+                            let policy = self.graph.timeout_policy_for(node_name).cloned();
+                            if let Some(ref p) = policy {
+                                if p.idle_timeout.is_some() {
+                                    ctx.set_progress_handle(ProgressHandle::new());
+                                }
+                            }
+
                             let start = std::time::Instant::now();
 
                             let mut node_stream = node.execute_stream(&ctx);
@@ -213,8 +253,14 @@ impl<'a> PregelExecutor<'a> {
                             result.events.push(StreamEvent::node_end(node_name, self.step, duration_ms));
                             result.events.extend(collected_events);
 
-                            // Get output from execute for state updates
-                            if let Ok(output) = node.execute(&ctx).await {
+                            // Get output from execute for state updates, with timeout if configured
+                            let output_result = match policy {
+                                Some(ref timeout_policy) => {
+                                    execute_with_timeout(node.as_ref(), &ctx, timeout_policy).await
+                                }
+                                None => node.execute(&ctx).await,
+                            };
+                            if let Ok(output) = output_result {
                                 for (key, value) in output.updates {
                                     self.graph.schema.apply_update(&mut self.state, &key, value);
                                 }
@@ -229,7 +275,16 @@ impl<'a> PregelExecutor<'a> {
                         }
                     }
 
-                    self.pending_nodes = self.graph.get_next_nodes(&result.executed_nodes, &self.state);
+                    self.pending_nodes = {
+                        let next_candidates = self.graph.get_next_nodes(&result.executed_nodes, &self.state);
+                        match self.filter_deferred_nodes(next_candidates, &result.executed_nodes) {
+                            Ok(nodes) => nodes,
+                            Err(e) => {
+                                yield Err(e);
+                                return;
+                            }
+                        }
+                    };
                     self.step += 1;
                     continue;
                 }
@@ -285,12 +340,125 @@ impl<'a> PregelExecutor<'a> {
                     }
                 }
 
-                self.pending_nodes = self.graph.get_next_nodes(&result.executed_nodes, &self.state);
+                self.pending_nodes = {
+                    let next_candidates = self.graph.get_next_nodes(&result.executed_nodes, &self.state);
+                    match self.filter_deferred_nodes(next_candidates, &result.executed_nodes) {
+                        Ok(nodes) => nodes,
+                        Err(e) => {
+                            yield Err(e);
+                            return;
+                        }
+                    }
+                };
                 self.step += 1;
             }
 
             yield Ok(StreamEvent::done(self.state.clone(), self.step + 1));
         }
+    }
+
+    /// Filter deferred nodes from the next candidates.
+    ///
+    /// For each candidate node that is configured as deferred, check whether all
+    /// upstream paths have completed. If not, hold the node in `pending_deferred`
+    /// and record the outputs from the just-executed nodes. If all upstream paths
+    /// have completed, inject the merged output into state and allow the node to
+    /// proceed.
+    ///
+    /// If a deferred node has a `fan_in_timeout` configured and the timeout has
+    /// elapsed:
+    /// - If at least one upstream path has completed, proceed with partial results.
+    /// - If zero upstream paths have completed, return `GraphError::FanInTimedOut`.
+    fn filter_deferred_nodes(
+        &mut self,
+        candidates: Vec<String>,
+        executed_nodes: &[String],
+    ) -> Result<Vec<String>> {
+        let mut ready_nodes = Vec::new();
+
+        for candidate in candidates {
+            if let Some(config) = self.graph.deferred_configs.get(&candidate) {
+                // This is a deferred node — check if all upstream paths are done
+                let upstream = self.graph.get_upstream_nodes(&candidate);
+
+                // Get or create the tracker for this deferred node
+                let tracker = self.pending_deferred.entry(candidate.clone()).or_insert_with(|| {
+                    let sources: Vec<&str> = upstream.iter().map(|s| s.as_str()).collect();
+                    FanInTracker::new(sources)
+                });
+
+                // Record the start time if this is the first time we see this deferred node
+                self.deferred_start_times.entry(candidate.clone()).or_insert_with(Instant::now);
+
+                // Record outputs from the just-executed nodes that are upstream of this deferred node
+                for executed in executed_nodes {
+                    if upstream.contains(executed) {
+                        // Use the current state as the output representation for this upstream node.
+                        // We capture a snapshot of the state that this upstream node contributed to.
+                        let output = self.state.get(executed).cloned().unwrap_or_else(|| {
+                            // If no state key matches the node name, capture the full state
+                            serde_json::Value::Object(
+                                self.state.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                            )
+                        });
+                        tracker.record(executed, output);
+                    }
+                }
+
+                if tracker.is_ready() {
+                    // All upstream paths have completed — merge and inject into state
+                    let merged = tracker.merge(&config.merge_strategy);
+                    let fan_in_key = format!("{candidate}_fan_in");
+                    self.graph.schema.apply_update(&mut self.state, &fan_in_key, merged);
+
+                    // Remove from pending_deferred and start times since it's now ready
+                    self.pending_deferred.remove(&candidate);
+                    self.deferred_start_times.remove(&candidate);
+                    ready_nodes.push(candidate);
+                } else if let Some(timeout_duration) = config.fan_in_timeout {
+                    // Check if the fan-in timeout has elapsed
+                    let start_time = self.deferred_start_times[&candidate];
+                    if start_time.elapsed() >= timeout_duration {
+                        let received = tracker.received_count();
+                        let expected = tracker.expected_count();
+
+                        if received > 0 {
+                            // Proceed with partial results
+                            tracing::warn!(
+                                node = %candidate,
+                                received,
+                                expected,
+                                "fan-in timeout expired, proceeding with partial results"
+                            );
+                            let merged = tracker.merge(&config.merge_strategy);
+                            let fan_in_key = format!("{candidate}_fan_in");
+                            self.graph.schema.apply_update(&mut self.state, &fan_in_key, merged);
+
+                            // Clean up tracking state
+                            self.pending_deferred.remove(&candidate);
+                            self.deferred_start_times.remove(&candidate);
+                            ready_nodes.push(candidate);
+                        } else {
+                            // Zero upstream paths completed — return error
+                            self.pending_deferred.remove(&candidate);
+                            self.deferred_start_times.remove(&candidate);
+                            return Err(GraphError::FanInTimedOut {
+                                node: candidate,
+                                received,
+                                expected,
+                            });
+                        }
+                    }
+                }
+                // If not ready and no timeout (or timeout not yet elapsed), the node stays
+                // in pending_deferred and is NOT added to ready_nodes
+            } else {
+                // Not a deferred node — schedule normally
+                ready_nodes.push(candidate);
+            }
+        }
+
+        Ok(ready_nodes)
     }
 
     /// Initialize state from input and/or checkpoint
@@ -334,21 +502,92 @@ impl<'a> PregelExecutor<'a> {
             }
         }
 
+        // --- Node cache: check for cache hits before executing ---
+        #[cfg(feature = "node-cache")]
+        let mut cached_results: HashMap<String, serde_json::Value> = HashMap::new();
+        #[cfg(feature = "node-cache")]
+        let mut nodes_to_execute: Vec<String> = Vec::new();
+
+        #[cfg(feature = "node-cache")]
+        {
+            for node_name in &self.pending_nodes {
+                if let Some(cache) = self.node_caches.get(node_name) {
+                    let cache_key = compute_cache_key(node_name, &self.state);
+                    let cached_value = cache.get(&cache_key).await;
+                    tracing::debug!(
+                        node = %node_name,
+                        cache_hit = cached_value.is_some(),
+                        cache_key = %cache_key,
+                        "node cache lookup"
+                    );
+                    if let Some(value) = cached_value {
+                        // Cache hit — store the cached result for later application
+                        cached_results.insert(node_name.clone(), value);
+                    } else {
+                        // Cache miss — node needs execution
+                        nodes_to_execute.push(node_name.clone());
+                    }
+                } else {
+                    // No cache configured — node needs execution
+                    nodes_to_execute.push(node_name.clone());
+                }
+            }
+        }
+
+        // Apply cached results immediately
+        #[cfg(feature = "node-cache")]
+        {
+            for (node_name, cached_value) in &cached_results {
+                result.executed_nodes.push(node_name.clone());
+                result.events.push(StreamEvent::node_end(node_name, self.step, 0));
+
+                // Reconstruct updates from the cached JSON value (a map of key -> value)
+                if let Some(updates_map) = cached_value.as_object() {
+                    for (key, value) in updates_map {
+                        self.graph.schema.apply_update(&mut self.state, key, value.clone());
+                    }
+                }
+            }
+        }
+
+        // Determine which nodes to execute (all if cache feature is disabled)
+        #[cfg(feature = "node-cache")]
+        let pending_for_execution = &nodes_to_execute;
+        #[cfg(not(feature = "node-cache"))]
+        let pending_for_execution = &self.pending_nodes;
+
         // Execute all pending nodes in parallel
-        let nodes: Vec<_> = self
-            .pending_nodes
+        let nodes: Vec<_> = pending_for_execution
             .iter()
             .filter_map(|name| self.graph.nodes.get(name).map(|n| (name.clone(), n.clone())))
             .collect();
 
+        // Look up timeout policies for each node before spawning futures
+        let timeout_policies: Vec<_> =
+            nodes.iter().map(|(name, _)| self.graph.timeout_policy_for(name).cloned()).collect();
+
         let futures: Vec<_> = nodes
             .into_iter()
-            .map(|(name, node)| {
-                let ctx = NodeContext::new(self.state.clone(), self.config.clone(), self.step);
+            .zip(timeout_policies)
+            .map(|((name, node), policy)| {
+                let mut ctx = NodeContext::new(self.state.clone(), self.config.clone(), self.step);
+
+                // Attach a ProgressHandle when idle timeout is configured
+                if let Some(ref p) = policy {
+                    if p.idle_timeout.is_some() {
+                        ctx.set_progress_handle(ProgressHandle::new());
+                    }
+                }
+
                 let step = self.step;
                 async move {
                     let start = Instant::now();
-                    let output = node.execute(&ctx).await;
+                    let output = match policy {
+                        Some(ref timeout_policy) => {
+                            execute_with_timeout(node.as_ref(), &ctx, timeout_policy).await
+                        }
+                        None => node.execute(&ctx).await,
+                    };
                     let duration_ms = start.elapsed().as_millis() as u64;
                     (name, output, duration_ms, step)
                 }
@@ -356,7 +595,7 @@ impl<'a> PregelExecutor<'a> {
             .collect();
 
         let outputs: Vec<_> =
-            stream::iter(futures).buffer_unordered(self.pending_nodes.len()).collect().await;
+            stream::iter(futures).buffer_unordered(pending_for_execution.len()).collect().await;
 
         // Collect all updates and check for errors/interrupts
         let mut all_updates = Vec::new();
@@ -378,6 +617,18 @@ impl<'a> PregelExecutor<'a> {
 
                     // Collect custom events
                     result.events.extend(output.events);
+
+                    // Store result in cache on miss
+                    #[cfg(feature = "node-cache")]
+                    {
+                        if let Some(cache) = self.node_caches.get(&node_name) {
+                            let cache_key = compute_cache_key(&node_name, &self.state);
+                            let updates_value = serde_json::to_value(&output.updates)
+                                .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+                            let ttl = self.graph.cache_policies.get(&node_name).and_then(|p| p.ttl);
+                            cache.set(&cache_key, updates_value, ttl).await;
+                        }
+                    }
 
                     // Collect updates
                     all_updates.push(output.updates);

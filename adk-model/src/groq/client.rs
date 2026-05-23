@@ -55,16 +55,19 @@ impl GroqClient {
         Self::new(GroqConfig::mixtral(api_key))
     }
 
+    /// Set the retry configuration (builder pattern).
     #[must_use]
     pub fn with_retry_config(mut self, retry_config: RetryConfig) -> Self {
         self.retry_config = retry_config;
         self
     }
 
+    /// Set the retry configuration (mutable reference).
     pub fn set_retry_config(&mut self, retry_config: RetryConfig) {
         self.retry_config = retry_config;
     }
 
+    /// Returns the current retry configuration.
     pub fn retry_config(&self) -> &RetryConfig {
         &self.retry_config
     }

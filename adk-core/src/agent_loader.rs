@@ -22,6 +22,7 @@ pub struct SingleAgentLoader {
 }
 
 impl SingleAgentLoader {
+    /// Creates a new loader that always returns the given agent.
     pub fn new(agent: Arc<dyn crate::Agent>) -> Self {
         Self { agent }
     }

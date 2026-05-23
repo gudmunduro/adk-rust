@@ -71,6 +71,11 @@ pub struct ServerConfig {
     pub backend_url: Option<String>,
     pub security: SecurityConfig,
     pub request_context_extractor: Option<Arc<dyn RequestContextExtractor>>,
+    /// Optional interceptor chain for A2A request/response middleware.
+    ///
+    /// When set, the chain is invoked before and after A2A executor processing.
+    #[cfg(feature = "a2a-interceptors")]
+    pub interceptor_chain: Option<Arc<crate::a2a::interceptor::InterceptorChain>>,
     /// Directories containing YAML agent definitions to watch for hot reload.
     /// Only used when the `yaml-agent` feature is enabled.
     #[cfg(feature = "yaml-agent")]
@@ -94,6 +99,8 @@ impl ServerConfig {
             backend_url: None,
             security: SecurityConfig::default(),
             request_context_extractor: None,
+            #[cfg(feature = "a2a-interceptors")]
+            interceptor_chain: None,
             #[cfg(feature = "yaml-agent")]
             yaml_agent_dirs: Vec::new(),
         }
@@ -192,6 +199,34 @@ impl ServerConfig {
     /// making scopes available via `ToolContext::user_scopes()`.
     pub fn with_request_context(mut self, extractor: Arc<dyn RequestContextExtractor>) -> Self {
         self.request_context_extractor = Some(extractor);
+        self
+    }
+
+    /// Configure an interceptor chain for A2A request/response middleware.
+    ///
+    /// When set, the chain's `run_before` is called before the A2A executor
+    /// processes a request, and `run_after` is called after it completes.
+    /// Interceptors can reject, short-circuit, or modify requests and responses.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use adk_server::a2a::interceptor::InterceptorChain;
+    /// use std::sync::Arc;
+    ///
+    /// let chain = InterceptorChain::new()
+    ///     .add(my_auth_interceptor)
+    ///     .add(my_rate_limiter);
+    ///
+    /// let config = ServerConfig::new(loader, session)
+    ///     .with_interceptor_chain(Arc::new(chain));
+    /// ```
+    #[cfg(feature = "a2a-interceptors")]
+    pub fn with_interceptor_chain(
+        mut self,
+        chain: Arc<crate::a2a::interceptor::InterceptorChain>,
+    ) -> Self {
+        self.interceptor_chain = Some(chain);
         self
     }
 

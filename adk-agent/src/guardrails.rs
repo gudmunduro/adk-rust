@@ -22,9 +22,11 @@ pub struct GuardrailSet;
 
 #[cfg(not(feature = "guardrails"))]
 impl GuardrailSet {
+    /// Create an empty guardrail set (no-op when feature is disabled).
     pub fn new() -> Self {
         Self
     }
+    /// Returns `true` (always empty when feature is disabled).
     pub fn is_empty(&self) -> bool {
         true
     }

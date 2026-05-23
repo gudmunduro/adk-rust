@@ -71,6 +71,7 @@ pub struct ConditionalAgent {
 }
 
 impl ConditionalAgent {
+    /// Create a new conditional agent with a condition function and the if-branch agent.
     pub fn new<F>(name: impl Into<String>, condition: F, if_agent: Arc<dyn Agent>) -> Self
     where
         F: Fn(&dyn InvocationContext) -> bool + Send + Sync + 'static,
@@ -91,17 +92,20 @@ impl ConditionalAgent {
         }
     }
 
+    /// Set the agent description.
     pub fn with_description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
     }
 
+    /// Set the else-branch agent executed when the condition is false.
     pub fn with_else(mut self, else_agent: Arc<dyn Agent>) -> Self {
         self.all_agents.push(else_agent.clone());
         self.else_agent = Some(else_agent);
         self
     }
 
+    /// Add a before-agent callback.
     pub fn before_callback(mut self, callback: BeforeAgentCallback) -> Self {
         if let Some(callbacks) = Arc::get_mut(&mut self.before_callbacks) {
             callbacks.push(callback);
@@ -109,6 +113,7 @@ impl ConditionalAgent {
         self
     }
 
+    /// Add an after-agent callback.
     pub fn after_callback(mut self, callback: AfterAgentCallback) -> Self {
         if let Some(callbacks) = Arc::get_mut(&mut self.after_callbacks) {
             callbacks.push(callback);
@@ -116,17 +121,20 @@ impl ConditionalAgent {
         self
     }
 
+    /// Set a preloaded skills index for this agent.
     #[cfg(feature = "skills")]
     pub fn with_skills(mut self, index: SkillIndex) -> Self {
         self.skills_index = Some(Arc::new(index));
         self
     }
 
+    /// Auto-load skills from `.skills/` in the current working directory.
     #[cfg(feature = "skills")]
     pub fn with_auto_skills(self) -> Result<Self> {
         self.with_skills_from_root(".")
     }
 
+    /// Auto-load skills from `.skills/` under a custom root directory.
     #[cfg(feature = "skills")]
     pub fn with_skills_from_root(mut self, root: impl AsRef<std::path::Path>) -> Result<Self> {
         let index = load_skill_index(root).map_err(|e| adk_core::AdkError::agent(e.to_string()))?;
@@ -134,12 +142,14 @@ impl ConditionalAgent {
         Ok(self)
     }
 
+    /// Customize skill selection behavior.
     #[cfg(feature = "skills")]
     pub fn with_skill_policy(mut self, policy: SelectionPolicy) -> Self {
         self.skill_policy = policy;
         self
     }
 
+    /// Limit injected skill content length.
     #[cfg(feature = "skills")]
     pub fn with_skill_budget(mut self, max_chars: usize) -> Self {
         self.max_skill_chars = max_chars;

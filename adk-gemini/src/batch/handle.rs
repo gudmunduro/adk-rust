@@ -74,32 +74,56 @@ use crate::{
     files::handle::FileHandle,
 };
 
+/// Errors that can occur when managing a batch operation.
 #[derive(Debug, Snafu)]
 pub enum Error {
+    /// The batch expired before completing.
     #[snafu(display("batch '{name}' expired before finishing"))]
     BatchExpired {
         /// Batch name.
         name: String,
     },
 
+    /// The batch failed during execution.
     #[snafu(display("batch '{name}' failed"))]
     BatchFailed {
+        /// The underlying operation error.
         source: OperationError,
         /// Batch name.
         name: String,
     },
 
+    /// An error from the underlying Gemini client.
     #[snafu(display("client invocation error"))]
-    Client { source: Box<ClientError> },
+    Client {
+        /// The underlying client error.
+        source: Box<ClientError>,
+    },
 
+    /// Failed to download the batch result file.
     #[snafu(display("failed to download batch result file '{file_name}'"))]
-    FileDownload { source: crate::files::Error, file_name: String },
+    FileDownload {
+        /// The underlying file error.
+        source: crate::files::Error,
+        /// The name of the file that failed to download.
+        file_name: String,
+    },
 
+    /// The batch result file content was not valid UTF-8.
     #[snafu(display("failed to decode batch result file content as UTF-8"))]
-    FileDecode { source: std::string::FromUtf8Error },
+    FileDecode {
+        /// The underlying UTF-8 decode error.
+        source: std::string::FromUtf8Error,
+    },
 
+    /// Failed to parse a line in the batch result file.
     #[snafu(display("failed to parse line in batch result file"))]
-    FileParse { source: serde_json::Error, line: String },
+    FileParse {
+        /// The underlying JSON parse error.
+        source: serde_json::Error,
+        /// The line that failed to parse.
+        line: String,
+    },
 
     /// This error should never occur, as the Google API contract
     /// guarantees that a result will always be provided.
@@ -113,9 +137,12 @@ pub enum Error {
     },
 }
 
+/// The result of a single request within a batch operation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BatchGenerationResponseItem {
+    /// The generation response or individual request error.
     pub response: Result<GenerationResponse, IndividualRequestError>,
+    /// Metadata identifying the original request.
     pub meta: RequestMetadata,
 }
 
@@ -125,9 +152,21 @@ pub enum BatchStatus {
     /// The operation is waiting to be processed.
     Pending,
     /// The operation is currently being processed.
-    Running { pending_count: i64, completed_count: i64, failed_count: i64, total_count: i64 },
+    Running {
+        /// Number of requests still pending.
+        pending_count: i64,
+        /// Number of requests completed successfully.
+        completed_count: i64,
+        /// Number of requests that failed.
+        failed_count: i64,
+        /// Total number of requests in the batch.
+        total_count: i64,
+    },
     /// The operation has completed successfully.
-    Succeeded { results: Vec<BatchGenerationResponseItem> },
+    Succeeded {
+        /// The batch results.
+        results: Vec<BatchGenerationResponseItem>,
+    },
     /// The operation was cancelled by the user.
     Cancelled,
     /// The operation has expired.

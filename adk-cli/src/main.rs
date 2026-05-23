@@ -1,5 +1,6 @@
 mod cli;
 mod deploy;
+mod graph;
 mod setup;
 mod skills;
 
@@ -49,6 +50,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Skills { command }) => skills::run(command),
         Some(Commands::Deploy { command }) => deploy::run(command).await,
+        Some(Commands::Graph { command }) => graph::run(command).await,
     }
 }
 

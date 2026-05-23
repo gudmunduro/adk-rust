@@ -1,5 +1,6 @@
 //! # adk-model
 #![allow(clippy::result_large_err)]
+#![deny(missing_docs)]
 //!
 //! LLM model integrations for ADK (Gemini, OpenAI, OpenRouter, Anthropic, DeepSeek, Groq,
 //! Ollama, Fireworks AI, Together AI, Mistral AI, Perplexity, Cerebras, SambaNova, Amazon
@@ -261,10 +262,12 @@ pub mod azure_ai;
 pub mod bedrock;
 #[cfg(feature = "deepseek")]
 pub mod deepseek;
+/// Gemini model provider (Google AI Studio and Vertex AI).
 #[cfg(feature = "gemini")]
 pub mod gemini;
 #[cfg(feature = "groq")]
 pub mod groq;
+/// Mock LLM for testing without real API calls.
 pub mod mock;
 #[cfg(feature = "ollama")]
 pub mod ollama;
@@ -274,7 +277,9 @@ pub mod openai;
 pub mod openai_compatible;
 #[cfg(feature = "openrouter")]
 pub mod openrouter;
+/// Canonical provider identifiers and metadata.
 pub mod provider;
+/// Retry logic with exponential backoff for transient provider errors.
 pub mod retry;
 pub mod tool_call_parser;
 #[cfg(any(

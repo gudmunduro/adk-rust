@@ -6,11 +6,16 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// Request to create a new session.
 #[derive(Debug, Clone)]
 pub struct CreateRequest {
+    /// Application name that owns the session.
     pub app_name: String,
+    /// User identifier for the session owner.
     pub user_id: String,
+    /// Optional session ID; generated if not provided.
     pub session_id: Option<String>,
+    /// Initial state key-value pairs for the session.
     pub state: HashMap<String, Value>,
 }
 
@@ -68,12 +73,18 @@ impl CreateRequest {
     }
 }
 
+/// Request to retrieve an existing session.
 #[derive(Debug, Clone)]
 pub struct GetRequest {
+    /// Application name that owns the session.
     pub app_name: String,
+    /// User identifier for the session owner.
     pub user_id: String,
+    /// Session identifier to retrieve.
     pub session_id: String,
+    /// If set, only return the N most recent events.
     pub num_recent_events: Option<usize>,
+    /// If set, only return events after this timestamp.
     pub after: Option<DateTime<Utc>>,
 }
 
@@ -95,9 +106,12 @@ impl GetRequest {
     }
 }
 
+/// Request to list sessions for a given app and user.
 #[derive(Debug, Clone)]
 pub struct ListRequest {
+    /// Application name to filter sessions by.
     pub app_name: String,
+    /// User identifier to filter sessions by.
     pub user_id: String,
     /// Maximum number of sessions to return. `None` means no limit.
     pub limit: Option<usize>,
@@ -155,10 +169,14 @@ pub struct AppendEventRequest {
     pub event: Event,
 }
 
+/// Request to delete a session.
 #[derive(Debug, Clone)]
 pub struct DeleteRequest {
+    /// Application name that owns the session.
     pub app_name: String,
+    /// User identifier for the session owner.
     pub user_id: String,
+    /// Session identifier to delete.
     pub session_id: String,
 }
 
@@ -180,12 +198,21 @@ impl DeleteRequest {
     }
 }
 
+/// Trait for session persistence backends.
+///
+/// Implementations manage the full lifecycle of sessions: creation, retrieval,
+/// listing, deletion, and event appending.
 #[async_trait]
 pub trait SessionService: Send + Sync {
+    /// Create a new session and return it.
     async fn create(&self, req: CreateRequest) -> Result<Box<dyn Session>>;
+    /// Retrieve an existing session by its identifiers.
     async fn get(&self, req: GetRequest) -> Result<Box<dyn Session>>;
+    /// List sessions for a given app and user.
     async fn list(&self, req: ListRequest) -> Result<Vec<Box<dyn Session>>>;
+    /// Delete a session by its identifiers.
     async fn delete(&self, req: DeleteRequest) -> Result<()>;
+    /// Append an event to a session identified by its session ID string.
     async fn append_event(&self, session_id: &str, event: Event) -> Result<()>;
 
     /// Get a session using typed [`AdkIdentity`] addressing.

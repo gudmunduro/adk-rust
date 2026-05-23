@@ -15,8 +15,10 @@ const X_TITLE_HEADER: &str = "x-title";
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OpenRouterApiMode {
+    /// Use the chat-completions API surface (default).
     #[default]
     ChatCompletions,
+    /// Use the Responses API surface.
     Responses,
 }
 

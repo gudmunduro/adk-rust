@@ -1,4 +1,6 @@
+/// Gemini model client implementation.
 pub mod client;
+/// Streaming response handling for Gemini.
 pub mod streaming;
 
 pub use crate::retry::RetryConfig;

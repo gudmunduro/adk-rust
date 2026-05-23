@@ -25,8 +25,11 @@ pub enum ThinkingMode {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Effort {
+    /// Minimal reasoning effort.
     Low,
+    /// Moderate reasoning effort.
     Medium,
+    /// Thorough reasoning effort.
     High,
     /// Very deep reasoning. Opus 4.7+ recommended.
     XHigh,

@@ -135,13 +135,9 @@ Each backend detects pre-existing tables (baseline detection) and registers them
 
 ## Rename: DatabaseSessionService → SqliteSessionService
 
-As of v0.4.0, `DatabaseSessionService` has been renamed to `SqliteSessionService` to accurately reflect that it is a SQLite-only backend. A deprecated type alias is provided for backward compatibility:
+As of v0.4.0, `DatabaseSessionService` was renamed to `SqliteSessionService` to accurately reflect that it is a SQLite-only backend. The deprecated type alias was removed in v0.7.0. Update your imports:
 
 ```rust
-// Old (still compiles with a deprecation warning)
-use adk_session::DatabaseSessionService;
-
-// New
 use adk_session::SqliteSessionService;
 ```
 

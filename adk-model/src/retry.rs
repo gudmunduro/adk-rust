@@ -1,12 +1,18 @@
 use adk_core::{AdkError, Result};
 use std::{future::Future, time::Duration};
 
+/// Configuration for automatic retry with exponential backoff.
 #[derive(Clone, Debug)]
 pub struct RetryConfig {
+    /// Whether retries are enabled.
     pub enabled: bool,
+    /// Maximum number of retry attempts before giving up.
     pub max_retries: u32,
+    /// Initial delay before the first retry.
     pub initial_delay: Duration,
+    /// Maximum delay between retries (caps exponential growth).
     pub max_delay: Duration,
+    /// Multiplier applied to the delay after each retry.
     pub backoff_multiplier: f32,
 }
 
@@ -23,29 +29,34 @@ impl Default for RetryConfig {
 }
 
 impl RetryConfig {
+    /// Create a disabled retry configuration (no retries).
     #[must_use]
     pub fn disabled() -> Self {
         Self { enabled: false, ..Self::default() }
     }
 
+    /// Set the maximum number of retry attempts.
     #[must_use]
     pub fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
         self
     }
 
+    /// Set the initial delay before the first retry.
     #[must_use]
     pub fn with_initial_delay(mut self, initial_delay: Duration) -> Self {
         self.initial_delay = initial_delay;
         self
     }
 
+    /// Set the maximum delay between retries.
     #[must_use]
     pub fn with_max_delay(mut self, max_delay: Duration) -> Self {
         self.max_delay = max_delay;
         self
     }
 
+    /// Set the backoff multiplier applied after each retry.
     #[must_use]
     pub fn with_backoff_multiplier(mut self, backoff_multiplier: f32) -> Self {
         self.backoff_multiplier = backoff_multiplier;
@@ -53,11 +64,13 @@ impl RetryConfig {
     }
 }
 
+/// Returns `true` if the HTTP status code indicates a transient error worth retrying.
 #[must_use]
 pub fn is_retryable_status_code(status_code: u16) -> bool {
     matches!(status_code, 408 | 429 | 500 | 502 | 503 | 504 | 529)
 }
 
+/// Returns `true` if the error message contains patterns indicating a transient failure.
 #[must_use]
 pub fn is_retryable_error_message(message: &str) -> bool {
     let normalized = message.to_ascii_uppercase();
@@ -79,6 +92,7 @@ pub fn is_retryable_error_message(message: &str) -> bool {
         || normalized.contains("OVERLOADED")
 }
 
+/// Returns `true` if the `AdkError` should be retried based on its retry hint or message.
 #[must_use]
 pub fn is_retryable_model_error(error: &AdkError) -> bool {
     // Primary: use structured retry hint (single source of truth)
@@ -123,6 +137,7 @@ pub struct ServerRetryHint {
     pub retry_after: Option<Duration>,
 }
 
+/// Execute an operation with automatic retry on transient errors.
 pub async fn execute_with_retry<T, Op, Fut, Classify>(
     retry_config: &RetryConfig,
     classify_error: Classify,

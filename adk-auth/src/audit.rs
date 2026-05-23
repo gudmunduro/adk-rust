@@ -118,7 +118,6 @@ pub struct AuditEvent {
     pub metadata: Option<serde_json::Value>,
 
     // ── Enterprise context fields ───────────────────────────────
-
     /// Workspace ID for multi-tenant scoping.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub workspace_id: Option<String>,
@@ -432,12 +431,7 @@ impl FileAuditSink {
         let path = path.into();
         let file = OpenOptions::new().create(true).append(true).open(&path)?;
         let writer = Mutex::new(BufWriter::new(file));
-        Ok(Self {
-            writer,
-            path,
-            last_event_json: Mutex::new(None),
-            chain_enabled: false,
-        })
+        Ok(Self { writer, path, last_event_json: Mutex::new(None), chain_enabled: false })
     }
 
     /// Create a new file audit sink with cryptographic hash chaining enabled.
@@ -448,12 +442,7 @@ impl FileAuditSink {
         let path = path.into();
         let file = OpenOptions::new().create(true).append(true).open(&path)?;
         let writer = Mutex::new(BufWriter::new(file));
-        Ok(Self {
-            writer,
-            path,
-            last_event_json: Mutex::new(None),
-            chain_enabled: true,
-        })
+        Ok(Self { writer, path, last_event_json: Mutex::new(None), chain_enabled: true })
     }
 
     /// Get the path to the audit log file.
@@ -545,11 +534,8 @@ impl AuditSink for InMemoryAuditSink {
 
     async fn query(&self, filter: &AuditFilter) -> Result<Vec<AuditEvent>, crate::AuthError> {
         let events = self.events.read().await;
-        let mut results: Vec<AuditEvent> = events
-            .iter()
-            .filter(|e| filter.matches(e))
-            .cloned()
-            .collect();
+        let mut results: Vec<AuditEvent> =
+            events.iter().filter(|e| filter.matches(e)).cloned().collect();
 
         // Apply offset
         if let Some(offset) = filter.offset {
@@ -622,7 +608,8 @@ mod tests {
 
     #[test]
     fn test_custom_event_type() {
-        let event = AuditEvent::custom("deployment_triggered", "ci-bot", "agent-v2", AuditOutcome::Created);
+        let event =
+            AuditEvent::custom("deployment_triggered", "ci-bot", "agent-v2", AuditOutcome::Created);
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("deployment_triggered"));
         assert!(json.contains("\"outcome\":\"created\""));
@@ -638,7 +625,8 @@ mod tests {
             AuditOutcome::Paused,
             AuditOutcome::Escalated,
         ] {
-            let event = AuditEvent::new(AuditEventType::ResourceCreated, "user", "res", outcome.clone());
+            let event =
+                AuditEvent::new(AuditEventType::ResourceCreated, "user", "res", outcome.clone());
             let json = serde_json::to_string(&event).unwrap();
             let deserialized: AuditEvent = serde_json::from_str(&json).unwrap();
             assert_eq!(deserialized.outcome, outcome);
@@ -664,7 +652,8 @@ mod tests {
         ];
 
         for event_type in types {
-            let event = AuditEvent::new(event_type.clone(), "user", "resource", AuditOutcome::Allowed);
+            let event =
+                AuditEvent::new(event_type.clone(), "user", "resource", AuditOutcome::Allowed);
             let json = serde_json::to_string(&event).unwrap();
             let deserialized: AuditEvent = serde_json::from_str(&json).unwrap();
             assert_eq!(deserialized.event_type, event_type);
@@ -676,8 +665,8 @@ mod tests {
         let event1 = AuditEvent::tool_access("alice", "search", AuditOutcome::Allowed);
         let json1 = event1.to_json().unwrap();
 
-        let event2 = AuditEvent::tool_access("bob", "exec", AuditOutcome::Denied)
-            .with_prev_hash(&json1);
+        let event2 =
+            AuditEvent::tool_access("bob", "exec", AuditOutcome::Denied).with_prev_hash(&json1);
 
         assert!(event2.prev_hash.is_some());
         // SHA-256 hex is 64 chars
@@ -716,20 +705,43 @@ mod tests {
     async fn test_in_memory_sink_query() {
         let sink = InMemoryAuditSink::new();
 
-        sink.log(AuditEvent::tool_access("alice", "search", AuditOutcome::Allowed).with_workspace("ws_1")).await.unwrap();
-        sink.log(AuditEvent::tool_access("bob", "exec", AuditOutcome::Denied).with_workspace("ws_1")).await.unwrap();
-        sink.log(AuditEvent::tool_access("alice", "deploy", AuditOutcome::Allowed).with_workspace("ws_2")).await.unwrap();
+        sink.log(
+            AuditEvent::tool_access("alice", "search", AuditOutcome::Allowed)
+                .with_workspace("ws_1"),
+        )
+        .await
+        .unwrap();
+        sink.log(
+            AuditEvent::tool_access("bob", "exec", AuditOutcome::Denied).with_workspace("ws_1"),
+        )
+        .await
+        .unwrap();
+        sink.log(
+            AuditEvent::tool_access("alice", "deploy", AuditOutcome::Allowed)
+                .with_workspace("ws_2"),
+        )
+        .await
+        .unwrap();
 
         // Query by user
-        let results = sink.query(&AuditFilter { user: Some("alice".to_string()), ..Default::default() }).await.unwrap();
+        let results = sink
+            .query(&AuditFilter { user: Some("alice".to_string()), ..Default::default() })
+            .await
+            .unwrap();
         assert_eq!(results.len(), 2);
 
         // Query by workspace
-        let results = sink.query(&AuditFilter { workspace_id: Some("ws_1".to_string()), ..Default::default() }).await.unwrap();
+        let results = sink
+            .query(&AuditFilter { workspace_id: Some("ws_1".to_string()), ..Default::default() })
+            .await
+            .unwrap();
         assert_eq!(results.len(), 2);
 
         // Query by outcome
-        let results = sink.query(&AuditFilter { outcome: Some(AuditOutcome::Denied), ..Default::default() }).await.unwrap();
+        let results = sink
+            .query(&AuditFilter { outcome: Some(AuditOutcome::Denied), ..Default::default() })
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].user, "bob");
     }

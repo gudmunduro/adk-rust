@@ -27,7 +27,9 @@ pub enum Tool {
         /// The code execution configuration
         code_execution: Value,
     },
+    /// URL context tool
     URLContext {
+        /// The URL context configuration
         url_context: URLContextConfig,
     },
     /// File search tool
@@ -221,16 +223,33 @@ pub struct FunctionCall {
     pub thought_signature: Option<String>,
 }
 
+/// Errors that can occur when extracting parameters from a [`FunctionCall`].
 #[derive(Debug, Snafu)]
 pub enum FunctionCallError {
+    /// Failed to deserialize a parameter value.
     #[snafu(display("failed to deserialize parameter '{key}'"))]
-    Deserialization { source: serde_json::Error, key: String },
+    Deserialization {
+        /// The underlying deserialization error.
+        source: serde_json::Error,
+        /// The parameter key that failed to deserialize.
+        key: String,
+    },
 
+    /// A required parameter is missing from the arguments.
     #[snafu(display("parameter '{key}' is missing in arguments '{args}'"))]
-    MissingParameter { key: String, args: serde_json::Value },
+    MissingParameter {
+        /// The missing parameter key.
+        key: String,
+        /// The arguments object that was searched.
+        args: serde_json::Value,
+    },
 
+    /// The arguments value is not a JSON object.
     #[snafu(display("arguments should be an object; actual: {actual}"))]
-    ArgumentTypeMismatch { actual: String },
+    ArgumentTypeMismatch {
+        /// String representation of the actual value type.
+        actual: String,
+    },
 }
 
 impl FunctionCall {
@@ -295,11 +314,13 @@ pub struct FunctionResponse {
 pub enum FunctionResponsePart {
     /// Inline binary data (base64-encoded).
     InlineData {
+        /// The inline blob data.
         #[serde(rename = "inlineData")]
         inline_data: crate::Blob,
     },
     /// File data referenced by URI.
     FileData {
+        /// The file data reference.
         #[serde(rename = "fileData")]
         file_data: crate::FileDataRef,
     },

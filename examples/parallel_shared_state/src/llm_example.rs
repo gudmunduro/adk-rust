@@ -11,7 +11,7 @@ use adk_agent::LlmAgentBuilder;
 use adk_core::{
     AdkError, Agent, Content, SessionId, Tool, ToolContext, UserId,
 };
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_session::InMemorySessionService;
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -252,22 +252,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .await?;
 
-    let runner = Runner::new(RunnerConfig {
-        app_name: "document-team".to_string(),
-        agent: Arc::new(parallel),
-        session_service,
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })?;
+    let runner = Runner::builder()
+        .app_name("document-team")
+        .agent(Arc::new(parallel))
+        .session_service(session_service)
+        .build()?;
 
     println!("Topic: The future of renewable energy\n");
     println!("Running 3 agents in parallel...\n");

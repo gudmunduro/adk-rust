@@ -36,15 +36,18 @@ pub struct GoogleMapsTool {
 }
 
 impl GoogleMapsTool {
+    /// Create a new `GoogleMapsTool` with default settings.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Enable or disable the interactive widget in the response.
     pub fn with_widget(mut self, enable_widget: bool) -> Self {
         self.enable_widget = enable_widget;
         self
     }
 
+    /// Set the contextual location for map queries.
     pub fn with_context(mut self, context: GoogleMapsContext) -> Self {
         self.context = Some(context);
         self
@@ -88,6 +91,7 @@ impl Tool for GoogleMapsTool {
 pub struct GeminiCodeExecutionTool;
 
 impl GeminiCodeExecutionTool {
+    /// Create a new `GeminiCodeExecutionTool`.
     pub fn new() -> Self {
         Self
     }
@@ -129,6 +133,7 @@ pub struct GeminiFileSearchTool {
 }
 
 impl GeminiFileSearchTool {
+    /// Create a new `GeminiFileSearchTool` with the given store names.
     pub fn new(file_search_store_names: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
             file_search_store_names: file_search_store_names.into_iter().map(Into::into).collect(),
@@ -170,6 +175,7 @@ impl Tool for GeminiFileSearchTool {
 /// Target environment for Gemini computer use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GeminiComputerEnvironment {
+    /// Browser-based environment.
     Browser,
 }
 
@@ -198,10 +204,12 @@ impl Default for GeminiComputerUseTool {
 }
 
 impl GeminiComputerUseTool {
+    /// Create a new `GeminiComputerUseTool` for the given environment.
     pub fn new(environment: GeminiComputerEnvironment) -> Self {
         Self { environment, ..Default::default() }
     }
 
+    /// Exclude specific predefined functions from computer use.
     pub fn with_excluded_functions(
         mut self,
         excluded_predefined_functions: impl IntoIterator<Item = impl Into<String>>,

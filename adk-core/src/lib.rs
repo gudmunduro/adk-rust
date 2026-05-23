@@ -2,6 +2,7 @@
 //!
 //! Core traits and types for ADK agents, tools, sessions, and events.
 #![allow(clippy::result_large_err)]
+#![deny(missing_docs)]
 //!
 //! ## Overview
 //!
@@ -71,22 +72,41 @@
 //! - `app:` - Application state (application-wide)
 //! - `temp:` - Temporary data (cleared each turn)
 
+/// Core agent trait and event stream type.
 pub mod agent;
+/// Dynamic agent loading by name.
 pub mod agent_loader;
+/// Callback type aliases for agent, model, and tool lifecycle hooks.
 pub mod callbacks;
+/// Invocation context traits: state, session, artifacts, memory, and run configuration.
 pub mod context;
+/// Unified structured error type and result alias.
 pub mod error;
+/// Event types representing agent interactions in a conversation.
 pub mod event;
+/// Typed identity primitives for app, user, session, and invocation.
 pub mod identity;
+/// Template-based instruction injection with session state interpolation.
 pub mod instruction_template;
+/// Intra-turn context compaction configuration.
 pub mod intra_compaction;
+/// LLM trait, request/response types, and caching configuration.
 pub mod model;
+/// HTTP request context extracted by auth middleware.
 pub mod request_context;
+/// Provider-aware JSON Schema normalization for tool declarations.
 pub mod schema_adapter;
+/// Thread-safe schema cache for tool parameter schemas.
 pub mod schema_cache;
+/// JSON Schema utility functions.
 pub mod schema_utils;
+/// Thread-safe shared state for parallel agent coordination.
 pub mod shared_state;
+/// Tool trait, toolset, execution strategy, and registry.
 pub mod tool;
+/// Semaphore-based tool concurrency management.
+pub mod tool_concurrency;
+/// Content, Part, and multimodal data types.
 pub mod types;
 
 pub use agent::{Agent, EventStream, ResolvedContext};
@@ -98,9 +118,10 @@ pub use callbacks::{
     OnToolErrorCallback,
 };
 pub use context::{
-    Artifacts, CallbackContext, IncludeContents, InvocationContext, MAX_STATE_KEY_LEN, Memory,
-    MemoryEntry, ReadonlyContext, ReadonlyState, RunConfig, SecretService, Session, State,
-    StreamingMode, ToolCallbackContext, ToolConfirmationDecision, ToolConfirmationPolicy,
+    Artifacts, BackpressurePolicy, CallbackContext, IncludeContents, InvocationContext,
+    MAX_STATE_KEY_LEN, Memory, MemoryEntry, ReadonlyContext, ReadonlyState, RunConfig,
+    RunConfigBuilder, SecretService, Session, State, StreamingMode, ToolCallbackContext,
+    ToolConcurrencyConfig, ToolConfirmationDecision, ToolConfirmationPolicy,
     ToolConfirmationRequest, ToolOutcome, validate_state_key,
 };
 pub use error::{AdkError, ErrorCategory, ErrorComponent, ErrorDetails, Result, RetryHint};
@@ -124,6 +145,7 @@ pub use tool::{
     RetryBudget, Tool, ToolContext, ToolExecutionStrategy, ToolPredicate, ToolRegistry, Toolset,
     ValidationMode,
 };
+pub use tool_concurrency::{ConcurrencyPermit, ToolConcurrencyManager};
 pub use types::{
     Content, FileDataPart, FunctionResponseData, InlineDataPart, MAX_INLINE_DATA_SIZE, Part,
 };

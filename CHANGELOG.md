@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - 2026-05-19
+
+### Breaking
+
+- **`DatabaseSessionService` type alias removed** (deprecated since 0.4.0). Use `SqliteSessionService` directly instead. The alias was a backward-compatibility shim that has been deprecated for 4 minor releases.
+
+- **`RustCodeTool` struct removed** (deprecated since 0.5.0). Use `adk_code::CodeTool` instead. The struct and its module have been fully removed from `adk-tool`.
+
+- **`RunnerConfig` and `RunConfig` are now `#[non_exhaustive]`**. Struct literal construction is no longer possible from downstream crates. Use the builder pattern instead:
+  ```rust
+  // RunnerConfig — use the typestate builder
+  let runner = Runner::builder()
+      .agent(agent)
+      .session_service(session_service)
+      .build();
+
+  // RunConfig — use the builder or Default
+  let run_config = RunConfig::builder()
+      .input_text("Hello")
+      .build();
+  ```
+
+### Changed
+
+- **Beta-to-Stable promotions**: The following crates have been promoted from Beta to Stable tier, committing to semantic versioning guarantees:
+  - `adk-server` — HTTP server (Axum) and A2A protocol
+  - `adk-graph` — Graph-based workflow orchestration with checkpoints
+  - `adk-memory` — Semantic memory and RAG search
+  - `adk-anthropic` — Dedicated Anthropic client and tool search
+
+### Added
+
+- **`#![deny(missing_docs)]` enforced on all 7 original Stable-tier crates**: `adk-core`, `adk-agent`, `adk-model`, `adk-gemini`, `adk-tool`, `adk-runner`, `adk-session`. All public items now have rustdoc documentation.
+
+- **Property tests for 4 crates**: Added proptest-based property tests (100+ iterations each) for `adk-agent` (event stream well-formedness), `adk-runner` (config builder round-trip), `adk-gemini` (serialization round-trip, thinking config validation), and `adk-tool` (schema generation, MCP round-trip).
+
+- **CI documentation lint job**: New `docs` job in CI that runs `RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps` for all 12 Stable-tier crates, failing on any undocumented public items.
+
 ## [0.8.4] - 2026-05-18
 
 ### Fixed

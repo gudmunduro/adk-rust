@@ -34,7 +34,7 @@ use adk_core::{
     Agent, CacheCapable, Content, ContextCacheConfig, EventsCompactionConfig, Memory, Part, Result,
     RunConfig, SessionId, StreamingMode, UserId,
 };
-use adk_runner::{Runner, RunnerConfig};
+use adk_runner::Runner;
 use adk_server::{
     RequestContextExtractor, SecurityConfig, ServerConfig, create_app, create_app_with_a2a,
     shutdown_signal,
@@ -242,7 +242,7 @@ impl Launcher {
     /// Note: this currently only affects console mode. The server does not
     /// yet accept a `RunConfig`.
     pub fn with_streaming_mode(mut self, mode: StreamingMode) -> Self {
-        self.run_config = Some(RunConfig { streaming_mode: mode, ..RunConfig::default() });
+        self.run_config = Some(RunConfig::builder().streaming_mode(mode).build());
         self
     }
 
@@ -342,22 +342,21 @@ impl Launcher {
                     println!();
 
                     let cancellation_token = CancellationToken::new();
-                    let runner = Runner::new(RunnerConfig {
-                        app_name: app_name.clone(),
-                        agent: agent.clone(),
-                        session_service: session_service.clone(),
-                        artifact_service: artifact_service.clone(),
-                        memory_service: memory_service.clone(),
-                        plugin_manager: None,
-                        run_config: run_config.clone(),
-                        compaction_config: None,
-                        context_cache_config: None,
-                        cache_capable: None,
-                        request_context: None,
-                        cancellation_token: Some(cancellation_token.clone()),
-                        intra_compaction_config: None,
-                        intra_compaction_summarizer: None,
-                    })?;
+                    let mut runner_builder = Runner::builder()
+                        .app_name(app_name.clone())
+                        .agent(agent.clone())
+                        .session_service(session_service.clone())
+                        .cancellation_token(cancellation_token.clone());
+                    if let Some(ref artifact_service) = artifact_service {
+                        runner_builder = runner_builder.artifact_service(artifact_service.clone());
+                    }
+                    if let Some(ref memory_service) = memory_service {
+                        runner_builder = runner_builder.memory_service(memory_service.clone());
+                    }
+                    if let Some(ref run_config) = run_config {
+                        runner_builder = runner_builder.run_config(run_config.clone());
+                    }
+                    let runner = runner_builder.build()?;
                     let mut events = runner
                         .run(
                             UserId::new(user_id.clone())?,

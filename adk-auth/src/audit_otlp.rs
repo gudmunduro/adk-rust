@@ -30,12 +30,12 @@
 //! sink.flush().await?; // Ensure events are exported
 //! ```
 
-use opentelemetry::logs::{LogRecord as _, Logger as _, LoggerProvider as _, Severity, AnyValue};
+use opentelemetry::logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity};
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use tracing::debug;
 
-use crate::audit::{AuditEvent, AuditOutcome, AuditSink};
 use crate::AuthError;
+use crate::audit::{AuditEvent, AuditOutcome, AuditSink};
 
 /// OpenTelemetry OTLP audit sink.
 ///
@@ -59,9 +59,7 @@ impl OtlpAuditSink {
             .build()
             .map_err(|e| AuthError::AuditError(format!("OTLP log exporter build failed: {e}")))?;
 
-        let provider = SdkLoggerProvider::builder()
-            .with_batch_exporter(exporter)
-            .build();
+        let provider = SdkLoggerProvider::builder().with_batch_exporter(exporter).build();
 
         Ok(Self { provider })
     }
@@ -69,12 +67,8 @@ impl OtlpAuditSink {
     /// Map audit outcome to OTel severity level.
     fn severity_from_outcome(outcome: &AuditOutcome) -> Severity {
         match outcome {
-            AuditOutcome::Allowed | AuditOutcome::Created | AuditOutcome::Updated => {
-                Severity::Info
-            }
-            AuditOutcome::Denied | AuditOutcome::Blocked | AuditOutcome::Paused => {
-                Severity::Warn
-            }
+            AuditOutcome::Allowed | AuditOutcome::Created | AuditOutcome::Updated => Severity::Info,
+            AuditOutcome::Denied | AuditOutcome::Blocked | AuditOutcome::Paused => Severity::Warn,
             AuditOutcome::Error => Severity::Error,
             AuditOutcome::Deleted | AuditOutcome::Escalated => Severity::Warn,
         }

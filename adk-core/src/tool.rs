@@ -4,9 +4,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 
+/// The core trait for all tools that agents can invoke.
+///
+/// Tools extend agent capabilities with custom functions. Each tool has a name,
+/// description, optional parameter schema, and an async `execute` method.
 #[async_trait]
 pub trait Tool: Send + Sync {
+    /// Returns the unique name of this tool.
     fn name(&self) -> &str;
+    /// Returns a human-readable description of what this tool does.
     fn description(&self) -> &str;
 
     /// Returns the tool declaration that should be exposed to model providers.
@@ -69,9 +75,11 @@ pub trait Tool: Send + Sync {
         false
     }
 
+    /// Returns the JSON Schema for this tool's parameters, if any.
     fn parameters_schema(&self) -> Option<Value> {
         None
     }
+    /// Returns the JSON Schema for this tool's response, if any.
     fn response_schema(&self) -> Option<Value> {
         None
     }
@@ -105,16 +113,23 @@ pub trait Tool: Send + Sync {
         false
     }
 
+    /// Executes the tool with the given context and arguments.
     async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> Result<Value>;
 }
 
+/// Context available to tools during execution.
+///
+/// Extends [`CallbackContext`] with tool-specific operations like accessing
+/// the function call ID, managing event actions, and searching memory.
 #[async_trait]
 pub trait ToolContext: CallbackContext {
+    /// Returns the function call ID for this tool invocation.
     fn function_call_id(&self) -> &str;
     /// Get the current event actions. Returns an owned copy for thread safety.
     fn actions(&self) -> EventActions;
     /// Set the event actions (e.g., to trigger escalation or skip summarization).
     fn set_actions(&self, actions: EventActions);
+    /// Searches memory for entries matching the query.
     async fn search_memory(&self, query: &str) -> Result<Vec<MemoryEntry>>;
 
     /// Returns the scopes granted to the current user for this invocation.
@@ -185,9 +200,12 @@ impl RetryBudget {
     }
 }
 
+/// A collection of tools that can be resolved dynamically from context.
 #[async_trait]
 pub trait Toolset: Send + Sync {
+    /// Returns the name of this toolset.
     fn name(&self) -> &str;
+    /// Returns the tools available in this toolset for the given context.
     async fn tools(&self, ctx: Arc<dyn crate::ReadonlyContext>) -> Result<Vec<Arc<dyn Tool>>>;
 }
 
@@ -228,6 +246,7 @@ pub trait ToolRegistry: Send + Sync {
     }
 }
 
+/// A predicate function for filtering tools.
 pub type ToolPredicate = Box<dyn Fn(&dyn Tool) -> bool + Send + Sync>;
 
 #[cfg(test)]

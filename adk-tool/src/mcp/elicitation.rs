@@ -122,6 +122,7 @@ pub struct AdkClientHandler {
 }
 
 impl AdkClientHandler {
+    /// Create a new `AdkClientHandler` with the given elicitation handler.
     pub fn new(handler: Arc<dyn ElicitationHandler>) -> Self {
         Self {
             handler,

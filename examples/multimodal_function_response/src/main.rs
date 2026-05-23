@@ -165,22 +165,11 @@ async fn make_runner(agent: Arc<dyn Agent>, session_id: &str) -> anyhow::Result<
             state: HashMap::new(),
         })
         .await?;
-    Ok(Runner::new(RunnerConfig {
-        app_name: APP_NAME.into(),
-        agent,
-        session_service: sessions,
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    })?)
+    Ok(Runner::builder()
+        .app_name(APP_NAME)
+        .agent(agent)
+        .session_service(sessions)
+        .build()?)
 }
 
 fn separator(title: &str) {

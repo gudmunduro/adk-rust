@@ -199,5 +199,5 @@ The IDE spawns the process, sends `initialize`, creates a session, and then send
 
 - **Add more tools**: Implement the `Tool` trait and add to the agent builder
 - **Switch to HTTP**: Use `TransportConfig::Http { bind_address, port }` for network access
-- **Add persistence**: Replace `InMemorySessionService` with `DatabaseSessionService`
+- **Add persistence**: Replace `InMemorySessionService` with `SqliteSessionService`
 - **Enable auth**: Add authentication middleware for production deployments

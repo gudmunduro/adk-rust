@@ -7,23 +7,32 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 // State scope prefixes
+/// Key prefix for application-scoped state (persists across sessions).
 pub const KEY_PREFIX_APP: &str = "app:";
+/// Key prefix for temporary state (cleared each turn).
 pub const KEY_PREFIX_TEMP: &str = "temp:";
+/// Key prefix for user-scoped state (persists across sessions).
 pub const KEY_PREFIX_USER: &str = "user:";
 
 /// Event represents a single interaction in a conversation.
 /// This struct embeds LlmResponse to match ADK-Go's design pattern.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
+    /// Unique identifier for this event.
     pub id: String,
+    /// When this event was created.
     pub timestamp: DateTime<Utc>,
+    /// The invocation that produced this event.
     pub invocation_id: String,
+    /// The conversation branch this event belongs to.
     pub branch: String,
+    /// The agent or role that authored this event.
     pub author: String,
     /// The LLM response containing content and metadata.
     /// Access content via `event.llm_response.content`.
     #[serde(flatten)]
     pub llm_response: LlmResponse,
+    /// Actions to apply (state changes, transfers, confirmations).
     pub actions: EventActions,
     /// IDs of long-running tools associated with this event.
     #[serde(default)]
@@ -50,15 +59,23 @@ pub struct EventCompaction {
     pub compacted_content: Content,
 }
 
+/// Actions to apply as side effects of an event.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EventActions {
+    /// State key-value changes to apply.
     pub state_delta: HashMap<String, serde_json::Value>,
+    /// Artifact version changes.
     pub artifact_delta: HashMap<String, i64>,
+    /// Whether to skip summarization for this event.
     pub skip_summarization: bool,
+    /// Agent name to transfer control to.
     pub transfer_to_agent: Option<String>,
+    /// Whether to escalate to a human operator.
     pub escalate: bool,
+    /// Tool confirmation request awaiting human approval.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_confirmation: Option<ToolConfirmationRequest>,
+    /// Decision for a pending tool confirmation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_confirmation_decision: Option<ToolConfirmationDecision>,
     /// Present when this event is a compaction summary replacing older events.
@@ -67,6 +84,7 @@ pub struct EventActions {
 }
 
 impl Event {
+    /// Creates a new event with a generated UUID and current timestamp.
     pub fn new(invocation_id: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),

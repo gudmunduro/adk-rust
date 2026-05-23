@@ -305,6 +305,14 @@ version = "^2.4"
 features = ["serde"]
 
 [[test]]
+name = "serialization_property_tests"
+path = "tests/serialization_property_tests.rs"
+
+[[test]]
+name = "thinking_config_property_tests"
+path = "tests/thinking_config_property_tests.rs"
+
+[[test]]
 name = "config_validation_tests"
 path = "tests/config_validation_tests.rs"
 

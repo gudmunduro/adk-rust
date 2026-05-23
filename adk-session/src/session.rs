@@ -3,12 +3,19 @@ use adk_core::Result;
 use adk_core::identity::{AdkIdentity, AppName, SessionId, UserId};
 use chrono::{DateTime, Utc};
 
+/// Trait representing a conversation session with state and event history.
 pub trait Session: Send + Sync {
+    /// Returns the session identifier.
     fn id(&self) -> &str;
+    /// Returns the application name that owns this session.
     fn app_name(&self) -> &str;
+    /// Returns the user identifier for the session owner.
     fn user_id(&self) -> &str;
+    /// Returns a reference to the session's state store.
     fn state(&self) -> &dyn State;
+    /// Returns a reference to the session's event history.
     fn events(&self) -> &dyn Events;
+    /// Returns the timestamp of the last update to this session.
     fn last_update_time(&self) -> DateTime<Utc>;
 
     /// Returns the application name as a typed [`AppName`].
@@ -71,6 +78,9 @@ pub trait Session: Send + Sync {
     }
 }
 
+/// Key prefix for application-scoped state entries.
 pub const KEY_PREFIX_APP: &str = "app:";
+/// Key prefix for temporary state entries (stripped on event append).
 pub const KEY_PREFIX_TEMP: &str = "temp:";
+/// Key prefix for user-scoped state entries.
 pub const KEY_PREFIX_USER: &str = "user:";

@@ -128,6 +128,11 @@ impl StateGraph {
             interrupt_before: HashSet::new(),
             interrupt_after: HashSet::new(),
             recursion_limit: 50,
+            timeout_policies: HashMap::new(),
+            default_timeout: None,
+            deferred_configs: HashMap::new(),
+            #[cfg(feature = "node-cache")]
+            cache_policies: HashMap::new(),
         })
     }
 
@@ -187,6 +192,15 @@ pub struct CompiledGraph {
     pub(crate) interrupt_before: HashSet<String>,
     pub(crate) interrupt_after: HashSet<String>,
     pub(crate) recursion_limit: usize,
+    /// Per-node timeout policies, keyed by node name.
+    pub(crate) timeout_policies: HashMap<String, crate::timeout::TimeoutPolicy>,
+    /// Default timeout policy applied to all nodes without an explicit override.
+    pub(crate) default_timeout: Option<crate::timeout::TimeoutPolicy>,
+    /// Deferred node configurations, keyed by node name.
+    pub(crate) deferred_configs: HashMap<String, crate::deferred::DeferredNodeConfig>,
+    /// Per-node cache policies, keyed by node name.
+    #[cfg(feature = "node-cache")]
+    pub(crate) cache_policies: HashMap<String, crate::cache::NodeCachePolicy>,
 }
 
 impl CompiledGraph {
@@ -218,6 +232,15 @@ impl CompiledGraph {
     pub fn with_recursion_limit(mut self, limit: usize) -> Self {
         self.recursion_limit = limit;
         self
+    }
+
+    /// Get the effective timeout policy for a node.
+    ///
+    /// Returns the per-node policy if one was configured via
+    /// [`GraphAgentBuilder::node_timeout`], otherwise falls back to the
+    /// default timeout policy. Returns `None` if neither is set.
+    pub fn timeout_policy_for(&self, node_name: &str) -> Option<&crate::timeout::TimeoutPolicy> {
+        self.timeout_policies.get(node_name).or(self.default_timeout.as_ref())
     }
 
     /// Get entry nodes
@@ -283,6 +306,47 @@ impl CompiledGraph {
             }
         }
         false
+    }
+
+    /// Get all upstream source nodes for a given target node.
+    ///
+    /// Returns the names of all nodes that have an edge pointing to the given
+    /// target node. This is used by the deferred node scheduler to determine
+    /// which upstream paths must complete before a fan-in node can execute.
+    ///
+    /// For conditional edges, all possible source nodes are included since any
+    /// of them could route to the target at runtime.
+    pub fn get_upstream_nodes(&self, target_node: &str) -> Vec<String> {
+        let mut sources = Vec::new();
+
+        for edge in &self.edges {
+            match edge {
+                Edge::Direct { source, target } => {
+                    if let EdgeTarget::Node(name) = target {
+                        if name == target_node && !sources.contains(source) {
+                            sources.push(source.clone());
+                        }
+                    }
+                }
+                Edge::Conditional { source, targets, .. } => {
+                    for target in targets.values() {
+                        if let EdgeTarget::Node(name) = target {
+                            if name == target_node && !sources.contains(source) {
+                                sources.push(source.clone());
+                            }
+                        }
+                    }
+                }
+                Edge::Entry { targets } => {
+                    if targets.contains(&target_node.to_string()) {
+                        // Entry nodes come from START, which is not a real node
+                        // so we don't add it as an upstream source
+                    }
+                }
+            }
+        }
+
+        sources
     }
 
     /// Get the state schema

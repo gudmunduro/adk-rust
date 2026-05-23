@@ -6,14 +6,91 @@ use serde_json::Value;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
+/// Policy for handling excess tool calls when the concurrency limit is reached.
+///
+/// Determines whether tool calls that exceed the configured concurrency limit
+/// should wait in a queue or fail immediately.
+///
+/// # Example
+///
+/// ```rust
+/// use adk_core::BackpressurePolicy;
+///
+/// // Default is Queue
+/// let policy = BackpressurePolicy::default();
+/// assert!(matches!(policy, BackpressurePolicy::Queue));
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum BackpressurePolicy {
+    /// Queue excess calls until a permit becomes available.
+    ///
+    /// This is the default policy. Tool calls will await until a semaphore
+    /// permit is released by a completing tool execution.
+    #[default]
+    Queue,
+
+    /// Fail immediately with a concurrency limit error when no permit is available.
+    ///
+    /// Use this when latency is more important than throughput — callers receive
+    /// an immediate error rather than waiting indefinitely.
+    Fail,
+}
+
+/// Configuration for tool execution concurrency.
+///
+/// Controls how many tool calls can execute simultaneously, with support for
+/// global limits, per-tool overrides, and configurable backpressure behavior.
+///
+/// # Example
+///
+/// ```rust
+/// use adk_core::{BackpressurePolicy, ToolConcurrencyConfig};
+/// use std::collections::HashMap;
+///
+/// let config = ToolConcurrencyConfig {
+///     max_concurrency: Some(10),
+///     per_tool: HashMap::from([
+///         ("web_scraper".to_string(), 2),
+///         ("calculator".to_string(), 8),
+///     ]),
+///     backpressure: BackpressurePolicy::Fail,
+/// };
+///
+/// assert_eq!(config.max_concurrency, Some(10));
+/// assert_eq!(config.per_tool.get("web_scraper"), Some(&2));
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct ToolConcurrencyConfig {
+    /// Global maximum concurrent tool calls. `None` means unlimited.
+    pub max_concurrency: Option<usize>,
+
+    /// Per-tool concurrency overrides. When a tool name is present in this map,
+    /// its individual limit takes precedence over the global `max_concurrency`.
+    pub per_tool: HashMap<String, usize>,
+
+    /// What to do when the concurrency limit is reached.
+    pub backpressure: BackpressurePolicy,
+}
+
+/// Read-only access to invocation metadata.
+///
+/// Provides identity information (user, app, session, invocation) and the
+/// current user content. Implemented by all context types.
 #[async_trait]
 pub trait ReadonlyContext: Send + Sync {
+    /// Returns the current invocation identifier.
     fn invocation_id(&self) -> &str;
+    /// Returns the name of the currently executing agent.
     fn agent_name(&self) -> &str;
+    /// Returns the user identifier for this session.
     fn user_id(&self) -> &str;
+    /// Returns the application name for this session.
     fn app_name(&self) -> &str;
+    /// Returns the session identifier.
     fn session_id(&self) -> &str;
+    /// Returns the current conversation branch.
     fn branch(&self) -> &str;
+    /// Returns the user's input content for this invocation.
     fn user_content(&self) -> &Content;
 
     /// Returns the application name as a typed [`AppName`].
@@ -134,24 +211,37 @@ pub fn validate_state_key(key: &str) -> std::result::Result<(), &'static str> {
     Ok(())
 }
 
+/// Mutable session state with key-value storage.
+///
+/// Implementations persist state across turns within a session.
 pub trait State: Send + Sync {
+    /// Returns the value for the given key, or `None` if not present.
     fn get(&self, key: &str) -> Option<Value>;
     /// Set a state value. Implementations should call [`validate_state_key`] and
     /// reject invalid keys (e.g., by logging a warning or panicking).
     fn set(&mut self, key: String, value: Value);
+    /// Returns all key-value pairs in the state.
     fn all(&self) -> HashMap<String, Value>;
 }
 
+/// Read-only view of session state.
 pub trait ReadonlyState: Send + Sync {
+    /// Returns the value for the given key, or `None` if not present.
     fn get(&self, key: &str) -> Option<Value>;
+    /// Returns all key-value pairs in the state.
     fn all(&self) -> HashMap<String, Value>;
 }
 
 // Session trait
+/// Represents an active conversation session with identity and state.
 pub trait Session: Send + Sync {
+    /// Returns the session identifier.
     fn id(&self) -> &str;
+    /// Returns the application name this session belongs to.
     fn app_name(&self) -> &str;
+    /// Returns the user identifier for this session.
     fn user_id(&self) -> &str;
+    /// Returns the mutable state associated with this session.
     fn state(&self) -> &dyn State;
     /// Returns the conversation history from this session as Content items
     fn conversation_history(&self) -> Vec<Content>;
@@ -265,8 +355,12 @@ pub struct ToolOutcome {
     pub attempt: u32,
 }
 
+/// Context available to agent lifecycle callbacks.
+///
+/// Extends [`ReadonlyContext`] with access to artifacts and tool execution metadata.
 #[async_trait]
 pub trait CallbackContext: ReadonlyContext {
+    /// Returns the artifact store, if one is configured.
     fn artifacts(&self) -> Option<Arc<dyn Artifacts>>;
 
     /// Returns structured metadata about the most recent tool execution.
@@ -385,13 +479,23 @@ impl CallbackContext for ToolCallbackContext {
     }
 }
 
+/// Full invocation context available to agents during execution.
+///
+/// Extends [`CallbackContext`] with access to the agent itself, memory,
+/// session, and run configuration.
 #[async_trait]
 pub trait InvocationContext: CallbackContext {
+    /// Returns the agent being executed.
     fn agent(&self) -> Arc<dyn Agent>;
+    /// Returns the memory service, if one is configured.
     fn memory(&self) -> Option<Arc<dyn Memory>>;
+    /// Returns the current session.
     fn session(&self) -> &dyn Session;
+    /// Returns the run configuration for this invocation.
     fn run_config(&self) -> &RunConfig;
+    /// Signals that this invocation should end after the current turn.
     fn end_invocation(&self);
+    /// Returns whether the invocation has been ended.
     fn ended(&self) -> bool;
 
     /// Returns the scopes granted to the current user for this invocation.
@@ -422,15 +526,21 @@ pub trait InvocationContext: CallbackContext {
 }
 
 // Placeholder service traits
+/// Binary artifact storage for agents.
 #[async_trait]
 pub trait Artifacts: Send + Sync {
+    /// Saves a binary artifact and returns its version number.
     async fn save(&self, name: &str, data: &crate::Part) -> Result<i64>;
+    /// Loads a binary artifact by name.
     async fn load(&self, name: &str) -> Result<crate::Part>;
+    /// Lists all artifact names.
     async fn list(&self) -> Result<Vec<String>>;
 }
 
+/// Semantic memory search for agents.
 #[async_trait]
 pub trait Memory: Send + Sync {
+    /// Searches memory for entries matching the query.
     async fn search(&self, query: &str) -> Result<Vec<MemoryEntry>>;
 
     /// Verify backend connectivity.
@@ -507,9 +617,12 @@ pub trait SecretService: Send + Sync {
     async fn get_secret(&self, name: &str) -> Result<String>;
 }
 
+/// A single entry returned from memory search.
 #[derive(Debug, Clone)]
 pub struct MemoryEntry {
+    /// The content of this memory entry.
     pub content: Content,
+    /// The author who created this memory entry.
     pub author: String,
 }
 
@@ -543,7 +656,9 @@ pub enum IncludeContents {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolConfirmationDecision {
+    /// Approve the tool execution.
     Approve,
+    /// Deny the tool execution.
     Deny,
 }
 
@@ -592,14 +707,24 @@ impl ToolConfirmationPolicy {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolConfirmationRequest {
+    /// Name of the tool awaiting confirmation.
     pub tool_name: String,
+    /// The function call ID from the LLM, if available.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function_call_id: Option<String>,
+    /// Arguments the tool would be called with.
     pub args: Value,
 }
 
+/// Configuration for a single agent run.
+///
+/// Controls streaming behavior, tool confirmation, caching, transfer targets,
+/// and concurrency settings. Use [`RunConfig::builder()`] to construct from
+/// external crates (struct is `#[non_exhaustive]`).
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct RunConfig {
+    /// The streaming mode for agent responses.
     pub streaming_mode: StreamingMode,
     /// Optional per-tool confirmation decisions for the current run.
     /// Keys are tool names.
@@ -631,9 +756,12 @@ pub struct RunConfig {
     /// history. Set this for chat surfaces that already summarize older turns
     /// and need predictable startup latency.
     pub history_max_events: Option<usize>,
-    /// Maximum number of tool calls to execute concurrently for parallel/auto
-    /// tool dispatch. `None` allows all eligible tool calls to run together.
-    pub max_tool_concurrency: Option<usize>,
+    /// Tool concurrency configuration controlling parallel tool dispatch limits,
+    /// per-tool overrides, and backpressure behavior.
+    ///
+    /// The default (`ToolConcurrencyConfig::default()`) imposes no limits,
+    /// preserving backward compatibility with the previous `max_tool_concurrency: None`.
+    pub tool_concurrency: ToolConcurrencyConfig,
     /// Whether tracing spans may include full request, response, and tool
     /// payloads when the `record-payloads` crate feature is enabled.
     pub record_payloads: bool,
@@ -652,10 +780,124 @@ impl Default for RunConfig {
             parent_agent: None,
             auto_cache: true,
             history_max_events: None,
-            max_tool_concurrency: None,
+            tool_concurrency: ToolConcurrencyConfig::default(),
             record_payloads: false,
             trace_payload_max_bytes: 2048,
         }
+    }
+}
+
+impl RunConfig {
+    /// Creates a new [`RunConfigBuilder`] initialized with default values.
+    ///
+    /// Use the builder to construct a `RunConfig` when struct literal syntax
+    /// is unavailable (e.g., from external crates due to `#[non_exhaustive]`).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use adk_core::{RunConfig, StreamingMode};
+    ///
+    /// let config = RunConfig::builder()
+    ///     .streaming_mode(StreamingMode::None)
+    ///     .auto_cache(false)
+    ///     .build();
+    ///
+    /// assert_eq!(config.streaming_mode, StreamingMode::None);
+    /// assert!(!config.auto_cache);
+    /// ```
+    pub fn builder() -> RunConfigBuilder {
+        RunConfigBuilder::default()
+    }
+}
+
+/// Builder for [`RunConfig`].
+///
+/// Provides a fluent API for constructing `RunConfig` instances. All fields
+/// start with their default values and can be overridden individually.
+///
+/// # Example
+///
+/// ```rust
+/// use adk_core::{RunConfig, RunConfigBuilder, StreamingMode, ToolConcurrencyConfig};
+///
+/// let config = RunConfigBuilder::default()
+///     .streaming_mode(StreamingMode::Bidi)
+///     .history_max_events(Some(50))
+///     .build();
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct RunConfigBuilder {
+    config: RunConfig,
+}
+
+impl RunConfigBuilder {
+    /// Sets the streaming mode for the run.
+    pub fn streaming_mode(mut self, mode: StreamingMode) -> Self {
+        self.config.streaming_mode = mode;
+        self
+    }
+
+    /// Sets per-tool confirmation decisions for the current run.
+    pub fn tool_confirmation_decisions(
+        mut self,
+        decisions: HashMap<String, ToolConfirmationDecision>,
+    ) -> Self {
+        self.config.tool_confirmation_decisions = decisions;
+        self
+    }
+
+    /// Sets the cached content name for automatic prompt caching.
+    pub fn cached_content(mut self, name: impl Into<String>) -> Self {
+        self.config.cached_content = Some(name.into());
+        self
+    }
+
+    /// Sets the valid agent names this agent can transfer to.
+    pub fn transfer_targets(mut self, targets: Vec<String>) -> Self {
+        self.config.transfer_targets = targets;
+        self
+    }
+
+    /// Sets the parent agent name.
+    pub fn parent_agent(mut self, name: impl Into<String>) -> Self {
+        self.config.parent_agent = Some(name.into());
+        self
+    }
+
+    /// Enables or disables automatic prompt caching for supported providers.
+    pub fn auto_cache(mut self, enabled: bool) -> Self {
+        self.config.auto_cache = enabled;
+        self
+    }
+
+    /// Sets the maximum number of recent persisted events to load at run start.
+    pub fn history_max_events(mut self, max: Option<usize>) -> Self {
+        self.config.history_max_events = max;
+        self
+    }
+
+    /// Sets the tool concurrency configuration.
+    pub fn tool_concurrency(mut self, config: ToolConcurrencyConfig) -> Self {
+        self.config.tool_concurrency = config;
+        self
+    }
+
+    /// Enables or disables full payload recording in tracing spans.
+    pub fn record_payloads(mut self, enabled: bool) -> Self {
+        self.config.record_payloads = enabled;
+        self
+    }
+
+    /// Sets the maximum serialized bytes for tracing payload fields.
+    pub fn trace_payload_max_bytes(mut self, max: usize) -> Self {
+        self.config.trace_payload_max_bytes = max;
+        self
+    }
+
+    /// Consumes the builder and returns the configured [`RunConfig`].
+    pub fn build(self) -> RunConfig {
+        self.config
     }
 }
 
@@ -668,7 +910,9 @@ mod tests {
         let config = RunConfig::default();
         assert_eq!(config.streaming_mode, StreamingMode::SSE);
         assert_eq!(config.history_max_events, None);
-        assert_eq!(config.max_tool_concurrency, None);
+        assert_eq!(config.tool_concurrency.max_concurrency, None);
+        assert!(config.tool_concurrency.per_tool.is_empty());
+        assert_eq!(config.tool_concurrency.backpressure, BackpressurePolicy::Queue);
         assert!(!config.record_payloads);
         assert_eq!(config.trace_payload_max_bytes, 2048);
         assert!(config.tool_confirmation_decisions.is_empty());
@@ -723,5 +967,55 @@ mod tests {
     #[test]
     fn test_validate_state_key_null_byte() {
         assert!(validate_state_key("foo\0bar").is_err());
+    }
+
+    #[test]
+    fn test_run_config_builder_defaults() {
+        let config = RunConfig::builder().build();
+        let default = RunConfig::default();
+        assert_eq!(config.streaming_mode, default.streaming_mode);
+        assert_eq!(config.auto_cache, default.auto_cache);
+        assert_eq!(config.history_max_events, default.history_max_events);
+        assert_eq!(config.record_payloads, default.record_payloads);
+        assert_eq!(config.trace_payload_max_bytes, default.trace_payload_max_bytes);
+        assert!(config.tool_confirmation_decisions.is_empty());
+        assert!(config.transfer_targets.is_empty());
+        assert!(config.cached_content.is_none());
+        assert!(config.parent_agent.is_none());
+    }
+
+    #[test]
+    fn test_run_config_builder_all_fields() {
+        let mut decisions = HashMap::new();
+        decisions.insert("delete".to_string(), ToolConfirmationDecision::Approve);
+
+        let config = RunConfig::builder()
+            .streaming_mode(StreamingMode::None)
+            .tool_confirmation_decisions(decisions.clone())
+            .cached_content("my-cache")
+            .transfer_targets(vec!["agent_a".to_string(), "agent_b".to_string()])
+            .parent_agent("parent")
+            .auto_cache(false)
+            .history_max_events(Some(50))
+            .tool_concurrency(ToolConcurrencyConfig {
+                max_concurrency: Some(4),
+                per_tool: HashMap::new(),
+                backpressure: BackpressurePolicy::Fail,
+            })
+            .record_payloads(true)
+            .trace_payload_max_bytes(4096)
+            .build();
+
+        assert_eq!(config.streaming_mode, StreamingMode::None);
+        assert_eq!(config.tool_confirmation_decisions, decisions);
+        assert_eq!(config.cached_content.as_deref(), Some("my-cache"));
+        assert_eq!(config.transfer_targets, vec!["agent_a", "agent_b"]);
+        assert_eq!(config.parent_agent.as_deref(), Some("parent"));
+        assert!(!config.auto_cache);
+        assert_eq!(config.history_max_events, Some(50));
+        assert_eq!(config.tool_concurrency.max_concurrency, Some(4));
+        assert_eq!(config.tool_concurrency.backpressure, BackpressurePolicy::Fail);
+        assert!(config.record_payloads);
+        assert_eq!(config.trace_payload_max_bytes, 4096);
     }
 }

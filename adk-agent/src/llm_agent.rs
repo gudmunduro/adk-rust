@@ -54,6 +54,13 @@ fn trace_json_payload<T: serde::Serialize>(
     format!("{}...[truncated {} bytes]", &json[..end], json.len() - end)
 }
 
+/// An LLM-powered agent that orchestrates tool calls and sub-agent delegation.
+///
+/// `LlmAgent` is the primary agent type in ADK. It sends requests to an LLM,
+/// executes tool calls from the response, and iterates until the model produces
+/// a final text response or the iteration limit is reached.
+///
+/// Use [`LlmAgentBuilder`] (via `LlmAgent::builder()`) to construct instances.
 pub struct LlmAgent {
     name: String,
     description: String,
@@ -177,6 +184,7 @@ impl LlmAgent {
     }
 }
 
+/// Builder for constructing an [`LlmAgent`] with all configuration options.
 pub struct LlmAgentBuilder {
     name: String,
     description: Option<String>,
@@ -221,6 +229,7 @@ pub struct LlmAgentBuilder {
 }
 
 impl LlmAgentBuilder {
+    /// Create a new builder with the given agent name.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -265,31 +274,37 @@ impl LlmAgentBuilder {
         }
     }
 
+    /// Set the agent description.
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = Some(desc.into());
         self
     }
 
+    /// Set the LLM model for this agent.
     pub fn model(mut self, model: Arc<dyn Llm>) -> Self {
         self.model = Some(model);
         self
     }
 
+    /// Set the system instruction for this agent.
     pub fn instruction(mut self, instruction: impl Into<String>) -> Self {
         self.instruction = Some(instruction.into());
         self
     }
 
+    /// Set a dynamic instruction provider evaluated per invocation.
     pub fn instruction_provider(mut self, provider: InstructionProvider) -> Self {
         self.instruction_provider = Some(Arc::new(provider));
         self
     }
 
+    /// Set a global instruction prepended to all requests.
     pub fn global_instruction(mut self, instruction: impl Into<String>) -> Self {
         self.global_instruction = Some(instruction.into());
         self
     }
 
+    /// Set a dynamic global instruction provider evaluated per invocation.
     pub fn global_instruction_provider(mut self, provider: GlobalInstructionProvider) -> Self {
         self.global_instruction_provider = Some(Arc::new(provider));
         self
@@ -330,31 +345,37 @@ impl LlmAgentBuilder {
         self
     }
 
+    /// Set a JSON schema for validating user input.
     pub fn input_schema(mut self, schema: serde_json::Value) -> Self {
         self.input_schema = Some(schema);
         self
     }
 
+    /// Set a JSON schema for structured output from the LLM.
     pub fn output_schema(mut self, schema: serde_json::Value) -> Self {
         self.output_schema = Some(schema);
         self
     }
 
+    /// Prevent this agent from transferring control back to its parent.
     pub fn disallow_transfer_to_parent(mut self, disallow: bool) -> Self {
         self.disallow_transfer_to_parent = disallow;
         self
     }
 
+    /// Prevent this agent from transferring control to peer agents.
     pub fn disallow_transfer_to_peers(mut self, disallow: bool) -> Self {
         self.disallow_transfer_to_peers = disallow;
         self
     }
 
+    /// Control which conversation history contents are included in LLM requests.
     pub fn include_contents(mut self, include: adk_core::IncludeContents) -> Self {
         self.include_contents = include;
         self
     }
 
+    /// Set a state key where the agent's final output will be stored.
     pub fn output_key(mut self, key: impl Into<String>) -> Self {
         self.output_key = Some(key.into());
         self
@@ -432,6 +453,7 @@ impl LlmAgentBuilder {
         self
     }
 
+    /// Add a tool to this agent's toolbox.
     pub fn tool(mut self, tool: Arc<dyn Tool>) -> Self {
         self.tools.push(tool);
         self
@@ -447,36 +469,43 @@ impl LlmAgentBuilder {
         self
     }
 
+    /// Add a sub-agent that this agent can delegate to.
     pub fn sub_agent(mut self, agent: Arc<dyn Agent>) -> Self {
         self.sub_agents.push(agent);
         self
     }
 
+    /// Add a before-agent callback.
     pub fn before_callback(mut self, callback: BeforeAgentCallback) -> Self {
         self.before_callbacks.push(callback);
         self
     }
 
+    /// Add an after-agent callback.
     pub fn after_callback(mut self, callback: AfterAgentCallback) -> Self {
         self.after_callbacks.push(callback);
         self
     }
 
+    /// Add a before-model callback invoked before each LLM request.
     pub fn before_model_callback(mut self, callback: BeforeModelCallback) -> Self {
         self.before_model_callbacks.push(callback);
         self
     }
 
+    /// Add an after-model callback invoked after each LLM response.
     pub fn after_model_callback(mut self, callback: AfterModelCallback) -> Self {
         self.after_model_callbacks.push(callback);
         self
     }
 
+    /// Add a before-tool callback invoked before each tool execution.
     pub fn before_tool_callback(mut self, callback: BeforeToolCallback) -> Self {
         self.before_tool_callbacks.push(callback);
         self
     }
 
+    /// Add an after-tool callback invoked after each tool execution.
     pub fn after_tool_callback(mut self, callback: AfterToolCallback) -> Self {
         self.after_tool_callbacks.push(callback);
         self
@@ -650,6 +679,7 @@ impl LlmAgentBuilder {
         self
     }
 
+    /// Build the [`LlmAgent`], returning an error if no model was set.
     pub fn build(self) -> Result<LlmAgent> {
         let model = self.model.ok_or_else(|| adk_core::AdkError::agent("Model is required"))?;
 
@@ -1780,6 +1810,12 @@ impl Agent for LlmAgent {
                     // Wrap circuit breaker in Mutex for shared access across parallel futures.
                     let cb_mutex = std::sync::Mutex::new(circuit_breaker_state.take());
 
+                    // Create concurrency manager for semaphore-based tool dispatch enforcement.
+                    // Per-tool overrides take precedence over the global limit.
+                    let concurrency_manager = adk_core::ToolConcurrencyManager::new(
+                        &ctx.run_config().tool_concurrency,
+                    );
+
                     // Per-tool execution async block. Returns (index, Content, EventActions, escalate_or_skip).
                     // Each tool retains its own retry budget, circuit breaker, tracing span,
                     // before/after callbacks, and error handling. Errors are captured as
@@ -1797,6 +1833,7 @@ impl Agent for LlmAgent {
                         let tool_confirmation_policy = &tool_confirmation_policy;
                         let cb_mutex = &cb_mutex;
                         let invocation_id = &invocation_id;
+                        let concurrency_manager = &concurrency_manager;
                         #[cfg(feature = "enhanced-plugins")]
                         let enhanced_plugin_manager = &enhanced_plugin_manager;
                         async move {
@@ -1806,6 +1843,27 @@ impl Agent for LlmAgent {
                             let mut tool_outcome_for_callback: Option<ToolOutcome> = None;
                             let mut executed_tool: Option<Arc<dyn Tool>> = None;
                             let mut executed_tool_response: Option<serde_json::Value> = None;
+
+                            // Acquire concurrency permit before tool execution.
+                            // The permit is held for the entire duration of this tool call
+                            // and released on drop when this async block completes.
+                            let _concurrency_permit = match concurrency_manager.acquire(&name).await {
+                                Ok(permit) => Some(permit),
+                                Err(e) => {
+                                    // Concurrency limit reached with Fail policy — return error
+                                    let error_content = Content {
+                                        role: "function".to_string(),
+                                        parts: vec![Part::FunctionResponse {
+                                            function_response: FunctionResponseData::new(
+                                                name.clone(),
+                                                serde_json::json!({ "error": e.to_string() }),
+                                            ),
+                                            id: id.clone(),
+                                        }],
+                                    };
+                                    return (idx, error_content, tool_actions, false);
+                                }
+                            };
 
                             // Tool confirmation (deny case; None handled by pre-check)
                             if tool_confirmation_policy.requires_confirmation(&name) {
@@ -2243,17 +2301,17 @@ impl Agent for LlmAgent {
                         }
                         ToolExecutionStrategy::Parallel => {
                             use futures::StreamExt as _;
-                            let limit = ctx
-                                .run_config()
-                                .max_tool_concurrency
-                                .unwrap_or(fc_parts.len())
-                                .max(1);
+                            // All concurrency enforcement is handled by the
+                            // ToolConcurrencyManager semaphore inside execute_one_tool.
+                            // Use fc_parts.len() as buffer so all futures can start
+                            // and queue on the semaphore for proper per-tool limiting.
+                            let buffer_size = fc_parts.len().max(1);
                             futures::stream::iter(fc_parts.into_iter().map(
                                 |(idx, name, args, id, fcid)| {
                                     execute_one_tool(idx, name, args, id, fcid)
                                 },
                             ))
-                            .buffer_unordered(limit)
+                            .buffer_unordered(buffer_size)
                             .collect()
                             .await
                         }
@@ -2269,20 +2327,18 @@ impl Agent for LlmAgent {
                             }
                             let mut all_results = Vec::new();
                             // Execute read-only tools concurrently first
+                            // Concurrency enforcement is handled by the semaphore
+                            // inside execute_one_tool.
                             if !read_only_fcs.is_empty() {
                                 use futures::StreamExt as _;
-                                let limit = ctx
-                                    .run_config()
-                                    .max_tool_concurrency
-                                    .unwrap_or(read_only_fcs.len())
-                                    .max(1);
+                                let buffer_size = read_only_fcs.len().max(1);
                                 all_results.extend(
                                     futures::stream::iter(read_only_fcs.into_iter().map(
                                         |(idx, name, args, id, fcid)| {
                                             execute_one_tool(idx, name, args, id, fcid)
                                         },
                                     ))
-                                    .buffer_unordered(limit)
+                                    .buffer_unordered(buffer_size)
                                     .collect::<Vec<_>>()
                                     .await,
                                 );

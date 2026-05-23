@@ -1180,8 +1180,8 @@ pub mod prelude {
     // Core types (always available)
     pub use crate::{
         AdkError, Agent, BeforeModelResult, Content, Event, EventStream, InvocationContext, Llm,
-        LlmRequest, LlmResponse, Part, Result, RunConfig, Session, State, Tool, ToolContext,
-        Toolset,
+        LlmRequest, LlmResponse, Part, Result, RunConfig, RunConfigBuilder, Session, State, Tool,
+        ToolContext, Toolset,
     };
 
     // Agents

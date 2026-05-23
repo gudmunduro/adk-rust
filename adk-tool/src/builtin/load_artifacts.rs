@@ -4,12 +4,14 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
+/// A tool that loads binary artifacts by name and returns their content.
 pub struct LoadArtifactsTool {
     name: String,
     description: String,
 }
 
 impl LoadArtifactsTool {
+    /// Create a new `LoadArtifactsTool` with default name and description.
     pub fn new() -> Self {
         Self {
             name: "load_artifacts".to_string(),

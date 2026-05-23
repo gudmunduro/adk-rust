@@ -482,7 +482,7 @@ async fn validate_adapter_forwarding(passed: &mut u32, failed: &mut u32) {
 }
 
 async fn validate_runner_mut(passed: &mut u32, failed: &mut u32) {
-    use adk_runner::{Runner, RunnerConfig};
+    use adk_runner::Runner;
     use adk_session::InMemorySessionService;
     use adk_core::{Agent, InvocationContext, Event};
     use futures::stream::BoxStream;
@@ -511,22 +511,11 @@ async fn validate_runner_mut(passed: &mut u32, failed: &mut u32) {
 
     // Build runner
     #[allow(deprecated)]
-    let mut runner = Runner::new(RunnerConfig {
-        app_name: "test".to_string(),
-        agent: Arc::new(NoopAgent),
-        session_service: Arc::new(InMemorySessionService::new()),
-        artifact_service: None,
-        memory_service: None,
-        plugin_manager: None,
-        run_config: None,
-        compaction_config: None,
-        context_cache_config: None,
-        cache_capable: None,
-        request_context: None,
-        cancellation_token: None,
-        intra_compaction_config: None,
-        intra_compaction_summarizer: None,
-    }).unwrap();
+    let mut runner = Runner::builder()
+        .app_name("test")
+        .agent(Arc::new(NoopAgent))
+        .session_service(Arc::new(InMemorySessionService::new()))
+        .build().unwrap();
 
     // with_auto_skills_mut borrows mutably
     match runner.with_auto_skills_mut(root, SkillInjectorConfig::default()) {

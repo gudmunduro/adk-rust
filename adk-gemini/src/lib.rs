@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 //! # adk-gemini
 //!
 //! A Rust client library for Google's Gemini 2.0 API.
@@ -28,11 +30,16 @@
 //! For more specialized types, import them directly from the crate root or their
 //! respective modules.
 
+/// Backend abstraction for Gemini API providers (AI Studio REST vs Vertex AI).
 pub mod backend;
+/// Gemini API client, builder, model enum, and error types.
 pub mod client;
+/// Model metadata discovery (list/get model info).
 pub mod model_info;
 mod models;
+/// Token cost estimation for Gemini models.
 pub mod pricing;
+/// Provider-specific schema normalization for Gemini function-calling API.
 pub mod schema_adapter;
 
 /// Convenient re-exports of commonly used types
