@@ -51,11 +51,15 @@ impl PostgresAuditSink {
     /// Run database migrations to create the audit_events table.
     ///
     /// Safe to call multiple times — uses `CREATE TABLE IF NOT EXISTS`.
+    /// Executes each statement individually since sqlx doesn't support
+    /// multi-statement queries.
     pub async fn migrate(&self) -> Result<(), AuthError> {
-        sqlx::query(MIGRATION_SQL)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| AuthError::AuditError(format!("migration failed: {e}")))?;
+        for statement in MIGRATION_STATEMENTS {
+            sqlx::query(statement)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| AuthError::AuditError(format!("migration failed: {e}")))?;
+        }
         info!("audit_events table ready");
         Ok(())
     }
@@ -66,31 +70,30 @@ impl PostgresAuditSink {
     }
 }
 
-const MIGRATION_SQL: &str = r#"
-CREATE TABLE IF NOT EXISTS audit_events (
-    id BIGSERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL,
-    user_id TEXT NOT NULL,
-    session_id TEXT,
-    event_type TEXT NOT NULL,
-    resource TEXT NOT NULL,
-    outcome TEXT NOT NULL,
-    metadata JSONB,
-    workspace_id TEXT,
-    tenant_id TEXT,
-    request_id TEXT,
-    ip_address TEXT,
-    resource_id TEXT,
-    action TEXT,
-    prev_hash TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_workspace ON audit_events (workspace_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_events (tenant_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_events (user_id, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events (event_type, timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_resource_id ON audit_events (resource_id) WHERE resource_id IS NOT NULL;
-"#;
+const MIGRATION_STATEMENTS: &[&str] = &[
+    r#"CREATE TABLE IF NOT EXISTS audit_events (
+        id BIGSERIAL PRIMARY KEY,
+        timestamp TIMESTAMPTZ NOT NULL,
+        user_id TEXT NOT NULL,
+        session_id TEXT,
+        event_type TEXT NOT NULL,
+        resource TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        metadata JSONB,
+        workspace_id TEXT,
+        tenant_id TEXT,
+        request_id TEXT,
+        ip_address TEXT,
+        resource_id TEXT,
+        action TEXT,
+        prev_hash TEXT
+    )"#,
+    "CREATE INDEX IF NOT EXISTS idx_audit_workspace ON audit_events (workspace_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_events (tenant_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_events (user_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events (event_type, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_resource_id ON audit_events (resource_id) WHERE resource_id IS NOT NULL",
+];
 
 #[async_trait::async_trait]
 impl AuditSink for PostgresAuditSink {
