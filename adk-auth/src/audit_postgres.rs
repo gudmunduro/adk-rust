@@ -28,6 +28,10 @@ use crate::AuthError;
 ///
 /// Stores audit events in the `audit_events` table with indexed columns for
 /// efficient querying by workspace, tenant, user, event type, and time range.
+///
+/// `Clone` is cheap — `PgPool` is `Arc`-based internally, so cloning just
+/// increments a reference count. No need to wrap in `Arc<PostgresAuditSink>`.
+#[derive(Clone)]
 pub struct PostgresAuditSink {
     pool: PgPool,
 }
