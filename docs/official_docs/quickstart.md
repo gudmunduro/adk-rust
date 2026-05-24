@@ -32,8 +32,14 @@ cargo adk new my_agent --template api
 # OpenAI GPT-5-mini agent
 cargo adk new my_agent --template openai
 
+# A2A protocol agent with builder API
+cargo adk new my_agent --template a2a
+
 # Use any provider with any template
 cargo adk new my_agent --template tools --provider anthropic
+
+# Add optional addons to any template
+cargo adk new my_agent --template tools --addon docker --addon ci
 ```
 
 | Template | What you get |
@@ -43,6 +49,11 @@ cargo adk new my_agent --template tools --provider anthropic
 | `rag` | RAG pipeline — Gemini embeddings, in-memory vector store, document ingestion |
 | `api` | Axum REST server with health check, ready for `docker build` |
 | `openai` | OpenAI GPT-5-mini agent with console |
+| `a2a` | A2A protocol agent with `A2aServer` builder and agent card |
+| `graph` | Graph-based workflow with checkpoints and durable resume |
+| `realtime` | Real-time voice/audio streaming agent |
+
+> **Tip:** Use the `--addon` flag to compose templates with optional addons like `docker`, `ci`, `telemetry`, and more. See the [Composable Templates](development/composable-templates.md) page for the full list of 9 addons and 5 enterprise patterns.
 
 ## Step 2: Add Your API Key
 

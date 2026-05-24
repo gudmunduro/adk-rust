@@ -252,6 +252,22 @@ cd weather-api
 cargo run
 ```
 
+## Pre-Deployment Verification
+
+Before deploying your agent, use `cargo adk build` to verify that the project compiles correctly without actually deploying:
+
+```bash
+# Verify compilation (no deployment)
+cargo adk build
+
+# Build with release optimizations
+cargo adk build --release
+```
+
+This catches compilation errors, missing dependencies, and configuration issues before you commit to a deployment. It is especially useful in CI pipelines as a gate before `cargo adk deploy`.
+
+See [cargo adk build](../development/cargo-adk-build.md) for full command documentation.
+
 ## Best Practices
 
 1. **Environment Variables**: Always load sensitive configuration (API keys) from environment variables
@@ -259,6 +275,7 @@ cargo run
 3. **Graceful Shutdown**: The Launcher handles Ctrl+C gracefully in both modes
 4. **Port Selection**: Choose ports that don't conflict with other services (default 8080)
 5. **Session Management**: In production, consider using `PostgresSessionService` or `SqliteSessionService` instead of in-memory sessions
+6. **Pre-Deployment Check**: Run `cargo adk build` before deploying to catch issues early
 
 ## Related
 

@@ -13,10 +13,10 @@ The [Agent Client Protocol](https://agentclientprotocol.com/) standardizes commu
 
 ```toml
 [dependencies]
-adk-acp = "0.8.2"
+adk-acp = "0.9.0"
 
 # Or via the umbrella crate:
-adk-rust = { version = "0.8.2", features = ["acp"] }
+adk-rust = { version = "0.9.0", features = ["acp"] }
 ```
 
 ## Quick Start

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - Unreleased
+## [0.9.0] - 2026-05-24
 
 ### Added
 
@@ -20,6 +20,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Getting-started documentation at `docs/official_docs/a2a/getting-started.md`
   - Property tests for template generation, builder composition, and error clarity
   - Live integration tests against external A2A agents
+
+- **Composable Template System** — Modular project scaffolding via `cargo adk new`:
+  - 8 base templates: `basic`, `tools`, `rag`, `api`, `openai`, `a2a`, `graph`, `realtime`
+  - 9 addons: composable feature modules added via the `--addon` flag (e.g., `--addon telemetry`, `--addon auth`, `--addon eval`)
+  - 5 enterprise patterns: production-ready project structures for common deployment scenarios
+  - `--addon` flag for combining any base template with one or more addons
+  - Templates generate complete project structures with Cargo.toml, src/, tests/, and documentation
+
+- **Cargo Adk Build** — Compile-without-deploy subcommand:
+  - `cargo adk build` compiles an agent project and verifies it is deployment-ready without actually deploying
+  - Validates project structure, dependencies, and configuration
+  - Useful as a pre-deployment verification step in CI pipelines
+  - Supports all standard `cargo build` flags (e.g., `--release`, `--features`)
+
+### Changed
+
+- **Version bump from 0.8.5 to 0.9.0** — All workspace crates updated to version 0.9.0. This release includes new features (composable templates, cargo adk build, A2A scaffolding), security fixes, and documentation improvements.
+
+### Security
+
+- **hickory-proto 0.26.1** — Updated from 0.24.x to address DNS resolution vulnerabilities that could allow cache poisoning in certain network configurations. Severity: moderate.
+- **openssl 0.10.80** — Updated from 0.10.78 to fix a potential memory safety issue in certificate chain validation that could lead to incorrect trust decisions. Severity: moderate.
+- **rubato 3.0** — Updated from 2.x to address an integer overflow in sample rate conversion that could cause buffer overruns when processing untrusted audio input. Severity: low.
+- **similar 3** — Updated from 2.x to fix a denial-of-service vulnerability where crafted diff inputs could trigger quadratic time complexity. Severity: low.
 
 ## [0.8.5] - 2026-05-19
 

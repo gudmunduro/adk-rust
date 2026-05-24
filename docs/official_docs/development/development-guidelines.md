@@ -745,6 +745,26 @@ refactor: simplify session state management
 test: add integration tests for A2A protocol
 ```
 
+## Project Scaffolding
+
+Use `cargo adk new` with the [Composable Template System](composable-templates.md) to scaffold new projects. The system provides 8 base templates, 9 addons, and 5 enterprise patterns:
+
+```bash
+# Basic agent (default)
+cargo adk new my-agent
+
+# Agent with tools and Docker support
+cargo adk new my-agent --template tools --addon docker
+
+# A2A protocol agent with CI and telemetry
+cargo adk new my-agent --template a2a --addon ci --addon telemetry
+
+# Graph workflow with enterprise observability
+cargo adk new my-agent --template graph --addon telemetry --addon docker --addon ci
+```
+
+The `--addon` flag is composable — combine any base template with any number of addons. See the [Composable Templates](composable-templates.md) documentation for the full list of templates, addons, and enterprise patterns.
+
 ## Common Tasks
 
 ### Adding a New Tool

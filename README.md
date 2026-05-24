@@ -8,7 +8,7 @@
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
 [![GitHub Discussions](https://img.shields.io/github/discussions/zavora-ai/adk-rust?style=flat&logo=github&color=5865F2)](https://github.com/zavora-ai/adk-rust/discussions)
 
-> **🚀 v0.9.0 Released!** Provider-aware schema normalization — MCP tools now work seamlessly across Gemini, OpenAI, Anthropic without manual schema tweaking. Plus: SchemaAdapter trait, per-provider transforms, schema caching. See [CHANGELOG](CHANGELOG.md) for full details.
+> **🚀 v0.9.0 Released!** Composable Template System — 8 base templates, 9 addons, 5 enterprise patterns via `cargo adk new --addon`. Plus: `cargo adk build` (compile without deploying), provider-aware schema normalization, A2A Simple Scaffolding, and security fixes (hickory-proto, openssl, rubato, similar). See [CHANGELOG](CHANGELOG.md) for full details.
 >
 > **Contributors:** Many thanks to [@mikefaille](https://github.com/mikefaille) — AdkIdentity design, realtime audio, LiveKit bridge, skill system. [@rohan-panickar](https://github.com/rohan-panickar) — OpenAI-compatible providers, xAI, multimodal content. [@dhruv-pant](https://github.com/dhruv-pant) — Gemini service account auth. [@tomtom215](https://github.com/tomtom215) — A2A Protocol v1.0.0 types crate ([a2a-protocol-types](https://crates.io/crates/a2a-protocol-types)), Foundation-verified wire types powering our A2A v1 layer. [@danielsan](https://github.com/danielsan) — Google deps issue & PR (#181, #203), RAG crash report (#205). [@CodingFlow](https://github.com/CodingFlow) — Gemini 3 thinking level, global endpoint, citationSources (#177, #178, #179). [@ctylx](https://github.com/ctylx) — skill discovery fix (#204). [@poborin](https://github.com/poborin) — project config proposal (#176). [@chillin-capybara](https://github.com/chillin-capybara) — ACP integration, adk-acp crate. [Get started →](https://github.com/zavora-ai/adk-rust/wiki/quickstart)
 >
@@ -52,12 +52,14 @@ cargo adk new my-agent
 cd my-agent && cargo run
 ```
 
-Or pick a template: `--template tools` | `rag` | `api` | `openai`. See [Quick Start](#quick-start) for details.
+Or pick a template: `--template tools` | `rag` | `api` | `openai` | `a2a` | `graph` | `realtime`. Combine with addons: `--addon telemetry` | `docker` | `ci`. See [Quick Start](#quick-start) for details.
 
 ## Overview
 
 ADK-Rust provides a comprehensive framework for building AI agents in Rust, featuring:
 
+- **Composable Template System**: 8 base templates, 9 addons, and 5 enterprise patterns via `cargo adk new --addon` for rapid project scaffolding
+- **`cargo adk build`**: Compile and verify your agent project without deploying — fast feedback loop for CI and local development
 - **Type-safe agent abstractions** with async execution and event streaming
 - **Multiple agent types**: LLM agents, workflow agents (sequential, parallel, loop), and custom agents
 - **Realtime voice agents**: Bidirectional audio streaming with OpenAI Realtime API and Gemini Live API
@@ -214,11 +216,20 @@ cargo adk new my-agent --template tools   # agent with #[tool] custom tools
 cargo adk new my-agent --template rag     # RAG with vector search
 cargo adk new my-agent --template api     # REST server
 cargo adk new my-agent --template openai  # OpenAI-powered agent
+cargo adk new my-agent --template a2a     # A2A protocol agent
+cargo adk new my-agent --template graph   # graph workflow agent
+cargo adk new my-agent --template realtime # realtime voice agent
+
+# Compose with addons (v0.9.0+)
+cargo adk new my-agent --template tools --addon telemetry --addon docker
+cargo adk new my-agent --template api --addon ci --addon monitoring
 
 cd my-agent
 cp .env.example .env    # add your API key
 cargo run
 ```
+
+Use `cargo adk build` to verify compilation without deploying.
 
 ### Manual installation
 
@@ -973,7 +984,16 @@ Contributions welcome! Please open an issue or pull request on GitHub.
 
 ## Roadmap
 
-**v0.8.0** (current) — performance and adoption release:
+**v0.9.0** (current) — composable templates, cargo adk build, security fixes:
+- **Composable Template System** — 8 base templates, 9 addons, 5 enterprise patterns via `cargo adk new --addon`.
+- **Cargo Adk Build** — compile-without-deploy subcommand for pre-deployment verification.
+- **A2A Simple Scaffolding** — `A2aServer::quick_start`, `A2aServer::builder`, and `cargo adk new --template a2a`.
+- **Security** — hickory-proto 0.26.1, openssl 0.10.80, rubato 3.0, similar 3.
+
+<details>
+<summary>v0.8.0 and earlier</summary>
+
+**v0.8.0** — performance and adoption release:
 - **Dependency diet** — true minimal starter tier, rustls-only HTTP clients, opt-in CLI provider fan-out, OTLP telemetry split, MCP gated behind features, and Gemini backtraces behind debug-only feature gates.
 - **Runtime hot paths** — empty session state deltas avoid full state merges, runner history windows are configurable, trace payloads are truncated by default, parallel tools are bounded by `RunConfig::max_tool_concurrency`, and context-cache network calls no longer hold the manager mutex.
 - **Validated onboarding** — cargo-adk templates target 0.8.0 and CI now checks generated projects, example target names, and documented Cargo commands.
@@ -1010,6 +1030,8 @@ Contributions welcome! Please open an issue or pull request on GitHub.
 **v0.3.0**: adk-gemini Vertex AI overhaul, context compaction, production hardening, ADK Studio debug mode, action nodes code generation, SSO/OAuth, plugin system.
 
 **v0.2.0**: Core framework, multi-provider LLM, tool system with MCP, sessions, artifacts, memory, REST/A2A servers, CLI, realtime voice, graph workflows, browser automation, evaluation, guardrails.
+</details>
+
 </details>
 
 </details>
