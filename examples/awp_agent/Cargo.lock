@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "adk-agent"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-core",
  "adk-skill",
@@ -20,7 +20,7 @@ dependencies = [
 
 [[package]]
 name = "adk-artifact"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -30,7 +30,7 @@ dependencies = [
 
 [[package]]
 name = "adk-awp"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-core",
  "arc-swap",
@@ -56,7 +56,7 @@ dependencies = [
 
 [[package]]
 name = "adk-core"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -65,13 +65,15 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
 [[package]]
 name = "adk-gemini"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
+ "adk-core",
  "async-stream",
  "async-trait",
  "base64",
@@ -95,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "adk-model"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-core",
  "adk-gemini",
@@ -114,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "adk-plugin"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-core",
  "serde_json",
@@ -124,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "adk-runner"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-artifact",
  "adk-core",
@@ -136,6 +138,7 @@ dependencies = [
  "futures",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
  "tokio-util",
  "tracing",
@@ -144,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "adk-session"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-core",
  "async-trait",
@@ -157,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "adk-skill"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "adk-core",
  "adk-plugin",
@@ -171,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "adk-telemetry"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "thiserror",
  "tracing",
@@ -283,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "awp-types"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "chrono",
  "serde",
@@ -1285,9 +1288,9 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "openssl"
-version = "0.10.79"
+version = "0.10.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf0b434746ee2832f4f0baf10137e1cabb18cbe6912c69e2e33263c45250f542"
+checksum = "a45fa2aa886c42762255da344f0a0d313e254066c46aad76f300c3d3da62d967"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -1316,9 +1319,9 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.115"
+version = "0.9.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "158fe5b292746440aa6e7a7e690e55aeb72d41505e2804c23c6973ad0e9c9781"
+checksum = "f28a22dc7140cda5f096e5e7724a6962ca81a7f8bfd2979f9b18c11af56318c4"
 dependencies = [
  "cc",
  "libc",
