@@ -428,7 +428,7 @@ impl MemoryService for PostgresMemoryService {
                     INSERT INTO memory_entries
                         (app_name, user_id, session_id, content, author, timestamp, embedding, search_text, project_id)
                     VALUES
-                        ($1, $2, $3, $4, $5, $6, $7, to_tsvector('english', $8), $9)
+                        ($1, $2, $3, $4, $5, $6, $7, to_tsvector('simple', $8), $9)
                     "#,
                 )
                 .bind(app_name)
@@ -449,7 +449,7 @@ impl MemoryService for PostgresMemoryService {
                     INSERT INTO memory_entries
                         (app_name, user_id, session_id, content, author, timestamp, search_text, project_id)
                     VALUES
-                        ($1, $2, $3, $4, $5, $6, to_tsvector('english', $7), $8)
+                        ($1, $2, $3, $4, $5, $6, to_tsvector('simple', $7), $8)
                     "#,
                 )
                 .bind(app_name)
@@ -583,10 +583,10 @@ impl MemoryService for PostgresMemoryService {
                 None => {
                     sqlx::query(
                         r#"
-                        SELECT content, author, timestamp, ts_rank(search_text, plainto_tsquery('english', $3)) AS rank_score
+                        SELECT content, author, timestamp, ts_rank(search_text, plainto_tsquery('simple', $3)) AS rank_score
                         FROM memory_entries
                         WHERE app_name = $1 AND user_id = $2
-                          AND search_text @@ plainto_tsquery('english', $3)
+                          AND search_text @@ plainto_tsquery('simple', $3)
                           AND project_id IS NULL
                         ORDER BY rank_score DESC
                         LIMIT $4
@@ -603,10 +603,10 @@ impl MemoryService for PostgresMemoryService {
                 Some(pid) => {
                     sqlx::query(
                         r#"
-                        SELECT content, author, timestamp, ts_rank(search_text, plainto_tsquery('english', $3)) AS rank_score
+                        SELECT content, author, timestamp, ts_rank(search_text, plainto_tsquery('simple', $3)) AS rank_score
                         FROM memory_entries
                         WHERE app_name = $1 AND user_id = $2
-                          AND search_text @@ plainto_tsquery('english', $3)
+                          AND search_text @@ plainto_tsquery('simple', $3)
                           AND (project_id IS NULL OR project_id = $5)
                         ORDER BY rank_score DESC
                         LIMIT $4
@@ -685,7 +685,7 @@ impl MemoryService for PostgresMemoryService {
             r#"
             DELETE FROM memory_entries
             WHERE app_name = $1 AND user_id = $2
-              AND search_text @@ plainto_tsquery('english', $3)
+              AND search_text @@ plainto_tsquery('simple', $3)
               AND project_id IS NULL
             "#,
         )
@@ -741,7 +741,7 @@ impl MemoryService for PostgresMemoryService {
                     INSERT INTO memory_entries
                         (app_name, user_id, session_id, content, author, timestamp, embedding, search_text, project_id)
                     VALUES
-                        ($1, $2, $3, $4, $5, $6, $7, to_tsvector('english', $8), $9)
+                        ($1, $2, $3, $4, $5, $6, $7, to_tsvector('simple', $8), $9)
                     "#,
                 )
                 .bind(app_name)
@@ -762,7 +762,7 @@ impl MemoryService for PostgresMemoryService {
                     INSERT INTO memory_entries
                         (app_name, user_id, session_id, content, author, timestamp, search_text, project_id)
                     VALUES
-                        ($1, $2, $3, $4, $5, $6, to_tsvector('english', $7), $8)
+                        ($1, $2, $3, $4, $5, $6, to_tsvector('simple', $7), $8)
                     "#,
                 )
                 .bind(app_name)
@@ -812,7 +812,7 @@ impl MemoryService for PostgresMemoryService {
                 INSERT INTO memory_entries
                     (app_name, user_id, session_id, content, author, timestamp, embedding, search_text, project_id)
                 VALUES
-                    ($1, $2, $3, $4, $5, $6, $7, to_tsvector('english', $8), $9)
+                    ($1, $2, $3, $4, $5, $6, $7, to_tsvector('simple', $8), $9)
                 "#,
             )
             .bind(app_name)
@@ -833,7 +833,7 @@ impl MemoryService for PostgresMemoryService {
                 INSERT INTO memory_entries
                     (app_name, user_id, session_id, content, author, timestamp, search_text, project_id)
                 VALUES
-                    ($1, $2, $3, $4, $5, $6, to_tsvector('english', $7), $8)
+                    ($1, $2, $3, $4, $5, $6, to_tsvector('simple', $7), $8)
                 "#,
             )
             .bind(app_name)
@@ -866,7 +866,7 @@ impl MemoryService for PostgresMemoryService {
             r#"
             DELETE FROM memory_entries
             WHERE app_name = $1 AND user_id = $2
-              AND search_text @@ plainto_tsquery('english', $3)
+              AND search_text @@ plainto_tsquery('simple', $3)
               AND project_id = $4
             "#,
         )

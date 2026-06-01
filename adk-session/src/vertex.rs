@@ -935,12 +935,52 @@ fn truncate_for_error(value: &str) -> String {
     if value.len() <= MAX_LEN {
         return value.to_string();
     }
-    format!("{}...", &value[..MAX_LEN])
+    let mut end = MAX_LEN;
+    while end > 0 && !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...", &value[..end])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_truncate_for_error_ascii() {
+        let short = "hello";
+        assert_eq!(truncate_for_error(short), "hello");
+
+        let long = "a".repeat(600);
+        let result = truncate_for_error(&long);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 515); // 512 + "..."
+    }
+
+    #[test]
+    fn test_truncate_for_error_multibyte_no_panic() {
+        // Chinese characters are 3 bytes each in UTF-8
+        // 200 repetitions of "你好" = 1200 bytes, byte 512 is NOT a char boundary
+        let value = "你好".repeat(200);
+        assert_eq!(value.len(), 1200);
+        assert!(!value.is_char_boundary(512)); // confirms the bug condition
+
+        // This must NOT panic
+        let result = truncate_for_error(&value);
+        assert!(result.ends_with("..."));
+        assert!(result.is_char_boundary(result.len())); // valid UTF-8
+    }
+
+    #[test]
+    fn test_truncate_for_error_emoji() {
+        // Emoji are 4 bytes each
+        let value = "🎉".repeat(200); // 800 bytes
+        let result = truncate_for_error(&value);
+        assert!(result.ends_with("..."));
+        // Should truncate to a valid char boundary
+        let without_dots = &result[..result.len() - 3];
+        assert!(without_dots.is_char_boundary(without_dots.len()));
+    }
 
     #[test]
     fn test_extract_reasoning_engine_id_from_resource_name() {
