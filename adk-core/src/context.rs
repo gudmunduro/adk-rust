@@ -587,8 +587,8 @@ pub trait Memory: Send + Sync {
 
 /// Trait for retrieving secrets at runtime.
 ///
-/// This is the core-level abstraction used by [`ToolContext::get_secret`] and
-/// [`InvocationContext::get_secret`]. Concrete implementations (e.g., AWS
+/// This is the core-level abstraction used by `ToolContext::get_secret` and
+/// `InvocationContext::get_secret`. Concrete implementations (e.g., AWS
 /// Secrets Manager, Azure Key Vault, GCP Secret Manager) live in `adk-auth`
 /// behind feature flags and implement this trait via the `SecretProvider`
 /// adapter.
@@ -720,8 +720,6 @@ pub struct ToolConfirmationRequest {
 ///
 /// Controls streaming behavior, tool confirmation, caching, transfer targets,
 /// and concurrency settings. Use [`RunConfig::builder()`] to construct from
-/// external crates (struct is `#[non_exhaustive]`).
-#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct RunConfig {
     /// The streaming mode for agent responses.
@@ -791,7 +789,6 @@ impl RunConfig {
     /// Creates a new [`RunConfigBuilder`] initialized with default values.
     ///
     /// Use the builder to construct a `RunConfig` when struct literal syntax
-    /// is unavailable (e.g., from external crates due to `#[non_exhaustive]`).
     ///
     /// # Example
     ///
