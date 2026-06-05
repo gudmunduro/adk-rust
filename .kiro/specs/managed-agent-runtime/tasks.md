@@ -238,33 +238,61 @@ This plan delivers the `adk-managed` crate — a new workspace member implementi
   - Verify identical event-type sequences across all 5 providers with mock Llm doubles
 
 - [ ] 11. Golden Fixture Conformance Tests
-  - [ ] 11.1 Create fixture JSON files (F-1 through F-8)
-    - Create `adk-managed/tests/fixtures/` directory
-    - Write F-1 (hello, no tools), F-2 (MCP tool), F-3 (custom tool round-trip), F-4 (confirmation deny), F-5 (resume after kill), F-6 (replay from seq), F-7 (interrupt mid-turn), F-8 (provider parity matrix)
-    - Each fixture: `{ name, agent_def, mock_responses, user_events, expect_sequence }`
+  - [ ] 11.1 Implement `ScriptedLlm` double
+    - Create `adk-managed/src/testing.rs` (pub module, usable by both runtime and platform teams)
+    - Implement `ScriptedLlm` struct implementing `Llm` trait with pre-scripted turns
+    - Implement `ScriptedTurn` with optional content and tool_calls
+    - This is NOT a mock — it exercises the full runtime pipeline (parking, checkpoints, replay)
+    - Only the provider API call is replaced with deterministic responses
+    - _Requirements: 10.4_
+
+  - [ ] 11.2 Implement unified fixture schema and runner
+    - Create `adk-managed/tests/fixtures/` directory with `README.md` documenting the schema
+    - Implement fixture runner that supports two modes (via `ADK_TEST_MODE` env var):
+      - `scripted` (default): uses `scripted_model.turns` → asserts `exact_sequence`
+      - `real`: uses `agent_def.model` against real provider → asserts `must_contain` + `must_end_with`
+    - Implement the `...` pattern operator for subsequence-with-gaps matching
+    - Implement `$capture` refs for tool_use_id round-trips
+    - _Requirements: 10.4, 10.5_
+
+  - [ ] 11.3 Create fixture JSON files (F-1 through F-8)
+    - Write all 8 fixtures with both `scripted_model` and `agent_def.model` sections
+    - Each fixture: `{ name, description, agent_def, scripted_model, scenario, assertions }`
+    - Assertions include both `exact_sequence` (for scripted) and `must_contain`/`must_end_with` (for real)
+    - F-1 (hello), F-2 (MCP tool), F-3 (custom tool), F-4 (confirmation), F-5 (resume), F-6 (replay), F-7 (interrupt), F-8 (provider parity)
     - _Requirements: 10.5_
 
-  - [ ] 11.2 Implement fixture test runner
+  - [ ] 11.4 Implement conformance test suite (scripted mode, per-commit gate)
     - Create `adk-managed/tests/fixture_conformance_tests.rs`
-    - Load each fixture JSON, construct DefaultManagedAgentRuntime with mock Llm
-    - Execute the flow: create → start_session → send_events → collect stream
-    - Assert `event.type` sequence matches `expect_sequence`
-    - _Requirements: 10.5_
+    - Load each fixture, construct runtime with `ScriptedLlm` + `InMemorySessionService`
+    - Execute scenario, assert `exact_sequence` — byte-identical type sequences
+    - This runs on every commit, blocks merge, costs $0
+    - _Requirements: 10.4, 10.5_
 
-  - [ ] 11.3 Implement F-5 (resume after kill) test
-    - Special handling: run to parking state, drop the runtime, reconstruct, call resume
-    - Assert continuation from checkpoint
+  - [ ] 11.5 Implement F-5 (resume after kill) conformance test
+    - Uses `ScriptedLlm` for deterministic crash-resume testing
+    - Run to parking state, drop runtime, reconstruct from checkpoint, resume
+    - Assert: post-resume seq > pre-crash seq, no gap, no duplicate
     - _Requirements: 2.3, 10.5_
 
-  - [ ]* 11.4 Write property tests (P-1 through P-7)
+  - [ ] 11.6 Implement real-LLM integration tests (Tier 1 + Tier 2)
+    - Create `adk-managed/tests/real_llm_tests.rs`
+    - All tests `#[ignore]` — run with `cargo test -- --ignored`
+    - Tier 1: Run F-1 and F-3 against real `gemini-2.5-flash` (GOOGLE_API_KEY required)
+    - Tier 2: Run F-3 against all available providers, assert structural parity
+    - Use subsequence-with-gaps assertions (`must_contain`, `must_end_with`)
+    - _Requirements: 5.1, 5.2, 10.5_
+
+  - [ ]* 11.7 Write property tests (P-1 through P-7, scripted double)
     - Create `adk-managed/tests/property_tests.rs`
-    - P-1: Seq monotonicity — for random event sequences, seq always increases
-    - P-2: Checkpoint atomicity — interleaved crash/resume produces consistent logs
-    - P-3: Resume no-gap — after resume, no seq≤N re-emitted
-    - P-4: Parking timeout — custom_tool_use always resolves (result or timeout)
-    - P-5: Provider parity — same def + same mock → identical type sequences across providers
-    - P-6: Replay completeness — from_seq=k returns exactly seq>k events
-    - P-7: State machine validity — only valid transitions succeed
+    - All use `ScriptedLlm` for deterministic, fast, offline execution
+    - P-1: Seq monotonicity — random turns, seq always increases
+    - P-2: Checkpoint atomicity — randomized crash interleaving (1000 iterations), prefix-consistent continuation
+    - P-3: Resume no-gap — kill at exact points, assert no seq≤N re-emitted
+    - P-4: Parking timeout — control timing, assert timeout error surfaced
+    - P-5: Provider parity — same scripted turns through all 5 adapters, byte-identical types
+    - P-6: Replay completeness — from_seq=k returns exactly seq>k, once each
+    - P-7: State machine — exhaustive valid/invalid transition testing
     - _Requirements: 10.4_
 
 - [ ] 12. Checkpoint — All fixtures pass
@@ -324,6 +352,12 @@ This plan delivers the `adk-managed` crate — a new workspace member implementi
 - `Last-Event-ID` is an HTTP header for SSE reconnection (platform's concern); the runtime exposes `stream_events(from_seq)` which the platform maps to the header
 - F-8 (provider parity) is the PRIMARY correctness gate — prioritize it early as a design forcing-function
 - All types are `#[non_exhaustive]` where polymorphic (R-9.2)
+- **Testing philosophy: "Deterministic for correctness, real for confidence"**
+  - Scripted `Llm` double (NOT a mock — implements real Llm trait, exercises full runtime pipeline): per-commit blocking gate, $0
+  - Real LLM calls (Gemini Flash, GPT-4.1-nano, Claude Haiku): nightly integration, ~$0.05/run
+  - One unified fixture corpus drives both modes (env var `ADK_TEST_MODE=scripted|real`)
+  - Scripted mode asserts `exact_sequence` (byte-identical); real mode asserts `must_contain` + `must_end_with` (subsequence with gaps)
+  - Property tests (AC-2.4, AC-4.3, P-5) REQUIRE scripted double — impossible against paid/rate-limited APIs
 
 ## Task Dependency Graph
 

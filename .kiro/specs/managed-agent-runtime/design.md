@@ -798,41 +798,221 @@ pub enum RuntimeError {
 
 ## Testing Strategy
 
-### Golden Fixtures (F-1 through F-8)
+### Philosophy: Deterministic for Correctness, Real for Confidence
 
-Each fixture is a JSON file specifying:
+Two classes of testing serve different purposes. Neither replaces the other:
+
+- **Scripted `Llm` doubles** (deterministic, in-process): These implement the real `Llm` trait and return pre-defined responses. They exercise the full runtime machinery (parking, checkpoints, replay, state machine) with exact assertions. They are NOT mocks in the brittle sense — they are deterministic test fixtures that run the real code path. Required for: AC-2.4 (randomized crash/resume — impossible against a paid API), AC-4.3 (exactly-once replay — needs known event count), F-8/P5 (byte-identical cross-provider — impossible with non-deterministic output).
+
+- **Real LLM calls** (non-deterministic, network): These call actual provider APIs (Gemini Flash, GPT-4.1-nano, Claude Haiku) with prompts engineered to reliably trigger specific behaviors. They catch provider dialect bugs (R-5.2 schema normalization) that a scripted double cannot. Assertions use subsequence-with-gaps matching (`...` = zero or more events of any type).
+
+### Four-Tier Test Architecture
+
+| Layer | Model | Asserts | Gate? | Cost |
+|-------|-------|---------|-------|------|
+| **Conformance** (F-1…F-8, property tests) | Scripted `Llm` double | Exact: type sequence, exactly-once replay, crash/resume prefix-consistency, byte-identical cross-provider | **Yes — per-commit, blocking** | $0 |
+| **Tier 1: Real-LLM structural** | Cheap real (flash/nano/haiku) | Subsequence-with-gaps (`...`), tool actually fired, ends idle | Nightly / on-demand | ~$0.05 |
+| **Tier 2: Real-LLM parity** | All real providers | Contains core types per provider; catches dialect/schema bugs (R-5.2) | Daily | ~$0.02 |
+| **Tier 3: Shared staging** | Full stack, real | End-to-end platform + runtime + SDK over HTTP/SSE | On-demand / nightly | ~$0.10 |
+
+### Unified Fixture Schema (One Corpus, Two Modes)
+
+Each fixture file supports both execution modes. The test runner selects mode via environment:
+
 ```json
 {
-  "name": "F-1 Hello (no tools)",
-  "agent_def": { "model": "mock", "system": "be brief" },
-  "mock_responses": [{"content": [{"type": "text", "text": "pong"}]}],
-  "user_events": [{"type": "user.message", "content": [{"type": "text", "text": "ping"}]}],
-  "expect_sequence": ["status.running", "agent.message", "status.idle"]
+  "name": "F-3 Custom tool round-trip",
+  "description": "Agent with custom tool, client returns result, agent responds.",
+
+  "agent_def": {
+    "model": "gemini-2.5-flash",
+    "system": "When asked about weather, ALWAYS use get_weather. Never guess.",
+    "tools": [{"type": "custom", "name": "get_weather", "input_schema": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}]
+  },
+
+  "scripted_model": {
+    "turns": [
+      {"tool_calls": [{"name": "get_weather", "input": {"city": "Tokyo"}}]},
+      {"content": [{"type": "text", "text": "The weather in Tokyo is 22°C and sunny."}]}
+    ]
+  },
+
+  "scenario": [
+    {"action": "send", "event": {"type": "user.message", "content": [{"type": "text", "text": "Weather in Tokyo?"}]}},
+    {"action": "expect", "tool_use": {"name": "get_weather"}, "capture": "$TOOL_ID"},
+    {"action": "send", "event": {"type": "user.custom_tool_result", "custom_tool_use_id": "$TOOL_ID", "content": [{"type": "text", "text": "22°C, sunny"}]}},
+    {"action": "expect_idle"}
+  ],
+
+  "assertions": {
+    "exact_sequence": ["status.running", "agent.custom_tool_use", "status.idle", "status.running", "agent.message", "status.idle"],
+    "must_contain": ["status.running", "agent.custom_tool_use", "agent.message", "status.idle"],
+    "must_end_with": "status.idle",
+    "custom_tool_name": "get_weather"
+  }
 }
 ```
 
-| Fixture | Tests | Requirements |
-|---------|-------|-------------|
-| F-1 Hello | Basic lifecycle, no tools | R-1, R-4.1 |
-| F-2 MCP tool | MCP tool invocation + schema normalization | R-5.2 |
-| F-3 Custom tool | Parking + round-trip | R-4.3 |
-| F-4 Confirmation | Permission policy + deny | R-4.2 |
-| F-5 Resume | Kill + resume from checkpoint | R-2.3 |
-| F-6 Replay | stream_events(from_seq) | R-4.4 |
-| F-7 Interrupt | Mid-turn interrupt | R-4.5 |
-| F-8 Provider parity | Same def, all providers, identical sequences | R-5.5 |
+**Mode selection (environment variable `ADK_TEST_MODE`):**
 
-### Property Tests (proptest, 100+ iterations)
+| Mode | Model source | Assertions used | When |
+|------|-------------|-----------------|------|
+| `scripted` (default) | `scripted_model.turns` → deterministic `Llm` double | `exact_sequence` (byte-identical) | Per-commit CI, blocking |
+| `real` | `agent_def.model` → real provider API | `must_contain` + `must_end_with` (subsequence with gaps) | Nightly, on-demand |
 
-| # | Property | What it proves |
-|---|----------|---------------|
-| 1 | Seq monotonicity | P-1 |
-| 2 | Checkpoint atomicity | P-2 |
-| 3 | Resume no-gap no-dup | P-3 |
-| 4 | Parking timeout | P-4 |
-| 5 | Provider parity | P-5 |
-| 6 | Replay completeness | P-6 |
-| 7 | State machine validity | P-7 |
+Same fixture file drives both modes. The runtime conformance suite and the platform SDK conformance suite consume the same corpus.
+
+### The `...` Pattern Operator
+
+For real-LLM mode, assertions use subsequence matching with gaps:
+
+- `must_contain: ["A", "B", "C"]` — these types appear in this order, with any events between them
+- `must_end_with: "status.idle"` — the last event has this type
+- `must_not_contain: ["error"]` — this type never appears
+- `"..."` in sequences means "zero or more events of any type" (handles non-deterministic extras like thinking blocks, multiple message chunks)
+
+This handles real-model non-determinism (extra `agent.message` chunks, variable tool-call patterns) while still asserting the structural properties that matter.
+
+### The Scripted `Llm` Double
+
+```rust
+/// A deterministic Llm implementation for conformance testing.
+/// Implements the real `Llm` trait. Returns pre-scripted responses
+/// turn by turn. Panics if more turns are requested than scripted.
+///
+/// This is NOT a mock — it exercises the full runtime pipeline:
+/// event mapping, checkpoint persistence, sequence assignment,
+/// parking, replay. Only the provider API call is replaced.
+pub struct ScriptedLlm {
+    turns: Vec<ScriptedTurn>,
+    current: AtomicUsize,
+}
+
+pub struct ScriptedTurn {
+    pub content: Option<Vec<ContentBlock>>,
+    pub tool_calls: Option<Vec<ScriptedToolCall>>,
+}
+
+#[async_trait]
+impl Llm for ScriptedLlm {
+    fn name(&self) -> &str { "scripted" }
+
+    async fn generate_content(
+        &self, request: LlmRequest, _stream: bool
+    ) -> Result<LlmResponseStream> {
+        let idx = self.current.fetch_add(1, Ordering::SeqCst);
+        let turn = &self.turns[idx];
+        // Convert ScriptedTurn to LlmResponse and return as a stream
+        Ok(Box::pin(stream::once(async move { Ok(turn.to_llm_response()) })))
+    }
+}
+```
+
+### Golden Fixtures (F-1 through F-8)
+
+| Fixture | Tests | Requirements | Scripted assertions | Real assertions |
+|---------|-------|-------------|--------------------|----|
+| F-1 Hello | Basic lifecycle, no tools | R-1, R-4.1 | `exact: [running, message, idle]` | `contains: [running, message]; ends: idle` |
+| F-2 MCP tool | MCP tool invocation + schema normalization | R-5.2 | `exact: [running, mcp_tool_use, message, idle]` | `contains: [running, mcp_tool_use]; ends: idle` |
+| F-3 Custom tool | Parking + round-trip | R-4.3 | `exact: [running, custom_tool_use, idle, running, message, idle]` | `contains: [running, custom_tool_use, message]; ends: idle` |
+| F-4 Confirmation | Permission policy + deny | R-4.2 | `exact: [running, tool_use, idle, running, message, idle]` | `contains: [running, tool_use]; ends: idle` |
+| F-5 Resume | Kill + resume from checkpoint | R-2.3 | `post-resume seq > pre-crash seq; no gap; no duplicate` | Same (structural, not content) |
+| F-6 Replay | stream_events(from_seq) | R-4.4 | `from_seq=2 returns exactly events with seq>2, once each` | Same (exact count known from scripted) |
+| F-7 Interrupt | Mid-turn interrupt | R-4.5 | `last event is status.idle` | `ends: idle` |
+| F-8 Provider parity | Same def, all providers, identical sequences | R-5.5 | `5 providers produce byte-identical type sequences` | `all providers contain same core types` |
+
+### Property Tests (proptest, 100+ iterations, scripted double)
+
+| # | Property | What it proves | Why scripted is required |
+|---|----------|---------------|------------------------|
+| 1 | Seq monotonicity | P-1 | Need exact seq values |
+| 2 | Checkpoint atomicity | P-2 | Randomized crash interleaving (1000s of iterations) |
+| 3 | Resume no-gap no-dup | P-3 | Kill at exact points, assert exact event counts |
+| 4 | Parking timeout | P-4 | Control timing precisely |
+| 5 | Provider parity | P-5 | Byte-identical assertion across adapters |
+| 6 | Replay completeness | P-6 | Exactly-once requires known event count |
+| 7 | State machine validity | P-7 | Exhaustive transition testing |
+
+### Real-LLM Integration Tests
+
+```rust
+/// Tier 1: Real Gemini. Requires GOOGLE_API_KEY.
+/// Asserts structural properties with subsequence matching.
+#[tokio::test]
+#[ignore] // Real API — run with: cargo test -- --ignored
+async fn real_gemini_custom_tool_round_trip() {
+    let runtime = build_runtime_real("gemini-2.5-flash").await;
+    let events = run_fixture_f3_real(&runtime).await;
+
+    // Subsequence assertions (handles non-deterministic extras)
+    assert_contains_in_order(&events, &["status.running", "agent.custom_tool_use"]);
+    assert_ends_with(&events, "status.idle");
+    assert_not_contains(&events, "error");
+}
+
+/// Tier 2: Provider parity with real models.
+/// Weaker than F-8/scripted (contains vs byte-identical) but catches
+/// R-5.2 schema normalization bugs that scripted cannot.
+#[tokio::test]
+#[ignore]
+async fn real_provider_parity_structural() {
+    let providers = available_real_providers(); // checks env vars
+    let mut results: Vec<(&str, Vec<String>)> = vec![];
+
+    for (name, model) in &providers {
+        let runtime = build_runtime_real(model).await;
+        let events = run_fixture_f3_real(&runtime).await;
+        results.push((name, event_types(&events)));
+    }
+
+    // All must contain the same core structural elements
+    for (name, types) in &results {
+        assert!(types.contains(&"agent.custom_tool_use".into()), "{name}: missing custom_tool_use");
+        assert!(types.last() == Some(&"status.idle".into()), "{name}: doesn't end with idle");
+    }
+}
+```
+
+### CI Configuration
+
+```yaml
+# Per-commit (blocking, free, fast)
+conformance:
+  runs-on: ubuntu-latest
+  steps:
+    - run: cargo test -p adk-managed  # scripted double, all F-1…F-8 + properties
+
+# Nightly (non-blocking, paid, slow)
+integration:
+  runs-on: ubuntu-latest
+  schedule: [{ cron: '0 2 * * *' }]
+  env:
+    GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    ADK_TEST_MODE: real
+  steps:
+    - run: cargo test -p adk-managed -- --ignored --test-threads=1
+```
+
+### Shared Staging (Tier 3 — Collaborative)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Shared Staging: staging.enterprise.adk-rust.com/managed/v1       │
+│                                                                   │
+│  • Real platform HTTP layer (enterprise team deploys)             │
+│  • Real adk-managed runtime (we deploy)                           │
+│  • Real LLM providers (shared keys)                               │
+│  • Shared Postgres                                                │
+│                                                                   │
+│  Runtime team: cargo test -p adk-managed --features staging       │
+│  Platform team: cargo test -p ep-managed --features staging       │
+│  SDK team: cargo test -p adk-enterprise --features staging        │
+│                                                                   │
+│  Same fixture corpus drives all three — converged assertions.     │
+└──────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
