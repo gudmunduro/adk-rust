@@ -5,7 +5,7 @@
 [![docs.rs](https://docs.rs/adk-rust/badge.svg)](https://docs.rs/adk-rust)
 [![Wiki](https://img.shields.io/badge/docs-Wiki-blue)](https://github.com/zavora-ai/adk-rust/wiki)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-![Rust](https://img.shields.io/badge/rust-1.96%2B-orange.svg)
+![Rust](https://img.shields.io/badge/rust-1.94%2B-orange.svg)
 [![GitHub Discussions](https://img.shields.io/github/discussions/zavora-ai/adk-rust?style=flat&logo=github&color=5865F2)](https://github.com/zavora-ai/adk-rust/discussions)
 
 > **🚀 v0.9.2 Released!** Composable Template System — 8 base templates, 9 addons, 5 enterprise patterns via `cargo adk new --addon`. Plus: `cargo adk build` (compile without deploying), provider-aware schema normalization, A2A Simple Scaffolding, and security fixes (hickory-proto, openssl, rubato, similar). See [CHANGELOG](CHANGELOG.md) for full details.
@@ -233,7 +233,7 @@ Use `cargo adk build` to verify compilation without deploying.
 
 ### Manual installation
 
-Requires Rust 1.96 or later (Rust 2024 edition). Add to your `Cargo.toml`:
+Requires Rust 1.94 or later (Rust 2024 edition). Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]

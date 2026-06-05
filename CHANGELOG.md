@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   All `adk-*` crates move from 0.9.x to 0.10.0 in lockstep.
 - **adk-mistralrs: Now a workspace member.** Previously excluded due to git
   dependencies; now included since mistral.rs published to crates.io.
-  Uses workspace `rust-version` (1.96.0).
+  Uses workspace `rust-version` (1.94.0).
 - **adk-core: `LlmResponse` and `LlmRequest` gained public fields.** These structs
   are not `#[non_exhaustive]` and are constructed with struct literals downstream,
   so the additions below are breaking changes for external code that builds them
@@ -1640,7 +1640,7 @@ let toolset = McpHttpClientBuilder::new("https://api.githubcopilot.com/mcp/")
 
 ### Changed
 - All ADK crates bumped to version 0.2.0
-- Rust edition updated to 2024, requires Rust 1.96+
+- Rust edition updated to 2024, requires Rust 1.94+
 
 ## [0.1.9] - 2026-01-03
 
@@ -1740,7 +1740,7 @@ let toolset = McpHttpClientBuilder::new("https://api.githubcopilot.com/mcp/")
 - **Host flag**: `--host` flag for backend and studio management scripts
 
 ### 🔥 Breaking Changes
-- **Rust 2024 Edition**: All crates now use `edition = "2024"` (requires Rust 1.96+)
+- **Rust 2024 Edition**: All crates now use `edition = "2024"` (requires Rust 1.94+)
 - **Workspace Restructure**: `vendor/gemini-rust` → `adk-gemini`
   - Import paths change from `gemini_rust::*` to `adk_gemini::*`
   - Standardized workspace dependencies for consistency

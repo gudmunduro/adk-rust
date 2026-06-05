@@ -11,7 +11,7 @@ Demonstrates the YAML agent definition loading feature from ADK-Rust v0.8.0.
 
 ## Prerequisites
 
-- Rust 1.96+
+- Rust 1.94+
 - A Google API key for Gemini
 
 ## Environment Variables
