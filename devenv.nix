@@ -31,7 +31,6 @@
   languages.rust = {
     enable = true;
     channel = "stable";
-    version = "latest";
   };
 
   languages.javascript = {
