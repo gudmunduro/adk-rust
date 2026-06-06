@@ -25,7 +25,7 @@
 //! let resolver = Arc::new(DefaultModelResolver::new());
 //! let sessions = Arc::new(InMemorySessionService::new());
 //!
-//! let runtime = DefaultManagedAgentRuntime::new(resolver, sessions, None, None);
+//! let runtime = DefaultManagedAgentRuntime::new(resolver, sessions);
 //! ```
 
 use std::collections::HashMap;
@@ -109,17 +109,15 @@ pub(crate) struct ActiveSession {
 /// let runtime = DefaultManagedAgentRuntime::new(
 ///     Arc::new(DefaultModelResolver::new()),
 ///     Arc::new(InMemorySessionService::new()),
-///     None,
-///     None,
 /// );
 ///
-/// // With sandbox and memory
+/// // With sandbox and memory (feature-gated)
 /// let runtime = DefaultManagedAgentRuntime::new(
 ///     Arc::new(DefaultModelResolver::new()),
 ///     Arc::new(InMemorySessionService::new()),
-///     Some(my_sandbox_factory),
-///     Some(my_memory_service),
-/// );
+/// )
+/// .with_sandbox(my_sandbox)
+/// .with_memory(my_memory_service);
 /// ```
 pub struct DefaultManagedAgentRuntime {
     /// Resolves ModelRef → Arc<dyn Llm>.
@@ -160,12 +158,9 @@ impl DefaultManagedAgentRuntime {
     ///
     /// * `model_resolver` - Resolves `ModelRef` declarations into callable LLM instances.
     /// * `session_service` - Persistent storage backend for sessions and checkpoints.
-    /// * `sandbox` - Optional sandbox backend for isolated built-in tool execution.
-    ///   Pass `None` if built-in tools should run in-process without isolation.
-    ///   Only available when the `sandbox` feature is enabled.
-    /// * `memory` - Optional memory service for cross-session persistent memory.
-    ///   Pass `None` if cross-session memory is not needed.
-    ///   Only available when the `memory` feature is enabled.
+    ///
+    /// Use `.with_sandbox()` and `.with_memory()` builder methods to inject
+    /// optional sandbox and memory services (feature-gated).
     ///
     /// # Example
     ///

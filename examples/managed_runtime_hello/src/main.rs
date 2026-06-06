@@ -68,11 +68,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let runtime = DefaultManagedAgentRuntime::new(
         resolver,
         session_service,
-        None, // No sandbox
-        None, // No memory
     );
 
-    println!("✓ Created DefaultManagedAgentRuntime (InMemory sessions, no sandbox, no memory)");
+    println!("✓ Created DefaultManagedAgentRuntime (InMemory sessions)");
 
     // ─── Step 3: Register an agent definition ────────────────────────────
     let agent_def = ManagedAgentDef::new(

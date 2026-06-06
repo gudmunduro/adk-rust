@@ -105,7 +105,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let runtime = DefaultManagedAgentRuntime::new(
         Arc::new(MockResolver { llm }),
         Arc::new(InMemorySessionService::new()),
-        None, None,
     );
 
     // 3. Create an agent from a declarative definition
