@@ -188,19 +188,34 @@ async fn run_fixture_scripted(fixture: &Fixture) -> Vec<String> {
     let cancel = CancellationToken::new();
     let parking = Arc::new(ToolParkingLot::new(Duration::from_secs(30)));
 
+    let session_id = format!("fixture_{}", fixture.name);
+
     // The ScriptedLlm is created but the session loop currently uses a stub
     // runner. The ScriptedLlm will be wired when the Runner integration is
     // complete. For now, validate the event pattern from the stub.
     let _scripted_llm = ScriptedLlm::new("fixture-model", fixture.scripted_model.turns.clone());
 
+    let session_service = build_stub_session_service();
+
+    // Seed the session in the service — the Runner requires it to exist.
+    session_service
+        .create(adk_session::service::CreateRequest {
+            app_name: "managed".to_string(),
+            user_id: "managed_user".to_string(),
+            session_id: Some(session_id.clone()),
+            state: std::collections::HashMap::new(),
+        })
+        .await
+        .expect("failed to seed session for fixture test");
+
     let session_loop = SessionLoop::new(
-        format!("fixture_{}", fixture.name),
+        session_id,
         event_rx,
         broadcast_tx,
         parking.clone(),
         cancel.clone(),
         build_stub_agent(),
-        build_stub_session_service(),
+        session_service,
     );
 
     let loop_handle = tokio::spawn(session_loop.run());
