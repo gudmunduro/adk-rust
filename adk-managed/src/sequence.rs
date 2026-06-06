@@ -23,9 +23,7 @@ pub struct SequenceCounter {
 impl SequenceCounter {
     /// Create a new counter starting at the given value.
     pub fn new(start: u64) -> Self {
-        Self {
-            value: AtomicU64::new(start),
-        }
+        Self { value: AtomicU64::new(start) }
     }
 
     /// Get the next sequence number (strictly increasing).
@@ -105,10 +103,8 @@ mod tests {
             })
             .collect();
 
-        let mut all_values: Vec<u64> = handles
-            .into_iter()
-            .flat_map(|h| h.join().unwrap())
-            .collect();
+        let mut all_values: Vec<u64> =
+            handles.into_iter().flat_map(|h| h.join().unwrap()).collect();
 
         // All values should be unique (no duplicates)
         all_values.sort();

@@ -30,7 +30,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 
 use crate::types::{ContentBlock, RuntimeError};
 
@@ -60,10 +60,7 @@ impl ToolParkingLot {
     /// * `timeout` - Maximum duration to wait for a tool result before returning
     ///   [`RuntimeError::ToolTimeout`].
     pub fn new(timeout: Duration) -> Self {
-        Self {
-            pending: Mutex::new(HashMap::new()),
-            timeout,
-        }
+        Self { pending: Mutex::new(HashMap::new()), timeout }
     }
 
     /// Create a new parking lot with the default timeout (5 minutes).
@@ -103,10 +100,7 @@ impl ToolParkingLot {
                 // Timeout elapsed — remove the pending entry and return timeout error.
                 let mut pending = self.pending.lock().await;
                 pending.remove(tool_use_id);
-                Err(RuntimeError::tool_timeout(
-                    tool_use_id,
-                    self.timeout.as_secs(),
-                ))
+                Err(RuntimeError::tool_timeout(tool_use_id, self.timeout.as_secs()))
             }
         }
     }
@@ -155,16 +149,12 @@ mod tests {
         let tool_id = "tool_use_123";
 
         let lot_clone = Arc::clone(&lot);
-        let park_handle = tokio::spawn(async move {
-            lot_clone.park(tool_id).await
-        });
+        let park_handle = tokio::spawn(async move { lot_clone.park(tool_id).await });
 
         // Give the park task a moment to register.
         tokio::time::sleep(Duration::from_millis(10)).await;
 
-        let content = vec![ContentBlock::Text {
-            text: "result data".to_string(),
-        }];
+        let content = vec![ContentBlock::Text { text: "result data".to_string() }];
         lot.deliver(tool_id, content).await.unwrap();
 
         let result = park_handle.await.unwrap().unwrap();
@@ -185,10 +175,7 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
-            RuntimeError::ToolTimeout {
-                tool_use_id,
-                timeout_secs,
-            } => {
+            RuntimeError::ToolTimeout { tool_use_id, timeout_secs } => {
                 assert_eq!(tool_use_id, tool_id);
                 // Duration is 50ms, which rounds down to 0 seconds.
                 assert_eq!(timeout_secs, 0);
@@ -202,12 +189,7 @@ mod tests {
         let lot = ToolParkingLot::new(Duration::from_secs(5));
 
         let result = lot
-            .deliver(
-                "nonexistent_id",
-                vec![ContentBlock::Text {
-                    text: "hello".to_string(),
-                }],
-            )
+            .deliver("nonexistent_id", vec![ContentBlock::Text { text: "hello".to_string() }])
             .await;
 
         assert!(result.is_err());
@@ -238,23 +220,13 @@ mod tests {
 
         tokio::time::sleep(Duration::from_millis(10)).await;
 
-        lot.deliver(
-            "tool_b",
-            vec![ContentBlock::Text {
-                text: "b_result".to_string(),
-            }],
-        )
-        .await
-        .unwrap();
+        lot.deliver("tool_b", vec![ContentBlock::Text { text: "b_result".to_string() }])
+            .await
+            .unwrap();
 
-        lot.deliver(
-            "tool_a",
-            vec![ContentBlock::Text {
-                text: "a_result".to_string(),
-            }],
-        )
-        .await
-        .unwrap();
+        lot.deliver("tool_a", vec![ContentBlock::Text { text: "a_result".to_string() }])
+            .await
+            .unwrap();
 
         let result_a = handle_a.await.unwrap().unwrap();
         let result_b = handle_b.await.unwrap().unwrap();
@@ -278,14 +250,8 @@ mod tests {
         let _ = lot.park(tool_id).await;
 
         // Now try to deliver — should fail because the entry was cleaned up.
-        let result = lot
-            .deliver(
-                tool_id,
-                vec![ContentBlock::Text {
-                    text: "late".to_string(),
-                }],
-            )
-            .await;
+        let result =
+            lot.deliver(tool_id, vec![ContentBlock::Text { text: "late".to_string() }]).await;
 
         assert!(result.is_err());
         match result.unwrap_err() {

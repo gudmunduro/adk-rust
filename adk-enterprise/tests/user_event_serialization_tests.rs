@@ -52,14 +52,12 @@ fn test_user_event_allow_tool_serialization() {
 
 #[test]
 fn test_user_event_allow_tool_deserialization() {
-    let json = r#"{"type": "user.tool_confirmation", "tool_use_id": "tool_123", "action": "allow"}"#;
+    let json =
+        r#"{"type": "user.tool_confirmation", "tool_use_id": "tool_123", "action": "allow"}"#;
     let event: UserEvent = serde_json::from_str(json).unwrap();
 
     match event {
-        UserEvent::ToolConfirmation {
-            tool_use_id,
-            action,
-        } => {
+        UserEvent::ToolConfirmation { tool_use_id, action } => {
             assert_eq!(tool_use_id, "tool_123");
             assert!(matches!(action, adk_enterprise::ToolConfirmationAction::Allow));
         }
@@ -85,10 +83,7 @@ fn test_user_event_deny_tool_deserialization() {
     let event: UserEvent = serde_json::from_str(json).unwrap();
 
     match event {
-        UserEvent::ToolConfirmation {
-            tool_use_id,
-            action,
-        } => {
+        UserEvent::ToolConfirmation { tool_use_id, action } => {
             assert_eq!(tool_use_id, "tool_456");
             match action {
                 adk_enterprise::ToolConfirmationAction::Deny { reason } => {
@@ -113,15 +108,11 @@ fn test_user_event_custom_tool_result_serialization() {
 
 #[test]
 fn test_user_event_custom_tool_result_deserialization() {
-    let json =
-        r#"{"type": "user.custom_tool_result", "tool_use_id": "tool_789", "content": "Result content here"}"#;
+    let json = r#"{"type": "user.custom_tool_result", "tool_use_id": "tool_789", "content": "Result content here"}"#;
     let event: UserEvent = serde_json::from_str(json).unwrap();
 
     match event {
-        UserEvent::CustomToolResult {
-            tool_use_id,
-            content,
-        } => {
+        UserEvent::CustomToolResult { tool_use_id, content } => {
             assert_eq!(tool_use_id, "tool_789");
             assert_eq!(content, "Result content here");
         }
@@ -140,7 +131,8 @@ fn test_user_event_define_outcome_serialization() {
 
 #[test]
 fn test_user_event_define_outcome_deserialization() {
-    let json = r#"{"type": "user.define_outcome", "criteria": "Complete the report by end of day"}"#;
+    let json =
+        r#"{"type": "user.define_outcome", "criteria": "Complete the report by end of day"}"#;
     let event: UserEvent = serde_json::from_str(json).unwrap();
 
     match event {

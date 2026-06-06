@@ -64,12 +64,7 @@ fn test_session_event_tool_use_deserialization() {
 
     let event: SessionEvent = serde_json::from_value(json).unwrap();
     match event {
-        SessionEvent::ToolUse {
-            seq,
-            tool_use_id,
-            name,
-            input,
-        } => {
+        SessionEvent::ToolUse { seq, tool_use_id, name, input } => {
             assert_eq!(seq, 2);
             assert_eq!(tool_use_id, "tu_abc123");
             assert_eq!(name, "bash");
@@ -91,12 +86,7 @@ fn test_session_event_custom_tool_use_deserialization() {
 
     let event: SessionEvent = serde_json::from_value(json).unwrap();
     match event {
-        SessionEvent::CustomToolUse {
-            seq,
-            custom_tool_use_id,
-            name,
-            input,
-        } => {
+        SessionEvent::CustomToolUse { seq, custom_tool_use_id, name, input } => {
             assert_eq!(seq, 3);
             assert_eq!(custom_tool_use_id, "ctu_def456");
             assert_eq!(name, "get_weather");
@@ -119,13 +109,7 @@ fn test_session_event_mcp_tool_use_deserialization() {
 
     let event: SessionEvent = serde_json::from_value(json).unwrap();
     match event {
-        SessionEvent::McpToolUse {
-            seq,
-            mcp_tool_use_id,
-            server_name,
-            name,
-            input,
-        } => {
+        SessionEvent::McpToolUse { seq, mcp_tool_use_id, server_name, name, input } => {
             assert_eq!(seq, 4);
             assert_eq!(mcp_tool_use_id, "mcp_ghi789");
             assert_eq!(server_name, "slack-server");
@@ -306,14 +290,8 @@ fn test_session_event_round_trip_message() {
 
     match (&event, &re_deserialized) {
         (
-            SessionEvent::Message {
-                seq: s1,
-                content: c1,
-            },
-            SessionEvent::Message {
-                seq: s2,
-                content: c2,
-            },
+            SessionEvent::Message { seq: s1, content: c1 },
+            SessionEvent::Message { seq: s2, content: c2 },
         ) => {
             assert_eq!(s1, s2);
             assert_eq!(c1.len(), c2.len());
@@ -367,9 +345,8 @@ fn test_stop_reason_serialization_end_turn() {
 
 #[test]
 fn test_stop_reason_serialization_requires_action() {
-    let reason = StopReason::RequiresAction {
-        event_ids: vec!["evt_a".to_string(), "evt_b".to_string()],
-    };
+    let reason =
+        StopReason::RequiresAction { event_ids: vec!["evt_a".to_string(), "evt_b".to_string()] };
     let json = serde_json::to_value(&reason).unwrap();
     assert_eq!(json["type"], "requires_action");
     assert_eq!(json["event_ids"], json!(["evt_a", "evt_b"]));

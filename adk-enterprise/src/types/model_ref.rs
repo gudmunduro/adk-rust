@@ -75,11 +75,7 @@ impl ModelRef {
     /// let model_ref = ModelRef::structured(Provider::Openai, "gpt-4.1");
     /// ```
     pub fn structured(provider: Provider, model: impl Into<String>) -> Self {
-        Self::Structured {
-            provider,
-            model: ModelConfig::Name(model.into()),
-            speed: None,
-        }
+        Self::Structured { provider, model: ModelConfig::Name(model.into()), speed: None }
     }
 
     /// Create a structured model reference with a speed hint.
@@ -263,8 +259,7 @@ mod tests {
 
     #[test]
     fn structured_with_speed_round_trip() {
-        let original =
-            ModelRef::structured_with_speed(Provider::Ollama, "llama3", "balanced");
+        let original = ModelRef::structured_with_speed(Provider::Ollama, "llama3", "balanced");
         let json = serde_json::to_string(&original).unwrap();
         let deserialized: ModelRef = serde_json::from_str(&json).unwrap();
         assert_eq!(original, deserialized);
@@ -369,22 +364,10 @@ mod tests {
 
     #[test]
     fn provider_serializes_camel_case() {
-        assert_eq!(
-            serde_json::to_string(&Provider::Gemini).unwrap(),
-            r#""gemini""#
-        );
-        assert_eq!(
-            serde_json::to_string(&Provider::Openai).unwrap(),
-            r#""openai""#
-        );
-        assert_eq!(
-            serde_json::to_string(&Provider::Anthropic).unwrap(),
-            r#""anthropic""#
-        );
-        assert_eq!(
-            serde_json::to_string(&Provider::Ollama).unwrap(),
-            r#""ollama""#
-        );
+        assert_eq!(serde_json::to_string(&Provider::Gemini).unwrap(), r#""gemini""#);
+        assert_eq!(serde_json::to_string(&Provider::Openai).unwrap(), r#""openai""#);
+        assert_eq!(serde_json::to_string(&Provider::Anthropic).unwrap(), r#""anthropic""#);
+        assert_eq!(serde_json::to_string(&Provider::Ollama).unwrap(), r#""ollama""#);
         assert_eq!(
             serde_json::to_string(&Provider::OpenaiCompatible).unwrap(),
             r#""openaiCompatible""#
@@ -454,10 +437,7 @@ mod tests {
     #[test]
     fn from_str_creates_shorthand() {
         let model_ref: ModelRef = "gemini-2.5-flash".into();
-        assert_eq!(
-            model_ref,
-            ModelRef::Shorthand("gemini-2.5-flash".to_string())
-        );
+        assert_eq!(model_ref, ModelRef::Shorthand("gemini-2.5-flash".to_string()));
     }
 
     #[test]

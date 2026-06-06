@@ -8,9 +8,7 @@
 //!
 //! **Validates: Requirements 15.1, 15.2, 15.3**
 
-use adk_enterprise::{
-    ContentBlock, CreateAgentParams, EnterpriseClient, SessionEvent, ToolConfig,
-};
+use adk_enterprise::{ContentBlock, CreateAgentParams, EnterpriseClient, SessionEvent, ToolConfig};
 use futures::StreamExt;
 
 /// Helper: create a client from the environment, panicking with guidance if missing.
@@ -53,19 +51,13 @@ async fn test_full_lifecycle() {
     assert_eq!(agent.version, 1);
 
     // 2. Create a session bound to the agent
-    let session = client
-        .create_session(&agent.id, None)
-        .await
-        .expect("failed to create session");
+    let session = client.create_session(&agent.id, None).await.expect("failed to create session");
 
     assert!(!session.id.is_empty(), "session ID should be non-empty");
     assert_eq!(session.agent_id, agent.id);
 
     // 3. Open SSE stream BEFORE sending (required ordering per design)
-    let mut stream = client
-        .stream_events(&session.id)
-        .await
-        .expect("failed to open event stream");
+    let mut stream = client.stream_events(&session.id).await.expect("failed to open event stream");
 
     // 4. Send a message
     client
@@ -83,9 +75,8 @@ async fn test_full_lifecycle() {
             match event.expect("stream error") {
                 SessionEvent::Message { content, .. } => {
                     // Verify we got at least one text content block
-                    let has_text = content
-                        .iter()
-                        .any(|block| matches!(block, ContentBlock::Text { .. }));
+                    let has_text =
+                        content.iter().any(|block| matches!(block, ContentBlock::Text { .. }));
                     if has_text {
                         received_message = true;
                     }
@@ -113,21 +104,12 @@ async fn test_full_lifecycle() {
     assert!(received_idle, "expected StatusIdle event");
 
     // 6. Archive the session (cleanup)
-    let archived = client
-        .archive_session(&session.id)
-        .await
-        .expect("failed to archive session");
+    let archived = client.archive_session(&session.id).await.expect("failed to archive session");
 
-    assert_eq!(
-        archived.status,
-        adk_enterprise::SessionStatus::Archived
-    );
+    assert_eq!(archived.status, adk_enterprise::SessionStatus::Archived);
 
     // Cleanup: delete the agent
-    client
-        .delete_agent(&agent.id)
-        .await
-        .expect("failed to delete agent");
+    client.delete_agent(&agent.id).await.expect("failed to delete agent");
 }
 
 /// Custom tool round-trip integration test.
@@ -180,16 +162,10 @@ async fn test_custom_tool_round_trip() {
     assert!(!agent.tools.is_empty(), "agent should have tools");
 
     // 2. Create a session
-    let session = client
-        .create_session(&agent.id, None)
-        .await
-        .expect("failed to create session");
+    let session = client.create_session(&agent.id, None).await.expect("failed to create session");
 
     // 3. Open SSE stream
-    let mut stream = client
-        .stream_events(&session.id)
-        .await
-        .expect("failed to open event stream");
+    let mut stream = client.stream_events(&session.id).await.expect("failed to open event stream");
 
     // 4. Send a message that triggers the tool
     client
@@ -205,30 +181,16 @@ async fn test_custom_tool_round_trip() {
     let result = tokio::time::timeout(timeout, async {
         while let Some(event) = stream.next().await {
             match event.expect("stream error") {
-                SessionEvent::CustomToolUse {
-                    custom_tool_use_id,
-                    name,
-                    input,
-                    ..
-                } => {
+                SessionEvent::CustomToolUse { custom_tool_use_id, name, input, .. } => {
                     // Verify the tool call
                     assert_eq!(name, "get_weather", "expected get_weather tool call");
-                    assert!(
-                        input.get("city").is_some(),
-                        "expected 'city' in tool input"
-                    );
+                    assert!(input.get("city").is_some(), "expected 'city' in tool input");
 
                     // 6. Send the custom tool result back
-                    let result_content = format!(
-                        "22°C, sunny in {}",
-                        input["city"].as_str().unwrap_or("unknown")
-                    );
+                    let result_content =
+                        format!("22°C, sunny in {}", input["city"].as_str().unwrap_or("unknown"));
                     client
-                        .custom_tool_result(
-                            &session.id,
-                            &custom_tool_use_id,
-                            &result_content,
-                        )
+                        .custom_tool_result(&session.id, &custom_tool_use_id, &result_content)
                         .await
                         .expect("failed to send custom tool result");
 
@@ -237,9 +199,8 @@ async fn test_custom_tool_round_trip() {
                 SessionEvent::Message { content, .. } => {
                     // 7. After tool result is sent, agent should produce a final message
                     if tool_use_id.is_some() {
-                        let has_text = content
-                            .iter()
-                            .any(|block| matches!(block, ContentBlock::Text { .. }));
+                        let has_text =
+                            content.iter().any(|block| matches!(block, ContentBlock::Text { .. }));
                         if has_text {
                             final_message_received = true;
                         }
@@ -258,24 +219,12 @@ async fn test_custom_tool_round_trip() {
     .await;
 
     assert!(result.is_ok(), "timed out waiting for custom tool flow");
-    assert!(
-        tool_use_id.is_some(),
-        "expected a CustomToolUse event from the agent"
-    );
-    assert!(
-        final_message_received,
-        "expected a final Message after tool result"
-    );
+    assert!(tool_use_id.is_some(), "expected a CustomToolUse event from the agent");
+    assert!(final_message_received, "expected a final Message after tool result");
 
     // Cleanup
-    client
-        .archive_session(&session.id)
-        .await
-        .expect("failed to archive session");
-    client
-        .delete_agent(&agent.id)
-        .await
-        .expect("failed to delete agent");
+    client.archive_session(&session.id).await.expect("failed to archive session");
+    client.delete_agent(&agent.id).await.expect("failed to delete agent");
 }
 
 /// Self-hosted client compatibility test.
@@ -327,10 +276,8 @@ async fn test_self_hosted_client() {
     assert_eq!(session.agent_id, agent.id);
 
     // Open stream and send a message
-    let mut stream = client
-        .stream_events(&session.id)
-        .await
-        .expect("self-hosted: failed to open stream");
+    let mut stream =
+        client.stream_events(&session.id).await.expect("self-hosted: failed to open stream");
 
     client
         .send_message(&session.id, "Say hello in one word.")
@@ -361,12 +308,6 @@ async fn test_self_hosted_client() {
     assert!(got_response, "self-hosted: expected a response message");
 
     // Cleanup
-    client
-        .archive_session(&session.id)
-        .await
-        .expect("self-hosted: failed to archive");
-    client
-        .delete_agent(&agent.id)
-        .await
-        .expect("self-hosted: failed to delete agent");
+    client.archive_session(&session.id).await.expect("self-hosted: failed to archive");
+    client.delete_agent(&agent.id).await.expect("self-hosted: failed to delete agent");
 }

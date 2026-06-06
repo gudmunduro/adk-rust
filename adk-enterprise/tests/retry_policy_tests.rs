@@ -63,9 +63,7 @@ impl SequentialResponder {
 
 impl Respond for SequentialResponder {
     fn respond(&self, _request: &wiremock::Request) -> ResponseTemplate {
-        let idx = self
-            .call_count
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let idx = self.call_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if idx < self.fail_responses.len() {
             self.fail_responses[idx].clone()
         } else {
@@ -83,14 +81,14 @@ async fn test_429_with_retry_after_retries_and_succeeds() {
 
     // First request returns 429 with Retry-After header, second returns 200
     let responder = SequentialResponder::new(
-        vec![ResponseTemplate::new(429)
-            .append_header("Retry-After", "1")
-            .set_body_json(serde_json::json!({
+        vec![ResponseTemplate::new(429).append_header("Retry-After", "1").set_body_json(
+            serde_json::json!({
                 "error": {
                     "type": "rate_limit_error",
                     "message": "Rate limited"
                 }
-            }))],
+            }),
+        )],
         ResponseTemplate::new(200).set_body_json(sample_agent_json()),
     );
 

@@ -19,11 +19,11 @@
 use std::collections::HashMap;
 
 use adk_enterprise::{
-    Agent, CreateAgentParams, CreateCredentialParams, CreateEnvironmentParams,
-    CreateMemoryParams, CreateMemoryStoreParams, CreateSessionParams, CreateVaultParams,
-    Credential, Environment, ListResponse, Memory, MemoryStore, MemoryVersion, ModelConfig,
-    ModelRef, PermissionMode, PermissionPolicy, Provider, Session, SessionEvent, SessionStatus,
-    ToolConfig, UpdateAgentParams, UpdateCredentialParams, UpdateMemoryParams, Usage, Vault,
+    Agent, CreateAgentParams, CreateCredentialParams, CreateEnvironmentParams, CreateMemoryParams,
+    CreateMemoryStoreParams, CreateSessionParams, CreateVaultParams, Credential, Environment,
+    ListResponse, Memory, MemoryStore, MemoryVersion, ModelConfig, ModelRef, PermissionMode,
+    PermissionPolicy, Provider, Session, SessionEvent, SessionStatus, ToolConfig,
+    UpdateAgentParams, UpdateCredentialParams, UpdateMemoryParams, Usage, Vault,
 };
 use serde_json::json;
 
@@ -66,9 +66,7 @@ fn create_agent_params_full_uses_camel_case() {
         tools: vec![ToolConfig::builtin("bash")],
         mcp_servers: vec![],
         skills: vec![],
-        permission_policy: Some(PermissionPolicy {
-            mode: PermissionMode::AutoApprove,
-        }),
+        permission_policy: Some(PermissionPolicy { mode: PermissionMode::AutoApprove }),
         metadata: Some(HashMap::from([("env".into(), "prod".into())])),
     };
     let json = serde_json::to_value(&params).unwrap();
@@ -89,10 +87,7 @@ fn create_agent_params_full_uses_camel_case() {
 
 #[test]
 fn update_agent_params_skips_none_fields() {
-    let params = UpdateAgentParams {
-        name: Some("New Name".into()),
-        ..Default::default()
-    };
+    let params = UpdateAgentParams { name: Some("New Name".into()), ..Default::default() };
     let json = serde_json::to_value(&params).unwrap();
 
     assert_eq!(json["name"], "New Name");
@@ -136,12 +131,7 @@ fn agent_response_deserializes_from_api_json() {
     assert_eq!(agent.skills.len(), 1);
     assert_eq!(agent.description, None);
     assert_eq!(agent.archived_at, None);
-    assert_eq!(
-        agent.permission_policy,
-        Some(PermissionPolicy {
-            mode: PermissionMode::Prompt
-        })
-    );
+    assert_eq!(agent.permission_policy, Some(PermissionPolicy { mode: PermissionMode::Prompt }));
 }
 
 #[test]
@@ -252,10 +242,7 @@ fn environment_response_deserializes_without_optional_fields() {
 
 #[test]
 fn create_session_params_minimal_skips_optional() {
-    let params = CreateSessionParams {
-        agent_id: "agt_123".into(),
-        ..Default::default()
-    };
+    let params = CreateSessionParams { agent_id: "agt_123".into(), ..Default::default() };
     let json = serde_json::to_value(&params).unwrap();
 
     assert_eq!(json["agentId"], "agt_123");
@@ -344,17 +331,16 @@ fn session_status_all_variants_serialize_camel_case() {
 
     for (status, expected_str) in cases {
         let json = serde_json::to_value(&status).unwrap();
-        assert_eq!(json, expected_str, "SessionStatus::{status:?} should serialize to \"{expected_str}\"");
+        assert_eq!(
+            json, expected_str,
+            "SessionStatus::{status:?} should serialize to \"{expected_str}\""
+        );
     }
 }
 
 #[test]
 fn usage_serializes_camel_case() {
-    let usage = Usage {
-        input_tokens: 100,
-        output_tokens: 50,
-        cost_usd: Some(0.001),
-    };
+    let usage = Usage { input_tokens: 100, output_tokens: 50, cost_usd: Some(0.001) };
     let json = serde_json::to_value(&usage).unwrap();
 
     assert_eq!(json["inputTokens"], 100);
@@ -482,11 +468,7 @@ fn tool_config_custom_wire_shape_with_input_schema() {
 
 #[test]
 fn tool_config_custom_without_optional_fields_wire_shape() {
-    let tool = ToolConfig::Custom {
-        name: "noop".into(),
-        description: None,
-        input_schema: None,
-    };
+    let tool = ToolConfig::Custom { name: "noop".into(), description: None, input_schema: None };
     let json = serde_json::to_value(&tool).unwrap();
 
     // Only type and name are present
@@ -517,38 +499,28 @@ fn tool_config_custom_round_trip_from_wire() {
 
 #[test]
 fn permission_mode_auto_approve_wire_format() {
-    let policy = PermissionPolicy {
-        mode: PermissionMode::AutoApprove,
-    };
+    let policy = PermissionPolicy { mode: PermissionMode::AutoApprove };
     let json = serde_json::to_value(&policy).unwrap();
     assert_eq!(json, json!({"mode": "autoApprove"}));
 }
 
 #[test]
 fn permission_mode_prompt_wire_format() {
-    let policy = PermissionPolicy {
-        mode: PermissionMode::Prompt,
-    };
+    let policy = PermissionPolicy { mode: PermissionMode::Prompt };
     let json = serde_json::to_value(&policy).unwrap();
     assert_eq!(json, json!({"mode": "prompt"}));
 }
 
 #[test]
 fn permission_mode_deny_wire_format() {
-    let policy = PermissionPolicy {
-        mode: PermissionMode::Deny,
-    };
+    let policy = PermissionPolicy { mode: PermissionMode::Deny };
     let json = serde_json::to_value(&policy).unwrap();
     assert_eq!(json, json!({"mode": "deny"}));
 }
 
 #[test]
 fn permission_policy_round_trip_all_modes() {
-    for mode in [
-        PermissionMode::AutoApprove,
-        PermissionMode::Prompt,
-        PermissionMode::Deny,
-    ] {
+    for mode in [PermissionMode::AutoApprove, PermissionMode::Prompt, PermissionMode::Deny] {
         let policy = PermissionPolicy { mode };
         let wire = serde_json::to_string(&policy).unwrap();
         let parsed: PermissionPolicy = serde_json::from_str(&wire).unwrap();
@@ -581,10 +553,7 @@ fn create_vault_params_serializes_camel_case() {
 
 #[test]
 fn create_vault_params_skips_none_description() {
-    let params = CreateVaultParams {
-        name: "Minimal".into(),
-        description: None,
-    };
+    let params = CreateVaultParams { name: "Minimal".into(), description: None };
     let json = serde_json::to_value(&params).unwrap();
 
     assert_eq!(json["name"], "Minimal");
@@ -668,10 +637,7 @@ fn credential_response_deserializes_from_api() {
 
 #[test]
 fn update_credential_params_skips_none_fields() {
-    let params = UpdateCredentialParams {
-        token: Some("new_token".into()),
-        ..Default::default()
-    };
+    let params = UpdateCredentialParams { token: Some("new_token".into()), ..Default::default() };
     let json = serde_json::to_value(&params).unwrap();
 
     assert_eq!(json["token"], "new_token");
@@ -694,10 +660,7 @@ fn create_memory_store_params_wire_shape() {
 
 #[test]
 fn create_memory_store_params_skips_none() {
-    let params = CreateMemoryStoreParams {
-        name: "Basic".into(),
-        description: None,
-    };
+    let params = CreateMemoryStoreParams { name: "Basic".into(), description: None };
     let json = serde_json::to_value(&params).unwrap();
 
     assert_eq!(json["name"], "Basic");
@@ -734,10 +697,7 @@ fn create_memory_params_wire_shape() {
 
 #[test]
 fn create_memory_params_skips_none_metadata() {
-    let params = CreateMemoryParams {
-        content: "Simple memory.".into(),
-        metadata: None,
-    };
+    let params = CreateMemoryParams { content: "Simple memory.".into(), metadata: None };
     let json = serde_json::to_value(&params).unwrap();
 
     assert_eq!(json["content"], "Simple memory.");
@@ -761,10 +721,7 @@ fn memory_response_deserializes_from_api() {
     assert_eq!(memory.store_id, "ms_001");
     assert_eq!(memory.content, "User prefers concise responses");
     assert_eq!(memory.version, 2);
-    assert_eq!(
-        memory.metadata,
-        Some(HashMap::from([("session".into(), "ses_abc".into())]))
-    );
+    assert_eq!(memory.metadata, Some(HashMap::from([("session".into(), "ses_abc".into())])));
 }
 
 #[test]
@@ -912,11 +869,8 @@ fn model_ref_untagged_round_trip_structured() {
 
 #[test]
 fn model_ref_untagged_round_trip_compatible() {
-    let original = ModelRef::compatible_with_key(
-        "deepseek-chat",
-        "https://api.deepseek.com",
-        "sk-key",
-    );
+    let original =
+        ModelRef::compatible_with_key("deepseek-chat", "https://api.deepseek.com", "sk-key");
     let wire = serde_json::to_string(&original).unwrap();
     let parsed: ModelRef = serde_json::from_str(&wire).unwrap();
     assert_eq!(original, parsed);

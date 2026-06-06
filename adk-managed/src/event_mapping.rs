@@ -136,45 +136,21 @@ pub enum ToolKind {
 /// ```
 pub fn map_runner_output(output: RunnerOutput, seq: u64) -> SessionEvent {
     match output {
-        RunnerOutput::TextContent { text } => SessionEvent::Message {
-            content: vec![ContentBlock::Text { text }],
-            seq,
-        },
-        RunnerOutput::BuiltinToolCall {
-            tool_use_id,
-            name,
-            input,
-        } => SessionEvent::ToolUse {
-            tool_use_id,
-            name,
-            input,
-            seq,
-        },
-        RunnerOutput::CustomToolCall {
-            custom_tool_use_id,
-            name,
-            input,
-        } => SessionEvent::CustomToolUse {
-            custom_tool_use_id,
-            name,
-            input,
-            seq,
-        },
-        RunnerOutput::McpToolCall {
-            tool_use_id,
-            name,
-            input,
-        } => SessionEvent::McpToolUse {
-            tool_use_id,
-            name,
-            input,
-            seq,
-        },
-        RunnerOutput::TurnComplete { stop_reason } => SessionEvent::StatusIdle {
-            seq,
-            stop_reason: Some(stop_reason),
-            usage: None,
-        },
+        RunnerOutput::TextContent { text } => {
+            SessionEvent::Message { content: vec![ContentBlock::Text { text }], seq }
+        }
+        RunnerOutput::BuiltinToolCall { tool_use_id, name, input } => {
+            SessionEvent::ToolUse { tool_use_id, name, input, seq }
+        }
+        RunnerOutput::CustomToolCall { custom_tool_use_id, name, input } => {
+            SessionEvent::CustomToolUse { custom_tool_use_id, name, input, seq }
+        }
+        RunnerOutput::McpToolCall { tool_use_id, name, input } => {
+            SessionEvent::McpToolUse { tool_use_id, name, input, seq }
+        }
+        RunnerOutput::TurnComplete { stop_reason } => {
+            SessionEvent::StatusIdle { seq, stop_reason: Some(stop_reason), usage: None }
+        }
     }
 }
 
@@ -192,9 +168,7 @@ pub fn requires_parking(output: &RunnerOutput) -> bool {
 /// Returns `None` for all other variants.
 pub fn custom_tool_use_id(output: &RunnerOutput) -> Option<&str> {
     match output {
-        RunnerOutput::CustomToolCall {
-            custom_tool_use_id, ..
-        } => Some(custom_tool_use_id),
+        RunnerOutput::CustomToolCall { custom_tool_use_id, .. } => Some(custom_tool_use_id),
         _ => None,
     }
 }
@@ -206,9 +180,7 @@ mod tests {
 
     #[test]
     fn test_text_content_maps_to_agent_message() {
-        let output = RunnerOutput::TextContent {
-            text: "Hello from the model".to_string(),
-        };
+        let output = RunnerOutput::TextContent { text: "Hello from the model".to_string() };
         let event = map_runner_output(output, 5);
 
         match event {
@@ -236,12 +208,7 @@ mod tests {
         let event = map_runner_output(output, 10);
 
         match event {
-            SessionEvent::ToolUse {
-                tool_use_id,
-                name,
-                input,
-                seq,
-            } => {
+            SessionEvent::ToolUse { tool_use_id, name, input, seq } => {
                 assert_eq!(seq, 10);
                 assert_eq!(tool_use_id, "tu_001");
                 assert_eq!(name, "web_search");
@@ -261,12 +228,7 @@ mod tests {
         let event = map_runner_output(output, 20);
 
         match event {
-            SessionEvent::CustomToolUse {
-                custom_tool_use_id,
-                name,
-                input,
-                seq,
-            } => {
+            SessionEvent::CustomToolUse { custom_tool_use_id, name, input, seq } => {
                 assert_eq!(seq, 20);
                 assert_eq!(custom_tool_use_id, "ctu_002");
                 assert_eq!(name, "deploy");
@@ -286,12 +248,7 @@ mod tests {
         let event = map_runner_output(output, 30);
 
         match event {
-            SessionEvent::McpToolUse {
-                tool_use_id,
-                name,
-                input,
-                seq,
-            } => {
+            SessionEvent::McpToolUse { tool_use_id, name, input, seq } => {
                 assert_eq!(seq, 30);
                 assert_eq!(tool_use_id, "mcp_003");
                 assert_eq!(name, "file_read");
@@ -303,9 +260,7 @@ mod tests {
 
     #[test]
     fn test_turn_complete_maps_to_status_idle() {
-        let output = RunnerOutput::TurnComplete {
-            stop_reason: StopReason::EndTurn,
-        };
+        let output = RunnerOutput::TurnComplete { stop_reason: StopReason::EndTurn };
         let event = map_runner_output(output, 40);
 
         match event {
@@ -342,9 +297,7 @@ mod tests {
 
     #[test]
     fn test_turn_complete_max_tokens() {
-        let output = RunnerOutput::TurnComplete {
-            stop_reason: StopReason::MaxTokens,
-        };
+        let output = RunnerOutput::TurnComplete { stop_reason: StopReason::MaxTokens };
         let event = map_runner_output(output, 60);
 
         match event {
@@ -368,9 +321,7 @@ mod tests {
 
     #[test]
     fn test_requires_parking_other_variants() {
-        let text = RunnerOutput::TextContent {
-            text: "hi".to_string(),
-        };
+        let text = RunnerOutput::TextContent { text: "hi".to_string() };
         let builtin = RunnerOutput::BuiltinToolCall {
             tool_use_id: "tu".to_string(),
             name: "search".to_string(),
@@ -381,9 +332,7 @@ mod tests {
             name: "read".to_string(),
             input: json!({}),
         };
-        let complete = RunnerOutput::TurnComplete {
-            stop_reason: StopReason::EndTurn,
-        };
+        let complete = RunnerOutput::TurnComplete { stop_reason: StopReason::EndTurn };
 
         assert!(!requires_parking(&text));
         assert!(!requires_parking(&builtin));
@@ -400,9 +349,7 @@ mod tests {
         };
         assert_eq!(custom_tool_use_id(&output), Some("ctu_extract"));
 
-        let text = RunnerOutput::TextContent {
-            text: "hi".to_string(),
-        };
+        let text = RunnerOutput::TextContent { text: "hi".to_string() };
         assert_eq!(custom_tool_use_id(&text), None);
     }
 
@@ -443,9 +390,7 @@ mod tests {
     fn test_mapping_preserves_seq_exactly() {
         // Verify that the seq value is passed through without modification.
         let outputs = vec![
-            RunnerOutput::TextContent {
-                text: "a".to_string(),
-            },
+            RunnerOutput::TextContent { text: "a".to_string() },
             RunnerOutput::BuiltinToolCall {
                 tool_use_id: "t".to_string(),
                 name: "n".to_string(),
@@ -461,9 +406,7 @@ mod tests {
                 name: "n".to_string(),
                 input: json!({}),
             },
-            RunnerOutput::TurnComplete {
-                stop_reason: StopReason::EndTurn,
-            },
+            RunnerOutput::TurnComplete { stop_reason: StopReason::EndTurn },
         ];
 
         for (i, output) in outputs.into_iter().enumerate() {

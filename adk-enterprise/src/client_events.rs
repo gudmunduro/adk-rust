@@ -12,12 +12,12 @@
 //! Implements Requirements 7.1, 7.2 (event history):
 //! - `list_events` — GET /sessions/{id}/events (cursor pagination)
 
+use crate::Result;
 use crate::client::EnterpriseClient;
 use crate::response::{handle_empty_response, handle_response};
-use crate::retry::{execute_with_retry, RetryPolicy};
+use crate::retry::{RetryPolicy, execute_with_retry};
 use crate::types::events::{StoredEvent, UserEvent};
 use crate::types::pagination::{ListParams, ListResponse};
-use crate::Result;
 
 impl EnterpriseClient {
     // ─── Event Dispatch (Requirements 5.1–5.4) ───────────────────────────
@@ -104,8 +104,7 @@ impl EnterpriseClient {
     /// client.allow_tool("ses_abc123", "tu_xyz789").await?;
     /// ```
     pub async fn allow_tool(&self, session_id: &str, tool_use_id: &str) -> Result<()> {
-        self.send_event(session_id, UserEvent::allow_tool(tool_use_id))
-            .await
+        self.send_event(session_id, UserEvent::allow_tool(tool_use_id)).await
     }
 
     /// Deny a pending tool use with a reason.
@@ -124,8 +123,7 @@ impl EnterpriseClient {
         tool_use_id: &str,
         reason: impl Into<String>,
     ) -> Result<()> {
-        self.send_event(session_id, UserEvent::deny_tool(tool_use_id, reason))
-            .await
+        self.send_event(session_id, UserEvent::deny_tool(tool_use_id, reason)).await
     }
 
     /// Provide a custom tool result.
@@ -147,11 +145,7 @@ impl EnterpriseClient {
         tool_use_id: &str,
         content: impl Into<String>,
     ) -> Result<()> {
-        self.send_event(
-            session_id,
-            UserEvent::custom_tool_result(tool_use_id, content),
-        )
-        .await
+        self.send_event(session_id, UserEvent::custom_tool_result(tool_use_id, content)).await
     }
 
     /// Define success criteria for the session outcome.
@@ -172,8 +166,7 @@ impl EnterpriseClient {
         session_id: &str,
         criteria: impl Into<String>,
     ) -> Result<()> {
-        self.send_event(session_id, UserEvent::define_outcome(criteria))
-            .await
+        self.send_event(session_id, UserEvent::define_outcome(criteria)).await
     }
 
     // ─── Event History (Requirements 7.1, 7.2) ──────────────────────────
@@ -223,12 +216,7 @@ impl EnterpriseClient {
             let headers = headers.clone();
             let query_params = query_params.clone();
             async move {
-                reqwest::Client::new()
-                    .get(&url)
-                    .headers(headers)
-                    .query(&query_params)
-                    .send()
-                    .await
+                reqwest::Client::new().get(&url).headers(headers).query(&query_params).send().await
             }
         })
         .await?;

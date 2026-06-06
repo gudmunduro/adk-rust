@@ -34,7 +34,7 @@
 use std::sync::Arc;
 
 use futures::StreamExt;
-use tokio::sync::{broadcast, mpsc, Mutex, Notify, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock, broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
@@ -43,10 +43,12 @@ use adk_runner::Runner;
 use adk_session::service::SessionService;
 
 use crate::checkpoint::{CheckpointManager, RunState};
-use crate::event_mapping::{RunnerOutput, map_runner_output, requires_parking, custom_tool_use_id};
+use crate::event_mapping::{RunnerOutput, custom_tool_use_id, map_runner_output, requires_parking};
 use crate::parking::ToolParkingLot;
 use crate::sequence::SequenceCounter;
-use crate::types::{ContentBlock, RuntimeError, SessionEvent, SessionStatus, StopReason, UserEvent};
+use crate::types::{
+    ContentBlock, RuntimeError, SessionEvent, SessionStatus, StopReason, UserEvent,
+};
 use crate::usage::{SessionUsageTracker, UsageReport};
 
 /// Supervised session loop — one per active session.
@@ -248,10 +250,7 @@ impl SessionLoop {
                     self.emit_idle(Some(StopReason::EndTurn), None).await;
                     break;
                 }
-                UserEvent::CustomToolResult {
-                    custom_tool_use_id,
-                    content,
-                } => {
+                UserEvent::CustomToolResult { custom_tool_use_id, content } => {
                     debug!(
                         session_id = %self.session_id,
                         tool_use_id = %custom_tool_use_id,
@@ -282,17 +281,20 @@ impl SessionLoop {
                                 text: serde_json::json!({
                                     "confirmation": "approved",
                                     "tool_use_id": tool_use_id
-                                }).to_string(),
+                                })
+                                .to_string(),
                             }]
                         }
                         crate::types::ConfirmationResult::Deny => {
-                            let message = deny_message.unwrap_or_else(|| "Tool execution denied by user".to_string());
+                            let message = deny_message
+                                .unwrap_or_else(|| "Tool execution denied by user".to_string());
                             vec![ContentBlock::Text {
                                 text: serde_json::json!({
                                     "confirmation": "denied",
                                     "tool_use_id": tool_use_id,
                                     "reason": message
-                                }).to_string(),
+                                })
+                                .to_string(),
                             }]
                         }
                     };
@@ -330,9 +332,7 @@ impl SessionLoop {
     async fn process_turn(&mut self, content: Vec<ContentBlock>) -> Result<(), RuntimeError> {
         // 1. Emit status.running
         self.status = SessionStatus::Running;
-        let running_event = SessionEvent::StatusRunning {
-            seq: self.seq.next(),
-        };
+        let running_event = SessionEvent::StatusRunning { seq: self.seq.next() };
         self.emit_event(running_event).await;
 
         // 2. Check interrupt before processing.
@@ -367,8 +367,7 @@ impl SessionLoop {
 
             match event_result {
                 Ok(event) => {
-                    self.process_runner_event(&event, &mut turn_usage, &mut custom_tool_ids)
-                        .await;
+                    self.process_runner_event(&event, &mut turn_usage, &mut custom_tool_ids).await;
                 }
                 Err(e) => {
                     warn!(
@@ -399,9 +398,7 @@ impl SessionLoop {
         let stop_reason = if custom_tool_ids.is_empty() {
             Some(StopReason::EndTurn)
         } else {
-            Some(StopReason::RequiresAction {
-                event_ids: custom_tool_ids,
-            })
+            Some(StopReason::RequiresAction { event_ids: custom_tool_ids })
         };
 
         // 8. Emit status.idle with usage from this turn
@@ -427,9 +424,7 @@ impl SessionLoop {
         for block in blocks {
             match block {
                 ContentBlock::Text { text } => {
-                    parts.push(Part::Text {
-                        text: text.clone(),
-                    });
+                    parts.push(Part::Text { text: text.clone() });
                 }
                 ContentBlock::Image { source } => {
                     // Convert image block to inline data or file reference
@@ -453,10 +448,7 @@ impl SessionLoop {
             }
         }
 
-        Content {
-            role: "user".to_string(),
-            parts,
-        }
+        Content { role: "user".to_string(), parts }
     }
 
     /// Process a single Runner event, mapping it to SessionEvents and tracking usage.
@@ -485,16 +477,13 @@ impl SessionLoop {
                         if text.is_empty() {
                             continue;
                         }
-                        let output = RunnerOutput::TextContent {
-                            text: text.clone(),
-                        };
+                        let output = RunnerOutput::TextContent { text: text.clone() };
                         let session_event = map_runner_output(output, self.seq.next());
                         self.emit_event(session_event).await;
                     }
                     Part::FunctionCall { name, args, id, .. } => {
-                        let tool_use_id = id
-                            .clone()
-                            .unwrap_or_else(|| format!("tu_{}", uuid::Uuid::new_v4()));
+                        let tool_use_id =
+                            id.clone().unwrap_or_else(|| format!("tu_{}", uuid::Uuid::new_v4()));
 
                         // Classify the tool call
                         let tool_kind = self.classify_tool(name);
@@ -562,13 +551,8 @@ impl SessionLoop {
     /// Classify a tool call by name to determine which RunnerOutput variant to use.
     fn classify_tool(&self, name: &str) -> ToolKind {
         // Known built-in tools execute server-side
-        const BUILTIN_TOOLS: &[&str] = &[
-            "bash",
-            "filesystem",
-            "web_search",
-            "web_fetch",
-            "code_execution",
-        ];
+        const BUILTIN_TOOLS: &[&str] =
+            &["bash", "filesystem", "web_search", "web_fetch", "code_execution"];
 
         if BUILTIN_TOOLS.contains(&name) {
             ToolKind::Builtin
@@ -583,11 +567,8 @@ impl SessionLoop {
     /// Emit a session event: assign to checkpoint and broadcast.
     async fn emit_event(&mut self, event: SessionEvent) {
         // Checkpoint atomically via the shared manager.
-        let run_state = RunState {
-            seq: self.seq.current(),
-            pending_tool_ids: Vec::new(),
-            status: self.status,
-        };
+        let run_state =
+            RunState { seq: self.seq.current(), pending_tool_ids: Vec::new(), status: self.status };
         self.checkpoint.write().await.checkpoint(event.clone(), run_state);
 
         // Broadcast to subscribers (ignore if no receivers).
@@ -597,11 +578,7 @@ impl SessionLoop {
     /// Emit a `status.idle` event and update internal status.
     async fn emit_idle(&mut self, stop_reason: Option<StopReason>, usage: Option<UsageReport>) {
         self.status = SessionStatus::Idle;
-        let idle_event = SessionEvent::StatusIdle {
-            seq: self.seq.next(),
-            stop_reason,
-            usage,
-        };
+        let idle_event = SessionEvent::StatusIdle { seq: self.seq.next(), stop_reason, usage };
         self.emit_event(idle_event).await;
     }
 
@@ -646,9 +623,7 @@ mod tests {
 
     impl TestLlm {
         fn new(text: &str) -> Self {
-            Self {
-                response_text: text.to_string(),
-            }
+            Self { response_text: text.to_string() }
         }
     }
 
@@ -679,20 +654,15 @@ mod tests {
 
     /// Build a test agent with the given LLM.
     fn build_test_agent(llm: impl Llm + 'static) -> Arc<dyn Agent> {
-        let agent = adk_agent::LlmAgentBuilder::new("test-agent")
-            .model(Arc::new(llm))
-            .build()
-            .unwrap();
+        let agent =
+            adk_agent::LlmAgentBuilder::new("test-agent").model(Arc::new(llm)).build().unwrap();
         Arc::new(agent)
     }
 
     /// Helper to create a session loop with default test configuration.
-    fn create_test_loop() -> (
-        mpsc::Sender<UserEvent>,
-        broadcast::Receiver<SessionEvent>,
-        CancellationToken,
-        SessionLoop,
-    ) {
+    fn create_test_loop()
+    -> (mpsc::Sender<UserEvent>, broadcast::Receiver<SessionEvent>, CancellationToken, SessionLoop)
+    {
         let (event_tx, event_rx) = mpsc::channel(64);
         let (broadcast_tx, broadcast_rx) = broadcast::channel(256);
         let cancel = CancellationToken::new();
@@ -723,9 +693,7 @@ mod tests {
         // Send a message.
         event_tx
             .send(UserEvent::Message {
-                content: vec![ContentBlock::Text {
-                    text: "Hello".to_string(),
-                }],
+                content: vec![ContentBlock::Text { text: "Hello".to_string() }],
             })
             .await
             .unwrap();
@@ -787,9 +755,7 @@ mod tests {
         // Send a message
         event_tx
             .send(UserEvent::Message {
-                content: vec![ContentBlock::Text {
-                    text: "First".to_string(),
-                }],
+                content: vec![ContentBlock::Text { text: "First".to_string() }],
             })
             .await
             .unwrap();
@@ -917,9 +883,7 @@ mod tests {
         // Send a message — should not be processed while paused.
         event_tx
             .send(UserEvent::Message {
-                content: vec![ContentBlock::Text {
-                    text: "While paused".to_string(),
-                }],
+                content: vec![ContentBlock::Text { text: "While paused".to_string() }],
             })
             .await
             .unwrap();
@@ -1014,9 +978,7 @@ mod tests {
         event_tx
             .send(UserEvent::CustomToolResult {
                 custom_tool_use_id: "ctu_test_001".to_string(),
-                content: vec![ContentBlock::Text {
-                    text: "tool output".to_string(),
-                }],
+                content: vec![ContentBlock::Text { text: "tool output".to_string() }],
             })
             .await
             .unwrap();
@@ -1061,42 +1023,18 @@ mod tests {
 
         // Test builtin tools
         assert!(matches!(session_loop.classify_tool("bash"), ToolKind::Builtin));
-        assert!(matches!(
-            session_loop.classify_tool("filesystem"),
-            ToolKind::Builtin
-        ));
-        assert!(matches!(
-            session_loop.classify_tool("web_search"),
-            ToolKind::Builtin
-        ));
-        assert!(matches!(
-            session_loop.classify_tool("web_fetch"),
-            ToolKind::Builtin
-        ));
-        assert!(matches!(
-            session_loop.classify_tool("code_execution"),
-            ToolKind::Builtin
-        ));
+        assert!(matches!(session_loop.classify_tool("filesystem"), ToolKind::Builtin));
+        assert!(matches!(session_loop.classify_tool("web_search"), ToolKind::Builtin));
+        assert!(matches!(session_loop.classify_tool("web_fetch"), ToolKind::Builtin));
+        assert!(matches!(session_loop.classify_tool("code_execution"), ToolKind::Builtin));
 
         // Test MCP tools
-        assert!(matches!(
-            session_loop.classify_tool("mcp_file_read"),
-            ToolKind::Mcp
-        ));
-        assert!(matches!(
-            session_loop.classify_tool("server::tool"),
-            ToolKind::Mcp
-        ));
+        assert!(matches!(session_loop.classify_tool("mcp_file_read"), ToolKind::Mcp));
+        assert!(matches!(session_loop.classify_tool("server::tool"), ToolKind::Mcp));
 
         // Test custom tools
-        assert!(matches!(
-            session_loop.classify_tool("get_weather"),
-            ToolKind::Custom
-        ));
-        assert!(matches!(
-            session_loop.classify_tool("deploy"),
-            ToolKind::Custom
-        ));
+        assert!(matches!(session_loop.classify_tool("get_weather"), ToolKind::Custom));
+        assert!(matches!(session_loop.classify_tool("deploy"), ToolKind::Custom));
 
         drop(event_tx);
     }

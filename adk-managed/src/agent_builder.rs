@@ -85,10 +85,9 @@ pub fn build_agent(
                 "filesystem",
                 "Read, write, and manage files in the agent's workspace.",
             )),
-            ToolConfig::WebSearch {} => Arc::new(ManagedBuiltinTool::new(
-                "web_search",
-                "Search the web for information.",
-            )),
+            ToolConfig::WebSearch {} => {
+                Arc::new(ManagedBuiltinTool::new("web_search", "Search the web for information."))
+            }
             ToolConfig::WebFetch {} => Arc::new(ManagedBuiltinTool::new(
                 "web_fetch",
                 "Fetch and extract content from a URL.",
@@ -97,15 +96,13 @@ pub fn build_agent(
                 "code_execution",
                 "Execute code in a sandboxed environment.",
             )),
-            ToolConfig::Custom {
-                name,
-                description,
-                input_schema,
-            } => Arc::new(ManagedCustomTool::new(
-                name.clone(),
-                description.clone().unwrap_or_default(),
-                input_schema.clone(),
-            )),
+            ToolConfig::Custom { name, description, input_schema } => {
+                Arc::new(ManagedCustomTool::new(
+                    name.clone(),
+                    description.clone().unwrap_or_default(),
+                    input_schema.clone(),
+                ))
+            }
         };
         builder = builder.tool(tool);
     }
@@ -132,9 +129,7 @@ pub fn build_agent(
         );
     }
 
-    let agent = builder
-        .build()
-        .map_err(|e| BuildError::BuildFailed(e.to_string()))?;
+    let agent = builder.build().map_err(|e| BuildError::BuildFailed(e.to_string()))?;
 
     Ok(Arc::new(agent))
 }
@@ -194,18 +189,12 @@ pub struct ManagedBuiltinTool {
 impl ManagedBuiltinTool {
     /// Create a new built-in tool.
     pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            description: description.into(),
-        }
+        Self { name: name.into(), description: description.into() }
     }
 
     /// Execute a bash command in a child process.
     async fn execute_bash(&self, args: &Value) -> adk_core::Result<Value> {
-        let command = args
-            .get("command")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default();
+        let command = args.get("command").and_then(|v| v.as_str()).unwrap_or_default();
 
         if command.is_empty() {
             return Ok(serde_json::json!({
@@ -234,10 +223,7 @@ impl ManagedBuiltinTool {
 
     /// Execute a filesystem operation.
     async fn execute_filesystem(&self, args: &Value) -> adk_core::Result<Value> {
-        let operation = args
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("read");
+        let operation = args.get("operation").and_then(|v| v.as_str()).unwrap_or("read");
 
         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -252,10 +238,7 @@ impl ManagedBuiltinTool {
                 }
             }
             "write" => {
-                let content = args
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                 if path.is_empty() {
                     return Ok(serde_json::json!({"error": "path is required"}));
                 }
@@ -301,14 +284,8 @@ impl Tool for ManagedBuiltinTool {
             "code_execution" => {
                 // Code execution requires a sandbox backend. Without one configured,
                 // we fall back to running via bash with the appropriate interpreter.
-                let language = args
-                    .get("language")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("python");
-                let code = args
-                    .get("code")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default();
+                let language = args.get("language").and_then(|v| v.as_str()).unwrap_or("python");
+                let code = args.get("code").and_then(|v| v.as_str()).unwrap_or_default();
 
                 if code.is_empty() {
                     return Ok(serde_json::json!({"error": "no code provided"}));
@@ -331,9 +308,7 @@ impl Tool for ManagedBuiltinTool {
                     .output()
                     .await
                     .map_err(|e| {
-                        adk_core::AdkError::tool(format!(
-                            "failed to spawn {interpreter}: {e}"
-                        ))
+                        adk_core::AdkError::tool(format!("failed to spawn {interpreter}: {e}"))
                     })?;
 
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -349,28 +324,20 @@ impl Tool for ManagedBuiltinTool {
             "web_search" => {
                 // Web search requires an external API (Google, Bing, etc.).
                 // Return a structured response indicating the service needs configuration.
-                let query = args
-                    .get("query")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default();
+                let query = args.get("query").and_then(|v| v.as_str()).unwrap_or_default();
                 Ok(serde_json::json!({
                     "error": "web_search is not configured for in-process execution. Configure an API key or use a provider with built-in search grounding.",
                     "query": query
                 }))
             }
             "web_fetch" => {
-                let url = args
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default();
+                let url = args.get("url").and_then(|v| v.as_str()).unwrap_or_default();
                 Ok(serde_json::json!({
                     "error": "web_fetch is not configured for in-process execution. Configure an HTTP client or sandbox with network access.",
                     "url": url
                 }))
             }
-            other => Err(adk_core::AdkError::tool(format!(
-                "unknown built-in tool: {other}"
-            ))),
+            other => Err(adk_core::AdkError::tool(format!("unknown built-in tool: {other}"))),
         }
     }
 }
@@ -410,16 +377,8 @@ impl ManagedCustomTool {
     /// * `name` — Tool name as declared in the agent definition.
     /// * `description` — Human-readable description for the LLM.
     /// * `input_schema` — JSON Schema for the tool's input parameters.
-    pub fn new(
-        name: String,
-        description: String,
-        input_schema: Value,
-    ) -> Self {
-        Self {
-            name,
-            description,
-            input_schema,
-        }
+    pub fn new(name: String, description: String, input_schema: Value) -> Self {
+        Self { name, description, input_schema }
     }
 }
 
@@ -461,9 +420,7 @@ impl Tool for ManagedCustomTool {
 mod tests {
     use super::*;
     use crate::types::{ManagedAgentDef, ModelRef, PermissionMode, PermissionPolicy, ToolConfig};
-    use adk_core::{
-        Content, FinishReason, Llm, LlmRequest, LlmResponse, LlmResponseStream,
-    };
+    use adk_core::{Content, FinishReason, Llm, LlmRequest, LlmResponse, LlmResponseStream};
     use async_stream::stream;
     use std::collections::HashMap;
 
@@ -474,9 +431,7 @@ mod tests {
 
     impl MockLlm {
         fn new(name: &str) -> Self {
-            Self {
-                name: name.to_string(),
-            }
+            Self { name: name.to_string() }
         }
     }
 
@@ -650,10 +605,7 @@ mod tests {
             model: ModelRef::Shorthand("gemini-2.5-flash".to_string()),
             system: None,
             description: None,
-            tools: vec![
-                ToolConfig::Bash {},
-                ToolConfig::Filesystem {},
-            ],
+            tools: vec![ToolConfig::Bash {}, ToolConfig::Filesystem {}],
             mcp_servers: vec![],
             skills: vec![],
             permission_policy: Some(PermissionPolicy {
@@ -675,35 +627,21 @@ mod tests {
 
     #[test]
     fn test_map_auto_approve_no_overrides() {
-        let policy = PermissionPolicy {
-            default: PermissionMode::AutoApprove,
-            tools: HashMap::new(),
-        };
+        let policy =
+            PermissionPolicy { default: PermissionMode::AutoApprove, tools: HashMap::new() };
         assert_eq!(map_permission_policy(&policy), ToolConfirmationPolicy::Never);
     }
 
     #[test]
     fn test_map_prompt_default() {
-        let policy = PermissionPolicy {
-            default: PermissionMode::Prompt,
-            tools: HashMap::new(),
-        };
-        assert_eq!(
-            map_permission_policy(&policy),
-            ToolConfirmationPolicy::Always
-        );
+        let policy = PermissionPolicy { default: PermissionMode::Prompt, tools: HashMap::new() };
+        assert_eq!(map_permission_policy(&policy), ToolConfirmationPolicy::Always);
     }
 
     #[test]
     fn test_map_deny_default() {
-        let policy = PermissionPolicy {
-            default: PermissionMode::Deny,
-            tools: HashMap::new(),
-        };
-        assert_eq!(
-            map_permission_policy(&policy),
-            ToolConfirmationPolicy::Always
-        );
+        let policy = PermissionPolicy { default: PermissionMode::Deny, tools: HashMap::new() };
+        assert_eq!(map_permission_policy(&policy), ToolConfirmationPolicy::Always);
     }
 
     #[test]
@@ -730,9 +668,7 @@ mod tests {
     fn test_map_auto_approve_with_auto_approve_overrides_only() {
         let policy = PermissionPolicy {
             default: PermissionMode::AutoApprove,
-            tools: HashMap::from([
-                ("read_file".to_string(), PermissionMode::AutoApprove),
-            ]),
+            tools: HashMap::from([("read_file".to_string(), PermissionMode::AutoApprove)]),
         };
         // AutoApprove overrides don't add to confirmation set
         assert_eq!(map_permission_policy(&policy), ToolConfirmationPolicy::Never);
@@ -751,10 +687,7 @@ mod tests {
     async fn test_builtin_tool_bash_executes() {
         let tool = ManagedBuiltinTool::new("bash", "Execute bash commands.");
         let ctx = Arc::new(adk_tool::SimpleToolContext::new("test-caller"));
-        let result = tool
-            .execute(ctx, serde_json::json!({"command": "echo hello"}))
-            .await
-            .unwrap();
+        let result = tool.execute(ctx, serde_json::json!({"command": "echo hello"})).await.unwrap();
         assert_eq!(result["exit_code"], 0);
         assert!(result["stdout"].as_str().unwrap().contains("hello"));
     }
@@ -763,10 +696,7 @@ mod tests {
     async fn test_builtin_tool_web_search_returns_error() {
         let tool = ManagedBuiltinTool::new("web_search", "Search the web.");
         let ctx = Arc::new(adk_tool::SimpleToolContext::new("test-caller"));
-        let result = tool
-            .execute(ctx, serde_json::json!({"query": "rust lang"}))
-            .await
-            .unwrap();
+        let result = tool.execute(ctx, serde_json::json!({"query": "rust lang"})).await.unwrap();
         assert!(result["error"].as_str().unwrap().contains("not configured"));
     }
 
@@ -798,10 +728,7 @@ mod tests {
         );
         let ctx = Arc::new(adk_tool::SimpleToolContext::new("test-caller"));
 
-        let result = tool
-            .execute(ctx, serde_json::json!({"city": "Seattle"}))
-            .await
-            .unwrap();
+        let result = tool.execute(ctx, serde_json::json!({"city": "Seattle"})).await.unwrap();
 
         assert_eq!(result["status"], "pending_client_execution");
         assert_eq!(result["tool"], "my_tool");

@@ -15,9 +15,9 @@ use std::time::Duration;
 
 use async_stream::stream;
 use bytes::Bytes;
-use futures::stream::Stream;
 use futures::StreamExt;
-use reqwest::header::{HeaderValue, ACCEPT};
+use futures::stream::Stream;
+use reqwest::header::{ACCEPT, HeaderValue};
 use tracing::{debug, warn};
 
 use crate::client::EnterpriseClient;
@@ -91,11 +91,7 @@ fn parse_sse_block(block: &str) -> Option<SseFrame> {
     }
 
     // Only return a frame if we have data
-    if has_data {
-        Some(frame)
-    } else {
-        None
-    }
+    if has_data { Some(frame) } else { None }
 }
 
 /// Deserializes the `data:` JSON payload into a `SessionEvent`.
@@ -408,9 +404,7 @@ impl EnterpriseClient {
         );
         tokio::time::sleep(delay).await;
 
-        let response = self
-            .open_sse_connection(url, last_event_id.as_deref())
-            .await?;
+        let response = self.open_sse_connection(url, last_event_id.as_deref()).await?;
 
         let status = response.status();
         if !status.is_success() {
@@ -439,15 +433,9 @@ fn map_sse_connect_error(status: reqwest::StatusCode, body: &str) -> EnterpriseE
         403 => EnterpriseError::Permission { message },
         404 => EnterpriseError::NotFound { message },
         409 => EnterpriseError::Conflict { message },
-        429 => EnterpriseError::RateLimit {
-            message,
-            retry_after: None,
-        },
+        429 => EnterpriseError::RateLimit { message, retry_after: None },
         500 => EnterpriseError::Internal { message },
-        503 => EnterpriseError::Unavailable {
-            message,
-            retry_after: None,
-        },
+        503 => EnterpriseError::Unavailable { message, retry_after: None },
         _ => EnterpriseError::Stream { message },
     }
 }
@@ -462,17 +450,15 @@ mod tests {
     fn test_parse_simple_event() {
         let block = "data: {\"type\":\"status.running\",\"seq\":1}";
         let frame = parse_sse_block(block).unwrap();
-        assert_eq!(
-            frame.data.as_deref(),
-            Some("{\"type\":\"status.running\",\"seq\":1}")
-        );
+        assert_eq!(frame.data.as_deref(), Some("{\"type\":\"status.running\",\"seq\":1}"));
         assert!(frame.event.is_none());
         assert!(frame.id.is_none());
     }
 
     #[test]
     fn test_parse_event_with_all_fields() {
-        let block = "event: message\nid: 42\ndata: {\"type\":\"agent.message\",\"seq\":42,\"content\":[]}";
+        let block =
+            "event: message\nid: 42\ndata: {\"type\":\"agent.message\",\"seq\":42,\"content\":[]}";
         let frame = parse_sse_block(block).unwrap();
         assert_eq!(frame.event.as_deref(), Some("message"));
         assert_eq!(frame.id.as_deref(), Some("42"));
@@ -491,12 +477,10 @@ mod tests {
 
     #[test]
     fn test_parse_comment_lines_skipped() {
-        let block = ": this is a comment\ndata: {\"type\":\"status.running\",\"seq\":1}\n: another comment";
+        let block =
+            ": this is a comment\ndata: {\"type\":\"status.running\",\"seq\":1}\n: another comment";
         let frame = parse_sse_block(block).unwrap();
-        assert_eq!(
-            frame.data.as_deref(),
-            Some("{\"type\":\"status.running\",\"seq\":1}")
-        );
+        assert_eq!(frame.data.as_deref(), Some("{\"type\":\"status.running\",\"seq\":1}"));
     }
 
     #[test]
@@ -544,7 +528,8 @@ mod tests {
 
     #[test]
     fn test_deserialize_valid_message_event() {
-        let data = r#"{"type":"agent.message","seq":5,"content":[{"type":"text","text":"Hello!"}]}"#;
+        let data =
+            r#"{"type":"agent.message","seq":5,"content":[{"type":"text","text":"Hello!"}]}"#;
         let event = deserialize_event(data).unwrap();
         match event {
             SessionEvent::Message { seq, content } => {
@@ -587,12 +572,7 @@ mod tests {
         let data = r#"{"type":"agent.tool_use","seq":3,"tool_use_id":"tu_abc","name":"bash","input":{"command":"ls"}}"#;
         let event = deserialize_event(data).unwrap();
         match event {
-            SessionEvent::ToolUse {
-                seq,
-                tool_use_id,
-                name,
-                ..
-            } => {
+            SessionEvent::ToolUse { seq, tool_use_id, name, .. } => {
                 assert_eq!(seq, 3);
                 assert_eq!(tool_use_id, "tu_abc");
                 assert_eq!(name, "bash");
@@ -603,14 +583,11 @@ mod tests {
 
     #[test]
     fn test_deserialize_error_event() {
-        let data = r#"{"type":"agent.error","seq":7,"message":"something failed","code":"internal"}"#;
+        let data =
+            r#"{"type":"agent.error","seq":7,"message":"something failed","code":"internal"}"#;
         let event = deserialize_event(data).unwrap();
         match event {
-            SessionEvent::Error {
-                seq,
-                message,
-                code,
-            } => {
+            SessionEvent::Error { seq, message, code } => {
                 assert_eq!(seq, 7);
                 assert_eq!(message, "something failed");
                 assert_eq!(code.as_deref(), Some("internal"));

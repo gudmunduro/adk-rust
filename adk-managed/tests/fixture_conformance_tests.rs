@@ -56,10 +56,8 @@ fn build_stub_agent() -> Arc<dyn Agent> {
         }
     }
 
-    let agent = adk_agent::LlmAgentBuilder::new("stub-agent")
-        .model(Arc::new(StubLlm))
-        .build()
-        .unwrap();
+    let agent =
+        adk_agent::LlmAgentBuilder::new("stub-agent").model(Arc::new(StubLlm)).build().unwrap();
     Arc::new(agent)
 }
 
@@ -93,15 +91,9 @@ enum ScenarioEvent {
     #[serde(rename = "user.interrupt")]
     Interrupt {},
     #[serde(rename = "user.custom_tool_result")]
-    CustomToolResult {
-        custom_tool_use_id: String,
-        content: Vec<ContentBlockJson>,
-    },
+    CustomToolResult { custom_tool_use_id: String, content: Vec<ContentBlockJson> },
     #[serde(rename = "user.tool_confirmation")]
-    ToolConfirmation {
-        tool_use_id: String,
-        result: String,
-    },
+    ToolConfirmation { tool_use_id: String, result: String },
 }
 
 #[derive(Debug, Deserialize)]
@@ -126,10 +118,8 @@ struct Assertions {
 
 /// Load a fixture from the fixtures directory.
 fn load_fixture(filename: &str) -> Fixture {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-        .join(filename);
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures").join(filename);
     let content = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("failed to read fixture {}: {e}", path.display()));
     serde_json::from_str(&content)
@@ -139,21 +129,17 @@ fn load_fixture(filename: &str) -> Fixture {
 /// Convert a scenario event into a `UserEvent`.
 fn scenario_to_user_event(event: &ScenarioEvent) -> UserEvent {
     match event {
-        ScenarioEvent::Message { content } => UserEvent::Message {
-            content: content.iter().map(content_block_from_json).collect(),
-        },
+        ScenarioEvent::Message { content } => {
+            UserEvent::Message { content: content.iter().map(content_block_from_json).collect() }
+        }
         ScenarioEvent::Interrupt {} => UserEvent::Interrupt {},
-        ScenarioEvent::CustomToolResult {
-            custom_tool_use_id,
-            content,
-        } => UserEvent::CustomToolResult {
-            custom_tool_use_id: custom_tool_use_id.clone(),
-            content: content.iter().map(content_block_from_json).collect(),
-        },
-        ScenarioEvent::ToolConfirmation {
-            tool_use_id,
-            result,
-        } => {
+        ScenarioEvent::CustomToolResult { custom_tool_use_id, content } => {
+            UserEvent::CustomToolResult {
+                custom_tool_use_id: custom_tool_use_id.clone(),
+                content: content.iter().map(content_block_from_json).collect(),
+            }
+        }
+        ScenarioEvent::ToolConfirmation { tool_use_id, result } => {
             let confirmation_result = match result.as_str() {
                 "allow" => adk_managed::types::ConfirmationResult::Allow,
                 _ => adk_managed::types::ConfirmationResult::Deny,
@@ -170,12 +156,8 @@ fn scenario_to_user_event(event: &ScenarioEvent) -> UserEvent {
 fn content_block_from_json(block: &ContentBlockJson) -> ContentBlock {
     match block {
         ContentBlockJson::Text { text } => ContentBlock::Text { text: text.clone() },
-        ContentBlockJson::Image { source } => ContentBlock::Image {
-            source: source.clone(),
-        },
-        ContentBlockJson::File { file_id } => ContentBlock::File {
-            file_id: file_id.clone(),
-        },
+        ContentBlockJson::Image { source } => ContentBlock::Image { source: source.clone() },
+        ContentBlockJson::File { file_id } => ContentBlock::File { file_id: file_id.clone() },
     }
 }
 
@@ -237,10 +219,13 @@ async fn run_fixture_scripted(fixture: &Fixture) -> Vec<String> {
             UserEvent::CustomToolResult { custom_tool_use_id, content } => {
                 // Deliver custom tool results directly to parking lot.
                 tokio::time::sleep(Duration::from_millis(20)).await;
-                event_tx.send(UserEvent::CustomToolResult {
-                    custom_tool_use_id: custom_tool_use_id.clone(),
-                    content: content.clone(),
-                }).await.unwrap();
+                event_tx
+                    .send(UserEvent::CustomToolResult {
+                        custom_tool_use_id: custom_tool_use_id.clone(),
+                        content: content.clone(),
+                    })
+                    .await
+                    .unwrap();
             }
             _ => {
                 event_tx.send(user_event).await.unwrap();
@@ -332,18 +317,12 @@ fn test_all_fixtures_parse() {
     for file in &fixture_files {
         let fixture = load_fixture(file);
         assert!(!fixture.name.is_empty(), "fixture {file} has no name");
-        assert!(
-            !fixture.description.is_empty(),
-            "fixture {file} has no description"
-        );
+        assert!(!fixture.description.is_empty(), "fixture {file} has no description");
         assert!(
             !fixture.assertions.exact_sequence.is_empty(),
             "fixture {file} has no exact_sequence assertions"
         );
-        assert!(
-            !fixture.scenario.is_empty(),
-            "fixture {file} has no scenario events"
-        );
+        assert!(!fixture.scenario.is_empty(), "fixture {file} has no scenario events");
     }
 }
 
@@ -396,9 +375,7 @@ async fn test_seq_monotonicity_in_fixture_run() {
     for i in 0..3 {
         event_tx
             .send(UserEvent::Message {
-                content: vec![ContentBlock::Text {
-                    text: format!("Message {i}"),
-                }],
+                content: vec![ContentBlock::Text { text: format!("Message {i}") }],
             })
             .await
             .unwrap();

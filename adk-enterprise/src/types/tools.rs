@@ -50,9 +50,7 @@ impl ToolConfig {
     /// let tool = ToolConfig::builtin("bash");
     /// ```
     pub fn builtin(type_name: impl Into<String>) -> Self {
-        Self::Builtin {
-            name: type_name.into(),
-        }
+        Self::Builtin { name: type_name.into() }
     }
 
     /// Create a custom tool configuration.
@@ -224,11 +222,8 @@ mod tests {
 
     #[test]
     fn test_custom_tool_omits_none_fields() {
-        let tool = ToolConfig::Custom {
-            name: "my_tool".into(),
-            description: None,
-            input_schema: None,
-        };
+        let tool =
+            ToolConfig::Custom { name: "my_tool".into(), description: None, input_schema: None };
         let json = serde_json::to_value(&tool).unwrap();
         assert_eq!(
             json,
@@ -345,18 +340,14 @@ mod tests {
 
     #[test]
     fn test_skill_ref_serializes_camel_case() {
-        let skill = SkillRef {
-            skill_id: "sk_abc123".into(),
-        };
+        let skill = SkillRef { skill_id: "sk_abc123".into() };
         let json = serde_json::to_value(&skill).unwrap();
         assert_eq!(json, json!({"skillId": "sk_abc123"}));
     }
 
     #[test]
     fn test_skill_ref_round_trip() {
-        let skill = SkillRef {
-            skill_id: "sk_test_456".into(),
-        };
+        let skill = SkillRef { skill_id: "sk_test_456".into() };
         let serialized = serde_json::to_string(&skill).unwrap();
         let deserialized: SkillRef = serde_json::from_str(&serialized).unwrap();
         assert_eq!(skill, deserialized);
@@ -373,38 +364,28 @@ mod tests {
 
     #[test]
     fn test_permission_policy_auto_approve() {
-        let policy = PermissionPolicy {
-            mode: PermissionMode::AutoApprove,
-        };
+        let policy = PermissionPolicy { mode: PermissionMode::AutoApprove };
         let json = serde_json::to_value(&policy).unwrap();
         assert_eq!(json, json!({"mode": "autoApprove"}));
     }
 
     #[test]
     fn test_permission_policy_prompt() {
-        let policy = PermissionPolicy {
-            mode: PermissionMode::Prompt,
-        };
+        let policy = PermissionPolicy { mode: PermissionMode::Prompt };
         let json = serde_json::to_value(&policy).unwrap();
         assert_eq!(json, json!({"mode": "prompt"}));
     }
 
     #[test]
     fn test_permission_policy_deny() {
-        let policy = PermissionPolicy {
-            mode: PermissionMode::Deny,
-        };
+        let policy = PermissionPolicy { mode: PermissionMode::Deny };
         let json = serde_json::to_value(&policy).unwrap();
         assert_eq!(json, json!({"mode": "deny"}));
     }
 
     #[test]
     fn test_permission_mode_round_trip() {
-        for mode in [
-            PermissionMode::AutoApprove,
-            PermissionMode::Prompt,
-            PermissionMode::Deny,
-        ] {
+        for mode in [PermissionMode::AutoApprove, PermissionMode::Prompt, PermissionMode::Deny] {
             let policy = PermissionPolicy { mode: mode.clone() };
             let serialized = serde_json::to_string(&policy).unwrap();
             let deserialized: PermissionPolicy = serde_json::from_str(&serialized).unwrap();

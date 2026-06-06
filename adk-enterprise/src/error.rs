@@ -9,10 +9,7 @@ use std::time::Duration;
 pub enum EnterpriseError {
     /// 400 — invalid request parameters.
     #[error("invalid request: {message}")]
-    InvalidRequest {
-        message: String,
-        param: Option<String>,
-    },
+    InvalidRequest { message: String, param: Option<String> },
 
     /// 401 — missing or invalid API key.
     #[error("authentication failed: {message}")]
@@ -36,10 +33,7 @@ pub enum EnterpriseError {
 
     /// 429 — rate limited.
     #[error("rate limited: retry after {retry_after:?}")]
-    RateLimit {
-        message: String,
-        retry_after: Option<Duration>,
-    },
+    RateLimit { message: String, retry_after: Option<Duration> },
 
     /// 500 — internal server error.
     #[error("internal error: {message}")]
@@ -47,10 +41,7 @@ pub enum EnterpriseError {
 
     /// 503 — service unavailable.
     #[error("service unavailable: {message}")]
-    Unavailable {
-        message: String,
-        retry_after: Option<Duration>,
-    },
+    Unavailable { message: String, retry_after: Option<Duration> },
 
     /// Network/connection error.
     #[error("connection error: {0}")]

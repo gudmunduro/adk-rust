@@ -21,10 +21,7 @@ pub(crate) async fn handle_response<T: DeserializeOwned>(response: Response) -> 
         Ok(value)
     } else {
         let retry_after = parse_retry_after(&response);
-        let body = response
-            .text()
-            .await
-            .unwrap_or_default();
+        let body = response.text().await.unwrap_or_default();
         Err(map_api_error(status, &body, retry_after))
     }
 }
@@ -39,10 +36,7 @@ pub(crate) async fn handle_empty_response(response: Response) -> Result<()> {
         Ok(())
     } else {
         let retry_after = parse_retry_after(&response);
-        let body = response
-            .text()
-            .await
-            .unwrap_or_default();
+        let body = response.text().await.unwrap_or_default();
         Err(map_api_error(status, &body, retry_after))
     }
 }
@@ -141,9 +135,7 @@ fn parse_error_envelope(body: &str) -> (String, Option<String>) {
     if let Ok(envelope) = serde_json::from_str::<ErrorEnvelope>(body)
         && let Some(error_body) = envelope.error
     {
-        let message = error_body
-            .message
-            .unwrap_or_else(|| "unknown error".into());
+        let message = error_body.message.unwrap_or_else(|| "unknown error".into());
         return (message, error_body.param);
     }
 
@@ -213,7 +205,8 @@ mod tests {
 
     #[test]
     fn test_map_api_error_404() {
-        let body = r#"{"error":{"type":"not_found","message":"Agent not found","param":"agent_id"}}"#;
+        let body =
+            r#"{"error":{"type":"not_found","message":"Agent not found","param":"agent_id"}}"#;
         let err = map_api_error(StatusCode::NOT_FOUND, body, None);
 
         match err {
@@ -257,10 +250,7 @@ mod tests {
         let err = map_api_error(StatusCode::TOO_MANY_REQUESTS, body, retry_after);
 
         match err {
-            EnterpriseError::RateLimit {
-                message,
-                retry_after,
-            } => {
+            EnterpriseError::RateLimit { message, retry_after } => {
                 assert_eq!(message, "Rate limit exceeded");
                 assert_eq!(retry_after, Some(Duration::from_secs(60)));
             }
@@ -283,15 +273,13 @@ mod tests {
 
     #[test]
     fn test_map_api_error_503_with_retry_after() {
-        let body = r#"{"error":{"type":"unavailable","message":"Service temporarily unavailable"}}"#;
+        let body =
+            r#"{"error":{"type":"unavailable","message":"Service temporarily unavailable"}}"#;
         let retry_after = Some(Duration::from_secs(30));
         let err = map_api_error(StatusCode::SERVICE_UNAVAILABLE, body, retry_after);
 
         match err {
-            EnterpriseError::Unavailable {
-                message,
-                retry_after,
-            } => {
+            EnterpriseError::Unavailable { message, retry_after } => {
                 assert_eq!(message, "Service temporarily unavailable");
                 assert_eq!(retry_after, Some(Duration::from_secs(30)));
             }

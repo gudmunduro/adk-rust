@@ -31,9 +31,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{
-    ManagedAgentDef, RuntimeError, SessionEvent, SessionStatus, UserEvent,
-};
+use crate::types::{ManagedAgentDef, RuntimeError, SessionEvent, SessionStatus, UserEvent};
 
 // ─── Handle Types ────────────────────────────────────────────────────────────
 

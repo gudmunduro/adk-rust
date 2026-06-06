@@ -49,11 +49,7 @@ pub struct RunState {
 impl RunState {
     /// Create a new initial run state (seq=0, no pending tools, queued status).
     pub fn initial() -> Self {
-        Self {
-            seq: 0,
-            pending_tool_ids: Vec::new(),
-            status: SessionStatus::Queued,
-        }
+        Self { seq: 0, pending_tool_ids: Vec::new(), status: SessionStatus::Queued }
     }
 }
 
@@ -92,11 +88,7 @@ impl CheckpointManager {
     /// Initializes with an empty event log and the initial run state
     /// (seq=0, no pending tools, queued status).
     pub fn new(session_id: String) -> Self {
-        Self {
-            session_id,
-            events: Vec::new(),
-            run_state: RunState::initial(),
-        }
+        Self { session_id, events: Vec::new(), run_state: RunState::initial() }
     }
 
     /// Atomically persist an event and updated run-state.
@@ -171,11 +163,7 @@ mod tests {
         let mut mgr = CheckpointManager::new("sess_001".to_string());
 
         let event = SessionEvent::StatusRunning { seq: 0 };
-        let state = RunState {
-            seq: 1,
-            pending_tool_ids: vec![],
-            status: SessionStatus::Running,
-        };
+        let state = RunState { seq: 1, pending_tool_ids: vec![], status: SessionStatus::Running };
 
         mgr.checkpoint(event, state.clone());
 
@@ -190,25 +178,15 @@ mod tests {
 
         // First checkpoint
         let event1 = SessionEvent::StatusRunning { seq: 0 };
-        let state1 = RunState {
-            seq: 1,
-            pending_tool_ids: vec![],
-            status: SessionStatus::Running,
-        };
+        let state1 = RunState { seq: 1, pending_tool_ids: vec![], status: SessionStatus::Running };
         mgr.checkpoint(event1, state1);
 
         // Second checkpoint
         let event2 = SessionEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: "Hello".to_string(),
-            }],
+            content: vec![ContentBlock::Text { text: "Hello".to_string() }],
             seq: 1,
         };
-        let state2 = RunState {
-            seq: 2,
-            pending_tool_ids: vec![],
-            status: SessionStatus::Running,
-        };
+        let state2 = RunState { seq: 2, pending_tool_ids: vec![], status: SessionStatus::Running };
         mgr.checkpoint(event2, state2.clone());
 
         // Third checkpoint — idle with pending tool
@@ -235,23 +213,11 @@ mod tests {
         let mut mgr = CheckpointManager::new("sess_003".to_string());
 
         let event1 = SessionEvent::StatusRunning { seq: 0 };
-        let state1 = RunState {
-            seq: 1,
-            pending_tool_ids: vec![],
-            status: SessionStatus::Running,
-        };
+        let state1 = RunState { seq: 1, pending_tool_ids: vec![], status: SessionStatus::Running };
         mgr.checkpoint(event1, state1);
 
-        let event2 = SessionEvent::StatusIdle {
-            seq: 1,
-            stop_reason: None,
-            usage: None,
-        };
-        let state2 = RunState {
-            seq: 2,
-            pending_tool_ids: vec![],
-            status: SessionStatus::Idle,
-        };
+        let event2 = SessionEvent::StatusIdle { seq: 1, stop_reason: None, usage: None };
+        let state2 = RunState { seq: 2, pending_tool_ids: vec![], status: SessionStatus::Idle };
         mgr.checkpoint(event2, state2.clone());
 
         let (events, run_state) = mgr.load_checkpoint();
@@ -291,11 +257,7 @@ mod tests {
 
         // Simulate the tool result arriving and session resuming
         let event2 = SessionEvent::StatusRunning { seq: 1 };
-        let state2 = RunState {
-            seq: 2,
-            pending_tool_ids: vec![],
-            status: SessionStatus::Running,
-        };
+        let state2 = RunState { seq: 2, pending_tool_ids: vec![], status: SessionStatus::Running };
         mgr.checkpoint(event2, state2.clone());
 
         // Pending tools should be cleared

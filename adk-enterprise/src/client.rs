@@ -1,9 +1,9 @@
 //! EnterpriseClient — the primary entry point for all API operations.
 
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 
-use crate::config::ClientConfig;
 use crate::Result;
+use crate::config::ClientConfig;
 
 /// The custom version header name for the ADK Managed Agent Service.
 const VERSION_HEADER: &str = "ADK-Managed-Agent";
@@ -69,7 +69,9 @@ impl EnterpriseClient {
         let api_key = std::env::var("ADK_API_KEY")
             .or_else(|_| std::env::var("ADK_ENTERPRISE_KEY"))
             .map_err(|_| crate::EnterpriseError::Authentication {
-                message: "No API key found. Set ADK_API_KEY or ADK_ENTERPRISE_KEY environment variable.".into(),
+                message:
+                    "No API key found. Set ADK_API_KEY or ADK_ENTERPRISE_KEY environment variable."
+                        .into(),
             })?;
         Self::new(api_key)
     }
@@ -89,10 +91,7 @@ impl EnterpriseClient {
     ///     "https://my-server.internal/managed/v1",
     /// )?;
     /// ```
-    pub fn self_hosted(
-        api_key: impl Into<String>,
-        base_url: impl Into<String>,
-    ) -> Result<Self> {
+    pub fn self_hosted(api_key: impl Into<String>, base_url: impl Into<String>) -> Result<Self> {
         let config = ClientConfig::self_hosted(api_key, base_url);
         Self::with_config(config)
     }
@@ -174,15 +173,10 @@ mod tests {
 
     #[test]
     fn test_self_hosted_creates_client_with_custom_url() {
-        let client = EnterpriseClient::self_hosted(
-            "adk_live_key",
-            "https://custom.example.com/managed/v1",
-        )
-        .unwrap();
-        assert_eq!(
-            client.config.base_url,
-            "https://custom.example.com/managed/v1"
-        );
+        let client =
+            EnterpriseClient::self_hosted("adk_live_key", "https://custom.example.com/managed/v1")
+                .unwrap();
+        assert_eq!(client.config.base_url, "https://custom.example.com/managed/v1");
         assert_eq!(client.config.api_key, "adk_live_key");
     }
 

@@ -134,11 +134,7 @@ mod tests {
         let model_ref: ModelRef = serde_json::from_value(json).unwrap();
 
         match model_ref {
-            ModelRef::Structured {
-                provider,
-                model,
-                speed,
-            } => {
+            ModelRef::Structured { provider, model, speed } => {
                 assert_eq!(provider, Provider::Openai);
                 match model {
                     ModelConfig::Name(name) => assert_eq!(name, "gpt-4.1"),
@@ -160,11 +156,7 @@ mod tests {
         let model_ref: ModelRef = serde_json::from_value(json).unwrap();
 
         match model_ref {
-            ModelRef::Structured {
-                provider,
-                model,
-                speed,
-            } => {
+            ModelRef::Structured { provider, model, speed } => {
                 assert_eq!(provider, Provider::Gemini);
                 match model {
                     ModelConfig::Name(name) => assert_eq!(name, "gemini-2.5-flash"),
@@ -189,18 +181,10 @@ mod tests {
         let model_ref: ModelRef = serde_json::from_value(json).unwrap();
 
         match model_ref {
-            ModelRef::Structured {
-                provider,
-                model,
-                speed,
-            } => {
+            ModelRef::Structured { provider, model, speed } => {
                 assert_eq!(provider, Provider::OpenaiCompatible);
                 match model {
-                    ModelConfig::Compatible {
-                        model,
-                        base_url,
-                        api_key,
-                    } => {
+                    ModelConfig::Compatible { model, base_url, api_key } => {
                         assert_eq!(model, "deepseek-chat");
                         assert_eq!(base_url, "https://api.deepseek.com/v1");
                         assert_eq!(api_key, "sk-test-key-123");
@@ -215,22 +199,13 @@ mod tests {
 
     #[test]
     fn test_provider_serialization() {
-        assert_eq!(
-            serde_json::to_value(Provider::Gemini).unwrap(),
-            serde_json::json!("gemini")
-        );
-        assert_eq!(
-            serde_json::to_value(Provider::Openai).unwrap(),
-            serde_json::json!("openai")
-        );
+        assert_eq!(serde_json::to_value(Provider::Gemini).unwrap(), serde_json::json!("gemini"));
+        assert_eq!(serde_json::to_value(Provider::Openai).unwrap(), serde_json::json!("openai"));
         assert_eq!(
             serde_json::to_value(Provider::Anthropic).unwrap(),
             serde_json::json!("anthropic")
         );
-        assert_eq!(
-            serde_json::to_value(Provider::Ollama).unwrap(),
-            serde_json::json!("ollama")
-        );
+        assert_eq!(serde_json::to_value(Provider::Ollama).unwrap(), serde_json::json!("ollama"));
         assert_eq!(
             serde_json::to_value(Provider::OpenaiCompatible).unwrap(),
             serde_json::json!("openai_compatible")
@@ -258,11 +233,7 @@ mod tests {
         let config: ModelConfig = serde_json::from_value(json).unwrap();
 
         match config {
-            ModelConfig::Compatible {
-                model,
-                base_url,
-                api_key,
-            } => {
+            ModelConfig::Compatible { model, base_url, api_key } => {
                 assert_eq!(model, "local-llama");
                 assert_eq!(base_url, "http://localhost:11434/v1");
                 assert_eq!(api_key, "ollama");

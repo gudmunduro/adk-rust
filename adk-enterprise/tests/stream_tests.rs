@@ -39,10 +39,7 @@ async fn test_single_event_parsing() {
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
         .and(header("accept", "text/event-stream"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_payload, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_payload, "text/event-stream"))
         .mount(&server)
         .await;
 
@@ -59,13 +56,7 @@ async fn test_single_event_parsing() {
 
     assert_eq!(events.len(), 2);
     assert!(matches!(events[0], SessionEvent::StatusRunning { seq: 1 }));
-    assert!(matches!(
-        events[1],
-        SessionEvent::StatusIdle {
-            seq: 2,
-            stop_reason: None,
-        }
-    ));
+    assert!(matches!(events[1], SessionEvent::StatusIdle { seq: 2, stop_reason: None }));
 }
 
 // ─── Test: Multi-event parsing (Requirement 6.3) ──────────────────────────────
@@ -83,10 +74,7 @@ async fn test_multi_event_parsing() {
 
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_payload, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_payload, "text/event-stream"))
         .mount(&server)
         .await;
 
@@ -105,10 +93,7 @@ async fn test_multi_event_parsing() {
     assert!(matches!(events[0], SessionEvent::StatusRunning { seq: 1 }));
     assert!(matches!(events[1], SessionEvent::Message { seq: 2, .. }));
     assert!(matches!(events[2], SessionEvent::ToolUse { seq: 3, .. }));
-    assert!(matches!(
-        events[3],
-        SessionEvent::StatusIdle { seq: 4, .. }
-    ));
+    assert!(matches!(events[3], SessionEvent::StatusIdle { seq: 4, .. }));
 }
 
 // ─── Test: Unknown event type → Unknown (Requirement 6.6) ─────────────────────
@@ -124,10 +109,7 @@ async fn test_unknown_event_type_yields_unknown_variant() {
 
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_payload, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_payload, "text/event-stream"))
         .mount(&server)
         .await;
 
@@ -144,10 +126,7 @@ async fn test_unknown_event_type_yields_unknown_variant() {
 
     assert_eq!(events.len(), 2);
     assert!(matches!(events[0], SessionEvent::Unknown));
-    assert!(matches!(
-        events[1],
-        SessionEvent::StatusIdle { seq: 100, .. }
-    ));
+    assert!(matches!(events[1], SessionEvent::StatusIdle { seq: 100, .. }));
 }
 
 // ─── Test: Invalid JSON → skip and continue (Requirement 6.6) ─────────────────
@@ -164,10 +143,7 @@ async fn test_invalid_json_skipped_and_stream_continues() {
 
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_payload, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_payload, "text/event-stream"))
         .mount(&server)
         .await;
 
@@ -210,10 +186,7 @@ async fn test_chunked_data_across_reads() {
 
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_payload, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_payload, "text/event-stream"))
         .mount(&server)
         .await;
 
@@ -248,21 +221,15 @@ async fn test_timeout_triggers_reconnect_not_error() {
     // First request: send one event, then no more data (simulates timeout scenario).
     // After the timeout (2s configured above), the client should reconnect.
     // Second request (reconnect): send a new event and close.
-    let first_response = sse_body(&[
-        "id: 1\ndata: {\"type\":\"status.running\",\"seq\":1}",
-    ]);
+    let first_response = sse_body(&["id: 1\ndata: {\"type\":\"status.running\",\"seq\":1}"]);
 
-    let reconnect_response = sse_body(&[
-        "id: 2\ndata: {\"type\":\"status.idle\",\"seq\":2,\"stop_reason\":null}",
-    ]);
+    let reconnect_response =
+        sse_body(&["id: 2\ndata: {\"type\":\"status.idle\",\"seq\":2,\"stop_reason\":null}"]);
 
     // Mount the first response (will be consumed on the initial connection)
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(first_response, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(first_response, "text/event-stream"))
         .expect(1)
         .mount(&server)
         .await;
@@ -282,8 +249,7 @@ async fn test_timeout_triggers_reconnect_not_error() {
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(reconnect_response, "text/event-stream"),
+            ResponseTemplate::new(200).set_body_raw(reconnect_response, "text/event-stream"),
         )
         .mount(&server)
         .await;
@@ -291,22 +257,13 @@ async fn test_timeout_triggers_reconnect_not_error() {
     // After the first connection's data is exhausted, the stream should reconnect
     // (since the connection drops / EOF is reached) and yield the next event.
     // The key assertion: we get an event (not an error), proving reconnect works.
-    let second_event = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        event_stream.next(),
-    )
-    .await;
+    let second_event =
+        tokio::time::timeout(std::time::Duration::from_secs(5), event_stream.next()).await;
 
     match second_event {
         Ok(Some(Ok(event))) => {
             // Reconnect succeeded and delivered the next event
-            assert!(matches!(
-                event,
-                SessionEvent::StatusIdle {
-                    seq: 2,
-                    stop_reason: None,
-                }
-            ));
+            assert!(matches!(event, SessionEvent::StatusIdle { seq: 2, stop_reason: None }));
         }
         Ok(Some(Err(_))) => {
             // Reconnect may have failed after max attempts in test conditions — acceptable
@@ -339,10 +296,7 @@ async fn test_keepalive_comments_skipped() {
 
     Mock::given(method("GET"))
         .and(path_regex(r"/sessions/.+/events/stream"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_raw(sse_payload, "text/event-stream"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse_payload, "text/event-stream"))
         .mount(&server)
         .await;
 
@@ -359,11 +313,5 @@ async fn test_keepalive_comments_skipped() {
 
     assert_eq!(events.len(), 2);
     assert!(matches!(events[0], SessionEvent::StatusRunning { seq: 1 }));
-    assert!(matches!(
-        events[1],
-        SessionEvent::StatusIdle {
-            seq: 2,
-            stop_reason: None,
-        }
-    ));
+    assert!(matches!(events[1], SessionEvent::StatusIdle { seq: 2, stop_reason: None }));
 }

@@ -112,35 +112,18 @@ impl UsageReport {
 
         // Use the metadata's total if it's provided and non-zero,
         // otherwise compute it ourselves.
-        let total = if total_tokens > 0 {
-            total_tokens
-        } else {
-            input_tokens + output_tokens
-        };
+        let total = if total_tokens > 0 { total_tokens } else { input_tokens + output_tokens };
 
-        let thinking_tokens = metadata.thinking_token_count.and_then(|t| {
-            if t > 0 {
-                Some(t as u64)
-            } else {
-                None
-            }
-        });
+        let thinking_tokens =
+            metadata.thinking_token_count.and_then(|t| if t > 0 { Some(t as u64) } else { None });
 
-        let cache_read_tokens = metadata.cache_read_input_token_count.and_then(|t| {
-            if t > 0 {
-                Some(t as u64)
-            } else {
-                None
-            }
-        });
+        let cache_read_tokens = metadata
+            .cache_read_input_token_count
+            .and_then(|t| if t > 0 { Some(t as u64) } else { None });
 
-        let cache_write_tokens = metadata.cache_creation_input_token_count.and_then(|t| {
-            if t > 0 {
-                Some(t as u64)
-            } else {
-                None
-            }
-        });
+        let cache_write_tokens = metadata
+            .cache_creation_input_token_count
+            .and_then(|t| if t > 0 { Some(t as u64) } else { None });
 
         Self {
             input_tokens,

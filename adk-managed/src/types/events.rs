@@ -240,11 +240,8 @@ mod tests {
 
     #[test]
     fn test_user_message_serialization() {
-        let event = UserEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: "Hello".to_string(),
-            }],
-        };
+        let event =
+            UserEvent::Message { content: vec![ContentBlock::Text { text: "Hello".to_string() }] };
         let value = serde_json::to_value(&event).unwrap();
         assert_eq!(value["type"], "user.message");
         assert_eq!(value["content"][0]["type"], "text");
@@ -289,9 +286,7 @@ mod tests {
     fn test_user_custom_tool_result_serialization() {
         let event = UserEvent::CustomToolResult {
             custom_tool_use_id: "ctu_789".to_string(),
-            content: vec![ContentBlock::Text {
-                text: "result data".to_string(),
-            }],
+            content: vec![ContentBlock::Text { text: "result data".to_string() }],
         };
         let value = serde_json::to_value(&event).unwrap();
         assert_eq!(value["type"], "user.custom_tool_result");
@@ -302,9 +297,7 @@ mod tests {
     fn test_user_tool_result_serialization() {
         let event = UserEvent::ToolResult {
             tool_use_id: "tu_self_001".to_string(),
-            content: vec![ContentBlock::Text {
-                text: "tool output".to_string(),
-            }],
+            content: vec![ContentBlock::Text { text: "tool output".to_string() }],
         };
         let value = serde_json::to_value(&event).unwrap();
         assert_eq!(value["type"], "user.tool_result");
@@ -313,9 +306,8 @@ mod tests {
 
     #[test]
     fn test_user_define_outcome_serialization() {
-        let event = UserEvent::DefineOutcome {
-            criteria: "Task is completed successfully".to_string(),
-        };
+        let event =
+            UserEvent::DefineOutcome { criteria: "Task is completed successfully".to_string() };
         let value = serde_json::to_value(&event).unwrap();
         assert_eq!(value["type"], "user.define_outcome");
         assert_eq!(value["criteria"], "Task is completed successfully");
@@ -331,9 +323,7 @@ mod tests {
     #[test]
     fn test_user_event_round_trip() {
         let event = UserEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: "Round trip".to_string(),
-            }],
+            content: vec![ContentBlock::Text { text: "Round trip".to_string() }],
         };
         let json = serde_json::to_string(&event).unwrap();
         let deserialized: UserEvent = serde_json::from_str(&json).unwrap();
@@ -354,9 +344,7 @@ mod tests {
     #[test]
     fn test_session_message_serialization() {
         let event = SessionEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: "Hi there".to_string(),
-            }],
+            content: vec![ContentBlock::Text { text: "Hi there".to_string() }],
             seq: 1,
         };
         let value = serde_json::to_value(&event).unwrap();
@@ -423,11 +411,7 @@ mod tests {
 
     #[test]
     fn test_session_status_idle_serialization_no_stop_reason() {
-        let event = SessionEvent::StatusIdle {
-            seq: 6,
-            stop_reason: None,
-            usage: None,
-        };
+        let event = SessionEvent::StatusIdle { seq: 6, stop_reason: None, usage: None };
         let value = serde_json::to_value(&event).unwrap();
         assert_eq!(value["type"], "status.idle");
         assert_eq!(value["seq"], 6);
@@ -460,10 +444,7 @@ mod tests {
         assert_eq!(value["type"], "status.idle");
         assert_eq!(value["seq"], 8);
         assert_eq!(value["stop_reason"]["reason"], "requires_action");
-        assert_eq!(
-            value["stop_reason"]["event_ids"],
-            json!(["evt_001", "evt_002"])
-        );
+        assert_eq!(value["stop_reason"]["event_ids"], json!(["evt_001", "evt_002"]));
     }
 
     #[test]
@@ -499,9 +480,7 @@ mod tests {
         let events = vec![
             SessionEvent::StatusRunning { seq: 0 },
             SessionEvent::Message {
-                content: vec![ContentBlock::Text {
-                    text: "Hello".to_string(),
-                }],
+                content: vec![ContentBlock::Text { text: "Hello".to_string() }],
                 seq: 1,
             },
             SessionEvent::ToolUse {
@@ -564,12 +543,7 @@ mod tests {
         let json = serde_json::to_string(&event).unwrap();
         let deserialized: SessionEvent = serde_json::from_str(&json).unwrap();
         match deserialized {
-            SessionEvent::CustomToolUse {
-                custom_tool_use_id,
-                name,
-                input,
-                seq,
-            } => {
+            SessionEvent::CustomToolUse { custom_tool_use_id, name, input, seq } => {
                 assert_eq!(custom_tool_use_id, "ctu_rt");
                 assert_eq!(name, "execute");
                 assert_eq!(input["command"], "ls -la");
@@ -594,10 +568,7 @@ mod tests {
             event_ids: vec!["evt_a".to_string(), "evt_b".to_string()],
         };
         let value = serde_json::to_value(&reason).unwrap();
-        assert_eq!(
-            value,
-            json!({"reason": "requires_action", "event_ids": ["evt_a", "evt_b"]})
-        );
+        assert_eq!(value, json!({"reason": "requires_action", "event_ids": ["evt_a", "evt_b"]}));
     }
 
     #[test]
@@ -611,9 +582,7 @@ mod tests {
     fn test_stop_reason_round_trip() {
         let reasons = vec![
             StopReason::EndTurn,
-            StopReason::RequiresAction {
-                event_ids: vec!["id1".to_string()],
-            },
+            StopReason::RequiresAction { event_ids: vec!["id1".to_string()] },
             StopReason::MaxTokens,
         ];
         for reason in reasons {

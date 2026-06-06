@@ -21,15 +21,14 @@ use crate::types::{ModelConfig, ModelRef, Provider};
 #[derive(Debug, thiserror::Error)]
 pub enum ResolverError {
     /// The model name prefix could not be mapped to a known provider.
-    #[error("cannot infer provider from model name \"{name}\". Expected prefix: gemini, gpt, claude, llama, mistral, or deepseek")]
+    #[error(
+        "cannot infer provider from model name \"{name}\". Expected prefix: gemini, gpt, claude, llama, mistral, or deepseek"
+    )]
     UnknownProvider { name: String },
 
     /// The provider is recognized but model construction failed.
     #[error("failed to construct model for provider {provider:?}: {reason}")]
-    ConstructionFailed {
-        provider: Provider,
-        reason: String,
-    },
+    ConstructionFailed { provider: Provider, reason: String },
 }
 
 /// Result alias for resolver operations.
@@ -85,9 +84,7 @@ pub fn infer_provider(name: &str) -> ResolverResult<Provider> {
     {
         Ok(Provider::Ollama)
     } else {
-        Err(ResolverError::UnknownProvider {
-            name: name.to_string(),
-        })
+        Err(ResolverError::UnknownProvider { name: name.to_string() })
     }
 }
 
@@ -140,14 +137,10 @@ impl ModelResolver for DefaultModelResolver {
                     ),
                 })
             }
-            ModelRef::Structured {
-                provider, model, ..
-            } => {
+            ModelRef::Structured { provider, model, .. } => {
                 let model_name = match model {
                     ModelConfig::Name(name) => name.clone(),
-                    ModelConfig::Compatible {
-                        model, base_url, ..
-                    } => {
+                    ModelConfig::Compatible { model, base_url, .. } => {
                         // For OpenAI-compatible, we have all we need to construct
                         // a client (model + base_url + api_key), but actual
                         // construction is deferred to a credentialed resolver.

@@ -17,17 +17,11 @@ pub enum UserEvent {
 
     /// Allow a pending tool use.
     #[serde(rename = "user.tool_confirmation")]
-    ToolConfirmation {
-        tool_use_id: String,
-        action: ToolConfirmationAction,
-    },
+    ToolConfirmation { tool_use_id: String, action: ToolConfirmationAction },
 
     /// Provide a custom tool result.
     #[serde(rename = "user.custom_tool_result")]
-    CustomToolResult {
-        tool_use_id: String,
-        content: String,
-    },
+    CustomToolResult { tool_use_id: String, content: String },
 
     /// Define an outcome for the session.
     #[serde(rename = "user.define_outcome")]
@@ -65,25 +59,18 @@ impl UserEvent {
     pub fn deny_tool(tool_use_id: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::ToolConfirmation {
             tool_use_id: tool_use_id.into(),
-            action: ToolConfirmationAction::Deny {
-                reason: Some(reason.into()),
-            },
+            action: ToolConfirmationAction::Deny { reason: Some(reason.into()) },
         }
     }
 
     /// Create a `user.custom_tool_result` event with the tool use ID and content.
     pub fn custom_tool_result(tool_use_id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self::CustomToolResult {
-            tool_use_id: tool_use_id.into(),
-            content: content.into(),
-        }
+        Self::CustomToolResult { tool_use_id: tool_use_id.into(), content: content.into() }
     }
 
     /// Create a `user.define_outcome` event with the given success criteria.
     pub fn define_outcome(criteria: impl Into<String>) -> Self {
-        Self::DefineOutcome {
-            criteria: criteria.into(),
-        }
+        Self::DefineOutcome { criteria: criteria.into() }
     }
 }
 
@@ -102,21 +89,11 @@ pub enum SessionEvent {
 
     /// Agent is using a built-in tool.
     #[serde(rename = "agent.tool_use")]
-    ToolUse {
-        seq: u64,
-        tool_use_id: String,
-        name: String,
-        input: serde_json::Value,
-    },
+    ToolUse { seq: u64, tool_use_id: String, name: String, input: serde_json::Value },
 
     /// Agent is using a custom tool (requires client to provide result).
     #[serde(rename = "agent.custom_tool_use")]
-    CustomToolUse {
-        seq: u64,
-        custom_tool_use_id: String,
-        name: String,
-        input: serde_json::Value,
-    },
+    CustomToolUse { seq: u64, custom_tool_use_id: String, name: String, input: serde_json::Value },
 
     /// Agent is using an MCP tool.
     #[serde(rename = "agent.mcp_tool_use")]
@@ -130,10 +107,7 @@ pub enum SessionEvent {
 
     /// Session status changed to idle (turn ended).
     #[serde(rename = "status.idle")]
-    StatusIdle {
-        seq: u64,
-        stop_reason: Option<StopReason>,
-    },
+    StatusIdle { seq: u64, stop_reason: Option<StopReason> },
 
     /// Session status changed to running.
     #[serde(rename = "status.running")]
@@ -141,11 +115,7 @@ pub enum SessionEvent {
 
     /// An error occurred during the session.
     #[serde(rename = "agent.error")]
-    Error {
-        seq: u64,
-        message: String,
-        code: Option<String>,
-    },
+    Error { seq: u64, message: String, code: Option<String> },
 
     /// Unknown event type (forward-compatible catch-all).
     #[serde(other)]
@@ -186,9 +156,7 @@ impl ContentBlock {
 
     /// Create a file content block.
     pub fn file(id: impl Into<String>) -> Self {
-        Self::File {
-            file_id: id.into(),
-        }
+        Self::File { file_id: id.into() }
     }
 }
 

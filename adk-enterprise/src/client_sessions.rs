@@ -10,13 +10,13 @@
 //! - `archive_session` — POST /sessions/{id}/archive
 //! - `delete_session` — DELETE /sessions/{id}
 
+use crate::Result;
 use crate::client::EnterpriseClient;
 use crate::idempotency::IDEMPOTENCY_KEY_HEADER;
 use crate::response::{handle_empty_response, handle_response};
-use crate::retry::{execute_create_with_retry, execute_with_retry, RetryPolicy};
+use crate::retry::{RetryPolicy, execute_create_with_retry, execute_with_retry};
 use crate::types::pagination::{ListParams, ListResponse};
 use crate::types::session::{CreateSessionParams, Session};
-use crate::Result;
 
 impl EnterpriseClient {
     /// Create a new session with minimal parameters (convenience method).
@@ -38,11 +38,7 @@ impl EnterpriseClient {
     /// // With an environment
     /// let session = client.create_session("agt_abc123", Some("env_xyz")).await?;
     /// ```
-    pub async fn create_session(
-        &self,
-        agent_id: &str,
-        env_id: Option<&str>,
-    ) -> Result<Session> {
+    pub async fn create_session(&self, agent_id: &str, env_id: Option<&str>) -> Result<Session> {
         let params = CreateSessionParams {
             agent_id: agent_id.to_string(),
             environment_id: env_id.map(|s| s.to_string()),
@@ -126,13 +122,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .get(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().get(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -171,10 +161,7 @@ impl EnterpriseClient {
     ///     })).await?;
     /// }
     /// ```
-    pub async fn list_sessions(
-        &self,
-        params: Option<ListParams>,
-    ) -> Result<ListResponse<Session>> {
+    pub async fn list_sessions(&self, params: Option<ListParams>) -> Result<ListResponse<Session>> {
         let url = self.build_url("/sessions");
         let headers = self.default_headers();
         let policy = RetryPolicy::from_config(self.config.max_retries, self.config.retry_backoff);
@@ -186,12 +173,7 @@ impl EnterpriseClient {
             let headers = headers.clone();
             let query_params = query_params.clone();
             async move {
-                reqwest::Client::new()
-                    .get(&url)
-                    .headers(headers)
-                    .query(&query_params)
-                    .send()
-                    .await
+                reqwest::Client::new().get(&url).headers(headers).query(&query_params).send().await
             }
         })
         .await?;
@@ -227,13 +209,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .post(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().post(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -267,13 +243,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .post(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().post(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -307,13 +277,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .post(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().post(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -346,13 +310,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .delete(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().delete(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -376,9 +334,9 @@ fn build_session_list_query(params: Option<&ListParams>) -> Vec<(String, String)
 
 #[cfg(test)]
 mod tests {
+    use crate::EnterpriseClient;
     use crate::types::pagination::ListResponse;
     use crate::types::session::{CreateSessionParams, Session, SessionStatus};
-    use crate::EnterpriseClient;
 
     #[test]
     fn test_create_session_params_serialization() {
@@ -400,10 +358,7 @@ mod tests {
 
     #[test]
     fn test_create_session_params_minimal_serialization() {
-        let params = CreateSessionParams {
-            agent_id: "agt_123".into(),
-            ..Default::default()
-        };
+        let params = CreateSessionParams { agent_id: "agt_123".into(), ..Default::default() };
         let json = serde_json::to_value(&params).unwrap();
         assert_eq!(json["agentId"], "agt_123");
         // Optional/empty fields should not appear
@@ -548,10 +503,7 @@ mod tests {
     #[test]
     fn test_build_session_list_query_limit_only() {
         use crate::types::pagination::ListParams;
-        let params = ListParams {
-            limit: Some(20),
-            cursor: None,
-        };
+        let params = ListParams { limit: Some(20), cursor: None };
         let query = super::build_session_list_query(Some(&params));
         assert_eq!(query, vec![("limit".to_string(), "20".to_string())]);
     }
@@ -559,10 +511,7 @@ mod tests {
     #[test]
     fn test_build_session_list_query_cursor_only() {
         use crate::types::pagination::ListParams;
-        let params = ListParams {
-            limit: None,
-            cursor: Some("abc123".into()),
-        };
+        let params = ListParams { limit: None, cursor: Some("abc123".into()) };
         let query = super::build_session_list_query(Some(&params));
         assert_eq!(query, vec![("cursor".to_string(), "abc123".to_string())]);
     }
@@ -570,10 +519,7 @@ mod tests {
     #[test]
     fn test_build_session_list_query_both() {
         use crate::types::pagination::ListParams;
-        let params = ListParams {
-            limit: Some(5),
-            cursor: Some("next_page".into()),
-        };
+        let params = ListParams { limit: Some(5), cursor: Some("next_page".into()) };
         let query = super::build_session_list_query(Some(&params));
         assert_eq!(
             query,

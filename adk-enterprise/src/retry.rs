@@ -67,11 +67,7 @@ impl Default for RetryPolicy {
 impl RetryPolicy {
     /// Create a `RetryPolicy` from client configuration values.
     pub fn from_config(max_retries: u32, initial_backoff: Duration) -> Self {
-        Self {
-            max_attempts: max_retries,
-            initial_backoff,
-            ..Default::default()
-        }
+        Self { max_attempts: max_retries, initial_backoff, ..Default::default() }
     }
 
     /// Calculate the backoff duration for a given attempt number (0-indexed).
@@ -79,8 +75,8 @@ impl RetryPolicy {
     /// Uses exponential backoff: `initial * multiplier^attempt`, capped at `max_backoff`.
     /// Adds random jitter (0–25% of computed backoff) to avoid thundering herd.
     fn backoff_duration(&self, attempt: u32) -> Duration {
-        let base = self.initial_backoff.as_secs_f64()
-            * self.backoff_multiplier.powi(attempt as i32);
+        let base =
+            self.initial_backoff.as_secs_f64() * self.backoff_multiplier.powi(attempt as i32);
         let capped = base.min(self.max_backoff.as_secs_f64());
 
         // Add jitter: random value between 0 and 25% of the capped backoff
@@ -93,10 +89,7 @@ impl RetryPolicy {
 
 /// Returns true if the HTTP status code is retryable (429, 500, 502, 503, 504).
 fn is_retryable_status(status: reqwest::StatusCode) -> bool {
-    matches!(
-        status.as_u16(),
-        429 | 500 | 502 | 503 | 504
-    )
+    matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504)
 }
 
 /// Parse the `Retry-After` header value into a `Duration`.
@@ -204,10 +197,7 @@ where
 
         // Retryable error — check if we have attempts remaining
         if attempt >= policy.max_attempts {
-            debug!(
-                status = status.as_u16(),
-                "retries exhausted, returning last error response"
-            );
+            debug!(status = status.as_u16(), "retries exhausted, returning last error response");
             return Ok(response);
         }
 

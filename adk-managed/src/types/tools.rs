@@ -283,24 +283,14 @@ mod tests {
         let serialized = serde_json::to_value(&tool).unwrap();
         assert_eq!(serialized["type"], "custom");
         assert_eq!(serialized["name"], "get_weather");
-        assert_eq!(
-            serialized["description"],
-            "Get the current weather for a city"
-        );
+        assert_eq!(serialized["description"], "Get the current weather for a city");
         assert_eq!(serialized["input_schema"], schema);
 
         let deserialized: ToolConfig = serde_json::from_value(serialized).unwrap();
         match deserialized {
-            ToolConfig::Custom {
-                name,
-                description,
-                input_schema,
-            } => {
+            ToolConfig::Custom { name, description, input_schema } => {
                 assert_eq!(name, "get_weather");
-                assert_eq!(
-                    description,
-                    Some("Get the current weather for a city".to_string())
-                );
+                assert_eq!(description, Some("Get the current weather for a city".to_string()));
                 assert_eq!(input_schema, schema);
             }
             _ => panic!("Expected Custom variant"),
@@ -326,9 +316,7 @@ mod tests {
 
         let deserialized: ToolConfig = serde_json::from_value(serialized).unwrap();
         match deserialized {
-            ToolConfig::Custom {
-                name, description, ..
-            } => {
+            ToolConfig::Custom { name, description, .. } => {
                 assert_eq!(name, "my_tool");
                 assert_eq!(description, None);
             }
@@ -371,10 +359,7 @@ mod tests {
             name: "filesystem".to_string(),
             transport: "stdio".to_string(),
             command: Some("npx".to_string()),
-            args: vec![
-                "-y".to_string(),
-                "@modelcontextprotocol/server-filesystem".to_string(),
-            ],
+            args: vec!["-y".to_string(), "@modelcontextprotocol/server-filesystem".to_string()],
             url: None,
             env: HashMap::from([("HOME".to_string(), "/tmp".to_string())]),
             auto_approve: vec!["read_file".to_string(), "list_dir".to_string()],
@@ -384,10 +369,7 @@ mod tests {
         assert_eq!(serialized["name"], "filesystem");
         assert_eq!(serialized["transport"], "stdio");
         assert_eq!(serialized["command"], "npx");
-        assert_eq!(
-            serialized["args"],
-            json!(["-y", "@modelcontextprotocol/server-filesystem"])
-        );
+        assert_eq!(serialized["args"], json!(["-y", "@modelcontextprotocol/server-filesystem"]));
         assert!(serialized.get("url").is_none());
         assert_eq!(serialized["env"]["HOME"], "/tmp");
         assert_eq!(serialized["auto_approve"], json!(["read_file", "list_dir"]));
@@ -429,10 +411,7 @@ mod tests {
         assert_eq!(deserialized.transport, "sse");
         assert_eq!(deserialized.command, None);
         assert!(deserialized.args.is_empty());
-        assert_eq!(
-            deserialized.url,
-            Some("https://mcp.example.com/sse".to_string())
-        );
+        assert_eq!(deserialized.url, Some("https://mcp.example.com/sse".to_string()));
         assert!(deserialized.env.is_empty());
         assert!(deserialized.auto_approve.is_empty());
     }
@@ -460,9 +439,7 @@ mod tests {
 
     #[test]
     fn test_skill_ref_serialization() {
-        let skill = SkillRef {
-            skill_id: "code-review-v2".to_string(),
-        };
+        let skill = SkillRef { skill_id: "code-review-v2".to_string() };
 
         let serialized = serde_json::to_value(&skill).unwrap();
         assert_eq!(serialized, json!({"skill_id": "code-review-v2"}));
@@ -474,12 +451,8 @@ mod tests {
     #[test]
     fn test_skill_ref_vec_round_trip() {
         let skills = vec![
-            SkillRef {
-                skill_id: "code-review-v2".to_string(),
-            },
-            SkillRef {
-                skill_id: "testing-assistant".to_string(),
-            },
+            SkillRef { skill_id: "code-review-v2".to_string() },
+            SkillRef { skill_id: "testing-assistant".to_string() },
         ];
 
         let serialized = serde_json::to_value(&skills).unwrap();
@@ -540,22 +513,14 @@ mod tests {
 
         let deserialized: PermissionPolicy = serde_json::from_value(serialized).unwrap();
         assert_eq!(deserialized.default, PermissionMode::Prompt);
-        assert_eq!(
-            deserialized.tools.get("read_file"),
-            Some(&PermissionMode::AutoApprove)
-        );
-        assert_eq!(
-            deserialized.tools.get("delete_file"),
-            Some(&PermissionMode::Deny)
-        );
+        assert_eq!(deserialized.tools.get("read_file"), Some(&PermissionMode::AutoApprove));
+        assert_eq!(deserialized.tools.get("delete_file"), Some(&PermissionMode::Deny));
     }
 
     #[test]
     fn test_permission_policy_without_overrides_serialization() {
-        let policy = PermissionPolicy {
-            default: PermissionMode::AutoApprove,
-            tools: HashMap::new(),
-        };
+        let policy =
+            PermissionPolicy { default: PermissionMode::AutoApprove, tools: HashMap::new() };
 
         let serialized = serde_json::to_value(&policy).unwrap();
         assert_eq!(serialized["default"], "auto_approve");
@@ -580,14 +545,8 @@ mod tests {
         let policy: PermissionPolicy = serde_json::from_str(json_str).unwrap();
         assert_eq!(policy.default, PermissionMode::Deny);
         assert_eq!(policy.tools.len(), 2);
-        assert_eq!(
-            policy.tools.get("read_file"),
-            Some(&PermissionMode::AutoApprove)
-        );
-        assert_eq!(
-            policy.tools.get("write_file"),
-            Some(&PermissionMode::Prompt)
-        );
+        assert_eq!(policy.tools.get("read_file"), Some(&PermissionMode::AutoApprove));
+        assert_eq!(policy.tools.get("write_file"), Some(&PermissionMode::Prompt));
     }
 
     #[test]
@@ -658,14 +617,8 @@ mod tests {
 
         // Check structural equivalence (HashMap ordering may differ)
         assert_eq!(reserialized["default"], policy_json["default"]);
-        assert_eq!(
-            reserialized["tools"]["read_file"],
-            policy_json["tools"]["read_file"]
-        );
-        assert_eq!(
-            reserialized["tools"]["delete_file"],
-            policy_json["tools"]["delete_file"]
-        );
+        assert_eq!(reserialized["tools"]["read_file"], policy_json["tools"]["read_file"]);
+        assert_eq!(reserialized["tools"]["delete_file"], policy_json["tools"]["delete_file"]);
     }
 
     #[test]

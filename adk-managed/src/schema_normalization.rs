@@ -235,10 +235,7 @@ mod tests {
 
         // Without $schema, the schema should largely pass through
         assert_eq!(normalized["type"], schema["type"]);
-        assert_eq!(
-            normalized["properties"]["name"]["type"],
-            schema["properties"]["name"]["type"]
-        );
+        assert_eq!(normalized["properties"]["name"]["type"], schema["properties"]["name"]["type"]);
         assert_eq!(normalized["required"], schema["required"]);
     }
 
@@ -274,8 +271,7 @@ mod tests {
         assert_eq!(normalized["type"], "object");
         // Nested structures preserved
         assert_eq!(
-            normalized["properties"]["config"]["properties"]["database"]["properties"]["host"]
-                ["type"],
+            normalized["properties"]["config"]["properties"]["database"]["properties"]["host"]["type"],
             "string"
         );
     }

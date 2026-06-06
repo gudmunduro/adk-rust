@@ -10,7 +10,7 @@
 use crate::client::EnterpriseClient;
 use crate::idempotency::IDEMPOTENCY_KEY_HEADER;
 use crate::response::{handle_empty_response, handle_response};
-use crate::retry::{execute_create_with_retry, execute_with_retry, RetryPolicy};
+use crate::retry::{RetryPolicy, execute_create_with_retry, execute_with_retry};
 use crate::types::{CreateEnvironmentParams, Environment};
 use crate::{EnterpriseError, Result};
 
@@ -187,10 +187,7 @@ impl EnterpriseClient {
 
         let status = response.status();
         if status.is_success() {
-            let bytes = response
-                .bytes()
-                .await
-                .map_err(EnterpriseError::Connection)?;
+            let bytes = response.bytes().await.map_err(EnterpriseError::Connection)?;
             Ok(bytes.to_vec())
         } else {
             let retry_after = response

@@ -9,16 +9,16 @@
 
 use reqwest::header::HeaderValue;
 
+use crate::Result;
 use crate::client::EnterpriseClient;
 use crate::idempotency::IDEMPOTENCY_KEY_HEADER;
 use crate::response::{handle_empty_response, handle_response};
-use crate::retry::{execute_create_with_retry, execute_with_retry, RetryPolicy};
+use crate::retry::{RetryPolicy, execute_create_with_retry, execute_with_retry};
 use crate::types::pagination::ListResponse;
 use crate::types::vault::{
     CreateCredentialParams, CreateVaultParams, Credential, CredentialValidation,
     UpdateCredentialParams, Vault,
 };
-use crate::Result;
 
 /// The beta feature header name.
 const BETA_HEADER: &str = "ADK-Beta";
@@ -91,13 +91,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .get(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().get(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -123,13 +117,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .get(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().get(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -154,13 +142,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .post(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().post(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -185,13 +167,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .delete(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().delete(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -266,13 +242,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .get(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().get(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -310,20 +280,16 @@ impl EnterpriseClient {
 
         let body = serde_json::to_vec(&params)?;
 
-        let response = execute_with_retry(&policy, || {
-            let url = url.clone();
-            let headers = headers.clone();
-            let body = body.clone();
-            async move {
-                reqwest::Client::new()
-                    .patch(&url)
-                    .headers(headers)
-                    .body(body)
-                    .send()
-                    .await
-            }
-        })
-        .await?;
+        let response =
+            execute_with_retry(&policy, || {
+                let url = url.clone();
+                let headers = headers.clone();
+                let body = body.clone();
+                async move {
+                    reqwest::Client::new().patch(&url).headers(headers).body(body).send().await
+                }
+            })
+            .await?;
 
         handle_response(response).await
     }
@@ -348,9 +314,7 @@ impl EnterpriseClient {
         vault_id: &str,
         cred_id: &str,
     ) -> Result<CredentialValidation> {
-        let url = self.build_url(&format!(
-            "/vaults/{vault_id}/credentials/{cred_id}/validate"
-        ));
+        let url = self.build_url(&format!("/vaults/{vault_id}/credentials/{cred_id}/validate"));
         let mut headers = self.default_headers();
         headers.insert(BETA_HEADER, HeaderValue::from_static(BETA_HEADER_VALUE));
         let policy = RetryPolicy::from_config(self.config.max_retries, self.config.retry_backoff);
@@ -358,13 +322,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .post(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().post(&url).headers(headers).send().await }
         })
         .await?;
 
@@ -389,13 +347,7 @@ impl EnterpriseClient {
         let response = execute_with_retry(&policy, || {
             let url = url.clone();
             let headers = headers.clone();
-            async move {
-                reqwest::Client::new()
-                    .delete(&url)
-                    .headers(headers)
-                    .send()
-                    .await
-            }
+            async move { reqwest::Client::new().delete(&url).headers(headers).send().await }
         })
         .await?;
 

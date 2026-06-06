@@ -34,7 +34,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use tokio::sync::{broadcast, mpsc, Mutex, Notify, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock, broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
@@ -45,7 +45,7 @@ use adk_core::Memory;
 use adk_sandbox::SandboxBackend;
 use adk_session::service::{CreateRequest, SessionService};
 
-use crate::agent_builder::{build_agent, BuildError};
+use crate::agent_builder::{BuildError, build_agent};
 use crate::checkpoint::CheckpointManager;
 use crate::parking::ToolParkingLot;
 use crate::replay::create_event_stream;
@@ -255,14 +255,12 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
     /// stores it in the internal registry, and returns an opaque handle.
     async fn create(&self, def: ManagedAgentDef) -> Result<AgentHandle, RuntimeError> {
         // 1. Resolve model
-        let model = self
-            .model_resolver
-            .resolve(&def.model)
-            .await
-            .map_err(|e| RuntimeError::ProviderError {
+        let model = self.model_resolver.resolve(&def.model).await.map_err(|e| {
+            RuntimeError::ProviderError {
                 provider: format!("{:?}", def.model),
                 message: e.to_string(),
-            })?;
+            }
+        })?;
 
         // 2. Build agent from definition
         let agent = build_agent(&def, model).map_err(|e| match e {
@@ -276,10 +274,7 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
         info!(agent_handle = %handle_id, agent_name = %def.name, "agent created");
 
         // 4. Store in registry
-        let registered = RegisteredAgent {
-            agent,
-            def,
-        };
+        let registered = RegisteredAgent { agent, def };
         self.agents.write().await.insert(handle_id.clone(), registered);
 
         Ok(AgentHandle(handle_id))
@@ -297,9 +292,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
     ) -> Result<SessionHandle, RuntimeError> {
         // 1. Look up agent from registry
         let agents = self.agents.read().await;
-        let registered = agents.get(&agent.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: agent.0.clone(),
-        })?;
+        let registered = agents
+            .get(&agent.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: agent.0.clone() })?;
         let agent_arc = Arc::clone(&registered.agent);
         drop(agents);
 
@@ -366,10 +361,7 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
             checkpoint,
         };
 
-        self.sessions
-            .write()
-            .await
-            .insert(session_id.clone(), active_session);
+        self.sessions.write().await.insert(session_id.clone(), active_session);
 
         info!(session_id = %session_id, "session started");
 
@@ -385,9 +377,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
         event: UserEvent,
     ) -> Result<(), RuntimeError> {
         let sessions = self.sessions.read().await;
-        let active = sessions.get(&session.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: session.0.clone(),
-        })?;
+        let active = sessions
+            .get(&session.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: session.0.clone() })?;
 
         active
             .event_tx
@@ -408,9 +400,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
         from_seq: Option<u64>,
     ) -> Result<BoxStream<'static, SessionEvent>, RuntimeError> {
         let sessions = self.sessions.read().await;
-        let active = sessions.get(&session.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: session.0.clone(),
-        })?;
+        let active = sessions
+            .get(&session.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: session.0.clone() })?;
 
         // Subscribe to broadcast channel
         let broadcast_rx = active.broadcast_tx.subscribe();
@@ -425,9 +417,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
     /// Interrupt the session at the next safe boundary.
     async fn interrupt(&self, session: &SessionHandle) -> Result<(), RuntimeError> {
         let sessions = self.sessions.read().await;
-        let active = sessions.get(&session.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: session.0.clone(),
-        })?;
+        let active = sessions
+            .get(&session.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: session.0.clone() })?;
 
         debug!(session_id = %session.0, "interrupting session");
         active.cancel_token.cancel();
@@ -438,9 +430,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
     /// Pause the session, checkpointing current state.
     async fn pause(&self, session: &SessionHandle) -> Result<(), RuntimeError> {
         let sessions = self.sessions.read().await;
-        let active = sessions.get(&session.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: session.0.clone(),
-        })?;
+        let active = sessions
+            .get(&session.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: session.0.clone() })?;
 
         debug!(session_id = %session.0, "pausing session");
         *active.pause_flag.lock().await = true;
@@ -452,9 +444,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
     /// Resume a paused session.
     async fn resume(&self, session: &SessionHandle) -> Result<(), RuntimeError> {
         let sessions = self.sessions.read().await;
-        let active = sessions.get(&session.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: session.0.clone(),
-        })?;
+        let active = sessions
+            .get(&session.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: session.0.clone() })?;
 
         debug!(session_id = %session.0, "resuming session");
         *active.pause_flag.lock().await = false;
@@ -467,9 +459,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
     /// Query the current status of a session.
     async fn status(&self, session: &SessionHandle) -> Result<SessionStatus, RuntimeError> {
         let sessions = self.sessions.read().await;
-        let active = sessions.get(&session.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: session.0.clone(),
-        })?;
+        let active = sessions
+            .get(&session.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: session.0.clone() })?;
 
         Ok(*active.status.read().await)
     }
@@ -477,9 +469,9 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
     /// Archive a session (terminal state).
     async fn archive(&self, session: &SessionHandle) -> Result<(), RuntimeError> {
         let sessions = self.sessions.read().await;
-        let active = sessions.get(&session.0).ok_or_else(|| RuntimeError::NotFound {
-            session_id: session.0.clone(),
-        })?;
+        let active = sessions
+            .get(&session.0)
+            .ok_or_else(|| RuntimeError::NotFound { session_id: session.0.clone() })?;
 
         debug!(session_id = %session.0, "archiving session");
         *active.status.write().await = SessionStatus::Archived;
@@ -502,9 +494,7 @@ impl ManagedAgentRuntime for DefaultManagedAgentRuntime {
         // Remove from sessions map
         let removed = self.sessions.write().await.remove(&session.0);
         if removed.is_none() {
-            return Err(RuntimeError::NotFound {
-                session_id: session.0.clone(),
-            });
+            return Err(RuntimeError::NotFound { session_id: session.0.clone() });
         }
 
         debug!(session_id = %session.0, "session deleted");
@@ -535,9 +525,7 @@ mod tests {
 
     impl MockLlm {
         fn new(name: &str) -> Self {
-            Self {
-                name: name.to_string(),
-            }
+            Self { name: name.to_string() }
         }
     }
 
@@ -671,10 +659,8 @@ mod tests {
         let resolver: Arc<dyn ModelResolver> = Arc::new(DefaultModelResolver::new());
         let session_service = mock_session_service();
 
-        let runtime = DefaultManagedAgentRuntime::new(
-            Arc::clone(&resolver),
-            Arc::clone(&session_service),
-        );
+        let runtime =
+            DefaultManagedAgentRuntime::new(Arc::clone(&resolver), Arc::clone(&session_service));
 
         // Verify we get references back (type-level verification)
         let _r: &Arc<dyn ModelResolver> = runtime.model_resolver();
@@ -823,11 +809,8 @@ mod tests {
         let agent = runtime.create(def).await.unwrap();
         let session = runtime.start_session(&agent, None).await.unwrap();
 
-        let event = UserEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: "Hello".to_string(),
-            }],
-        };
+        let event =
+            UserEvent::Message { content: vec![ContentBlock::Text { text: "Hello".to_string() }] };
 
         let result = runtime.send_event(&session, event).await;
         assert!(result.is_ok());
@@ -838,11 +821,8 @@ mod tests {
         let runtime = create_test_runtime();
 
         let fake_session = SessionHandle("nonexistent".to_string());
-        let event = UserEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: "Hello".to_string(),
-            }],
-        };
+        let event =
+            UserEvent::Message { content: vec![ContentBlock::Text { text: "Hello".to_string() }] };
 
         let result = runtime.send_event(&fake_session, event).await;
         assert!(result.is_err());
@@ -873,19 +853,15 @@ mod tests {
         let mut stream = runtime.stream_events(&session, None).await.unwrap();
 
         // Send a message (the session loop will process it and emit events)
-        let event = UserEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: "Test".to_string(),
-            }],
-        };
+        let event =
+            UserEvent::Message { content: vec![ContentBlock::Text { text: "Test".to_string() }] };
         runtime.send_event(&session, event).await.unwrap();
 
         // We should receive at least a StatusRunning event
-        let first_event =
-            tokio::time::timeout(Duration::from_secs(2), stream.next())
-                .await
-                .expect("timed out waiting for event")
-                .expect("stream ended unexpectedly");
+        let first_event = tokio::time::timeout(Duration::from_secs(2), stream.next())
+            .await
+            .expect("timed out waiting for event")
+            .expect("stream ended unexpectedly");
 
         match first_event {
             SessionEvent::StatusRunning { .. } => {}
@@ -971,16 +947,10 @@ mod tests {
         let session = runtime.start_session(&agent, None).await.unwrap();
 
         runtime.pause(&session).await.unwrap();
-        assert_eq!(
-            runtime.status(&session).await.unwrap(),
-            SessionStatus::Paused
-        );
+        assert_eq!(runtime.status(&session).await.unwrap(), SessionStatus::Paused);
 
         runtime.resume(&session).await.unwrap();
-        assert_eq!(
-            runtime.status(&session).await.unwrap(),
-            SessionStatus::Running
-        );
+        assert_eq!(runtime.status(&session).await.unwrap(), SessionStatus::Running);
     }
 
     #[tokio::test]

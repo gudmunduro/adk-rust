@@ -43,8 +43,7 @@
 //! ```
 
 use adk_core::{
-    Llm, LlmRequest, LlmResponse, LlmResponseStream, Result as AdkResult,
-    types::Content,
+    Llm, LlmRequest, LlmResponse, LlmResponseStream, Result as AdkResult, types::Content,
 };
 use async_stream::stream;
 use async_trait::async_trait;
@@ -128,11 +127,7 @@ impl ScriptedLlm {
     /// Turns are consumed in FIFO order — each call to `generate_content`
     /// advances to the next turn.
     pub fn new(name: impl Into<String>, turns: Vec<ScriptedTurn>) -> Self {
-        Self {
-            name: name.into(),
-            turns,
-            current_turn: AtomicUsize::new(0),
-        }
+        Self { name: name.into(), turns, current_turn: AtomicUsize::new(0) }
     }
 
     /// Returns the number of turns that have been consumed so far.
@@ -147,23 +142,20 @@ impl ScriptedLlm {
 
     /// Build an `LlmResponse` from a `ScriptedTurn`.
     fn build_response(turn: &ScriptedTurn, turn_index: usize) -> LlmResponse {
-        use adk_core::types::Part;
         use adk_core::FinishReason;
+        use adk_core::types::Part;
 
         let mut parts = Vec::new();
 
         // Add text part if present.
         if let Some(text) = &turn.text {
-            parts.push(Part::Text {
-                text: text.clone(),
-            });
+            parts.push(Part::Text { text: text.clone() });
         }
 
         // Add function call parts.
         for (i, tool_call) in turn.tool_calls.iter().enumerate() {
-            let id = tool_call.id.clone().unwrap_or_else(|| {
-                format!("scripted_tc_{turn_index}_{i}")
-            });
+            let id =
+                tool_call.id.clone().unwrap_or_else(|| format!("scripted_tc_{turn_index}_{i}"));
             parts.push(Part::FunctionCall {
                 name: tool_call.name.clone(),
                 args: tool_call.input.clone(),
@@ -175,10 +167,7 @@ impl ScriptedLlm {
         let content = if parts.is_empty() {
             None
         } else {
-            Some(Content {
-                role: "model".to_string(),
-                parts,
-            })
+            Some(Content { role: "model".to_string(), parts })
         };
 
         LlmResponse {
@@ -260,10 +249,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_scripted_llm_returns_text() {
-        let turns = vec![ScriptedTurn {
-            text: Some("Hello, world!".to_string()),
-            tool_calls: vec![],
-        }];
+        let turns =
+            vec![ScriptedTurn { text: Some("Hello, world!".to_string()), tool_calls: vec![] }];
         let llm = ScriptedLlm::new("test-model", turns);
 
         assert_eq!(llm.name(), "test-model");
@@ -317,18 +304,9 @@ mod tests {
     #[tokio::test]
     async fn test_scripted_llm_advances_through_turns() {
         let turns = vec![
-            ScriptedTurn {
-                text: Some("First".to_string()),
-                tool_calls: vec![],
-            },
-            ScriptedTurn {
-                text: Some("Second".to_string()),
-                tool_calls: vec![],
-            },
-            ScriptedTurn {
-                text: Some("Third".to_string()),
-                tool_calls: vec![],
-            },
+            ScriptedTurn { text: Some("First".to_string()), tool_calls: vec![] },
+            ScriptedTurn { text: Some("Second".to_string()), tool_calls: vec![] },
+            ScriptedTurn { text: Some("Third".to_string()), tool_calls: vec![] },
         ];
         let llm = ScriptedLlm::new("multi-turn", turns);
 
@@ -350,10 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_scripted_llm_handles_exhaustion() {
-        let turns = vec![ScriptedTurn {
-            text: Some("Only one".to_string()),
-            tool_calls: vec![],
-        }];
+        let turns = vec![ScriptedTurn { text: Some("Only one".to_string()), tool_calls: vec![] }];
         let llm = ScriptedLlm::new("exhausted", turns);
 
         // Consume the only turn.

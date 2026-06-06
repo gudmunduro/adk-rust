@@ -18,9 +18,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// Helper to create a client pointing at the mock server.
 fn mock_client(base_url: &str) -> EnterpriseClient {
-    let config = ClientConfig::new("adk_live_test_key")
-        .with_base_url(base_url)
-        .with_max_retries(0); // No retries in tests for speed
+    let config = ClientConfig::new("adk_live_test_key").with_base_url(base_url).with_max_retries(0); // No retries in tests for speed
     EnterpriseClient::with_config(config).unwrap()
 }
 
@@ -199,10 +197,7 @@ async fn test_list_agents_with_pagination_params() {
         .mount(&server)
         .await;
 
-    let params = ListParams {
-        limit: Some(5),
-        cursor: Some("cur_abc".into()),
-    };
+    let params = ListParams { limit: Some(5), cursor: Some("cur_abc".into()) };
     let response = client.list_agents(Some(params)).await.unwrap();
 
     assert!(response.data.is_empty());
@@ -231,10 +226,7 @@ async fn test_update_agent_sends_patch() {
         .mount(&server)
         .await;
 
-    let params = UpdateAgentParams {
-        name: Some("Updated Agent".into()),
-        ..Default::default()
-    };
+    let params = UpdateAgentParams { name: Some("Updated Agent".into()), ..Default::default() };
 
     let agent = client.update_agent("agt_abc123", params).await.unwrap();
 
@@ -366,10 +358,7 @@ async fn test_update_agent_validation_error() {
         .mount(&server)
         .await;
 
-    let params = UpdateAgentParams {
-        model: Some("invalid-model!!!".into()),
-        ..Default::default()
-    };
+    let params = UpdateAgentParams { model: Some("invalid-model!!!".into()), ..Default::default() };
 
     let result = client.update_agent("agt_abc123", params).await;
     assert!(result.is_err());

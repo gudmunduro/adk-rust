@@ -92,12 +92,8 @@ pub fn create_event_stream(
         }
         Some(k) => {
             // Replay historical events with seq > k, then chain with live
-            let historical: Vec<SessionEvent> = checkpoint
-                .events()
-                .iter()
-                .filter(|event| get_seq(event) > k)
-                .cloned()
-                .collect();
+            let historical: Vec<SessionEvent> =
+                checkpoint.events().iter().filter(|event| get_seq(event) > k).cloned().collect();
 
             let replay_stream = stream::iter(historical);
             Box::pin(replay_stream.chain(live_stream))
@@ -116,19 +112,14 @@ mod tests {
     /// Helper to create a simple message event with a given seq.
     fn message_event(seq: u64) -> SessionEvent {
         SessionEvent::Message {
-            content: vec![ContentBlock::Text {
-                text: format!("msg_{seq}"),
-            }],
+            content: vec![ContentBlock::Text { text: format!("msg_{seq}") }],
             seq,
         }
     }
 
     #[test]
     fn test_get_seq_message() {
-        let event = SessionEvent::Message {
-            content: vec![],
-            seq: 10,
-        };
+        let event = SessionEvent::Message { content: vec![], seq: 10 };
         assert_eq!(get_seq(&event), 10);
     }
 
@@ -173,21 +164,14 @@ mod tests {
 
     #[test]
     fn test_get_seq_status_idle() {
-        let event = SessionEvent::StatusIdle {
-            seq: 99,
-            stop_reason: None,
-            usage: None,
-        };
+        let event = SessionEvent::StatusIdle { seq: 99, stop_reason: None, usage: None };
         assert_eq!(get_seq(&event), 99);
     }
 
     #[test]
     fn test_get_seq_error() {
-        let event = SessionEvent::Error {
-            code: "err".to_string(),
-            message: "oops".to_string(),
-            seq: 42,
-        };
+        let event =
+            SessionEvent::Error { code: "err".to_string(), message: "oops".to_string(), seq: 42 };
         assert_eq!(get_seq(&event), 42);
     }
 
@@ -198,11 +182,7 @@ mod tests {
         // Store events with seq 1..5
         for seq in 1..=5 {
             let event = message_event(seq);
-            let state = RunState {
-                seq,
-                pending_tool_ids: vec![],
-                status: SessionStatus::Running,
-            };
+            let state = RunState { seq, pending_tool_ids: vec![], status: SessionStatus::Running };
             checkpoint.checkpoint(event, state);
         }
 
@@ -224,11 +204,7 @@ mod tests {
 
         for seq in 1..=3 {
             let event = message_event(seq);
-            let state = RunState {
-                seq,
-                pending_tool_ids: vec![],
-                status: SessionStatus::Running,
-            };
+            let state = RunState { seq, pending_tool_ids: vec![], status: SessionStatus::Running };
             checkpoint.checkpoint(event, state);
         }
 
@@ -275,11 +251,7 @@ mod tests {
         // Historical events: seq 1, 2, 3
         for seq in 1..=3 {
             let event = message_event(seq);
-            let state = RunState {
-                seq,
-                pending_tool_ids: vec![],
-                status: SessionStatus::Running,
-            };
+            let state = RunState { seq, pending_tool_ids: vec![], status: SessionStatus::Running };
             checkpoint.checkpoint(event, state);
         }
 
@@ -308,11 +280,7 @@ mod tests {
 
         for seq in 1..=3 {
             let event = message_event(seq);
-            let state = RunState {
-                seq,
-                pending_tool_ids: vec![],
-                status: SessionStatus::Running,
-            };
+            let state = RunState { seq, pending_tool_ids: vec![], status: SessionStatus::Running };
             checkpoint.checkpoint(event, state);
         }
 

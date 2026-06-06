@@ -176,9 +176,7 @@ mod tests {
                 env: HashMap::new(),
                 auto_approve: vec!["search".to_string()],
             }],
-            skills: vec![SkillRef {
-                skill_id: "web-research".to_string(),
-            }],
+            skills: vec![SkillRef { skill_id: "web-research".to_string() }],
             permission_policy: Some(PermissionPolicy {
                 default: PermissionMode::AutoApprove,
                 tools: {
@@ -200,10 +198,7 @@ mod tests {
         // Verify top-level fields
         assert_eq!(json["name"], "research-agent");
         assert_eq!(json["system"], "You are a research assistant.");
-        assert_eq!(
-            json["description"],
-            "Researches topics using web search and custom tools"
-        );
+        assert_eq!(json["description"], "Researches topics using web search and custom tools");
 
         // Verify model (structured form)
         let model = &json["model"];
@@ -266,10 +261,7 @@ mod tests {
         assert_eq!(def.mcp_servers.len(), 0);
         assert_eq!(def.permission_policy, None);
         assert_eq!(def.description, None);
-        assert_eq!(
-            def.metadata.as_ref().unwrap().get("env"),
-            Some(&"staging".to_string())
-        );
+        assert_eq!(def.metadata.as_ref().unwrap().get("env"), Some(&"staging".to_string()));
     }
 
     #[test]

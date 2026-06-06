@@ -55,9 +55,7 @@ mod tests {
 
     #[test]
     fn test_text_serialization_round_trip() {
-        let block = ContentBlock::Text {
-            text: "Hello, world!".to_string(),
-        };
+        let block = ContentBlock::Text { text: "Hello, world!".to_string() };
 
         let serialized = serde_json::to_value(&block).unwrap();
         assert_eq!(
@@ -78,9 +76,7 @@ mod tests {
     #[test]
     fn test_image_serialization_round_trip() {
         let source = json!({"url": "https://example.com/img.png", "media_type": "image/png"});
-        let block = ContentBlock::Image {
-            source: source.clone(),
-        };
+        let block = ContentBlock::Image { source: source.clone() };
 
         let serialized = serde_json::to_value(&block).unwrap();
         assert_eq!(
@@ -93,9 +89,7 @@ mod tests {
 
         let deserialized: ContentBlock = serde_json::from_value(serialized).unwrap();
         match deserialized {
-            ContentBlock::Image {
-                source: deserialized_source,
-            } => {
+            ContentBlock::Image { source: deserialized_source } => {
                 assert_eq!(deserialized_source, source);
             }
             _ => panic!("Expected Image variant"),
@@ -104,9 +98,7 @@ mod tests {
 
     #[test]
     fn test_file_serialization_round_trip() {
-        let block = ContentBlock::File {
-            file_id: "file_abc123".to_string(),
-        };
+        let block = ContentBlock::File { file_id: "file_abc123".to_string() };
 
         let serialized = serde_json::to_value(&block).unwrap();
         assert_eq!(
@@ -136,7 +128,8 @@ mod tests {
 
     #[test]
     fn test_image_from_json_string() {
-        let json_str = r#"{"type": "image", "source": {"url": "https://cdn.example.com/photo.jpg"}}"#;
+        let json_str =
+            r#"{"type": "image", "source": {"url": "https://cdn.example.com/photo.jpg"}}"#;
         let block: ContentBlock = serde_json::from_str(json_str).unwrap();
         match block {
             ContentBlock::Image { source } => {
@@ -166,15 +159,9 @@ mod tests {
     #[test]
     fn test_vec_content_blocks_round_trip() {
         let blocks = vec![
-            ContentBlock::Text {
-                text: "Here is an image:".to_string(),
-            },
-            ContentBlock::Image {
-                source: json!({"url": "https://example.com/img.png"}),
-            },
-            ContentBlock::File {
-                file_id: "attachment_001".to_string(),
-            },
+            ContentBlock::Text { text: "Here is an image:".to_string() },
+            ContentBlock::Image { source: json!({"url": "https://example.com/img.png"}) },
+            ContentBlock::File { file_id: "attachment_001".to_string() },
         ];
 
         let serialized = serde_json::to_value(&blocks).unwrap();
@@ -199,9 +186,7 @@ mod tests {
 
     #[test]
     fn test_debug_impl() {
-        let block = ContentBlock::Text {
-            text: "test".to_string(),
-        };
+        let block = ContentBlock::Text { text: "test".to_string() };
         let debug_str = format!("{block:?}");
         assert!(debug_str.contains("Text"));
         assert!(debug_str.contains("test"));
@@ -209,9 +194,7 @@ mod tests {
 
     #[test]
     fn test_clone_impl() {
-        let block = ContentBlock::Image {
-            source: json!({"url": "https://example.com/img.png"}),
-        };
+        let block = ContentBlock::Image { source: json!({"url": "https://example.com/img.png"}) };
         let cloned = block.clone();
         let original_json = serde_json::to_value(&block).unwrap();
         let cloned_json = serde_json::to_value(&cloned).unwrap();
