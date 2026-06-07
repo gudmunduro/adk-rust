@@ -38,7 +38,6 @@ def main():
     with open(workload_path) as f:
         workload = json.load(f)
 
-    from langchain_core.tools import tool as langchain_tool
     from langchain_google_genai import ChatGoogleGenerativeAI
     from langgraph.prebuilt import create_react_agent
 
@@ -102,21 +101,27 @@ def main():
 
     total_time_us = (turn_end - turn_start) // 1000
 
-    # Estimate LLM time (we don't have per-call timing, so estimate overhead)
-    # For LangGraph, the overhead includes: message routing, tool dispatch,
-    # graph state management, serialization between nodes
-    # We'll report total time and let the user understand it includes LLM
-    # A more precise measurement would require instrumenting the LLM wrapper
+    # Estimate simulated tool latency to subtract from overhead
+    # Each tool call sleeps for its simulatedLatencyMs
+    total_tool_latency_us = 0
+    for tool_name, tool_def in workload.get("agent", {}).get("tools", {}).items():
+        latency_ms = tool_def.get("simulatedLatencyMs", 0)
+        # Approximate: distribute tool calls evenly across defined tools
+        if tool_calls_count > 0 and latency_ms > 0:
+            calls_per_tool = tool_calls_count // max(1, len(workload["agent"]["tools"]))
+            total_tool_latency_us += calls_per_tool * latency_ms * 1000
 
-    # For a fair comparison, report the overhead as a portion of total time
-    # minus estimated LLM time. Since we can't separate them cleanly in LangGraph,
-    # report the full per-turn time divided by number of LLM calls
+    # Framework overhead = total_time - estimated_llm_time - tool_simulation_time
+    # We can't separate LLM time precisely without per-call instrumentation,
+    # so we report (total - tool_latency) / llm_calls as per-turn cost
+    # (includes LLM time — acknowledged in comparison notes)
+    adjusted_time_us = total_time_us - total_tool_latency_us
     if llm_calls > 0:
-        per_turn_us = total_time_us // llm_calls
+        per_turn_us = adjusted_time_us // llm_calls
     else:
-        per_turn_us = total_time_us
+        per_turn_us = adjusted_time_us
 
-    # We'll create samples based on how many turns occurred
+    # Create samples based on how many turns occurred
     overhead_samples = [per_turn_us] * max(1, llm_calls)
 
     overhead_samples.sort()
