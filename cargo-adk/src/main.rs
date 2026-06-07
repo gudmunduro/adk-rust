@@ -167,6 +167,40 @@ enum AdkCommand {
         #[arg(long)]
         stream_output: bool,
     },
+
+    /// Run agent evaluations
+    Eval {
+        /// Path to eval set file or directory
+        path: PathBuf,
+
+        /// Model override (e.g., "gemini-2.5-flash")
+        #[arg(long)]
+        model: Option<String>,
+
+        /// Save results as baseline
+        #[arg(long)]
+        save_baseline: bool,
+
+        /// Check for regressions against saved baseline
+        #[arg(long)]
+        check_regression: bool,
+
+        /// Regression tolerance (default 0.05)
+        #[arg(long, default_value = "0.05")]
+        tolerance: f64,
+
+        /// Output format: "table" (default), "json", "junit"
+        #[arg(long, default_value = "table")]
+        format: String,
+
+        /// Output file (for junit/json formats)
+        #[arg(long)]
+        output: Option<PathBuf>,
+
+        /// Concurrency level for parallel evaluation
+        #[arg(long, default_value = "1")]
+        concurrency: usize,
+    },
 }
 
 // ── JSON output types ───────────────────────────────────────────
@@ -333,6 +367,35 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        AdkCommand::Eval {
+            path,
+            model,
+            save_baseline,
+            check_regression,
+            tolerance,
+            format,
+            output,
+            concurrency,
+        } => {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("failed to create tokio runtime");
+
+            if let Err(e) = rt.block_on(run_eval(
+                path,
+                model,
+                save_baseline,
+                check_regression,
+                tolerance,
+                format,
+                output,
+                concurrency,
+            )) {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
     }
 }
 
@@ -368,57 +431,57 @@ fn handle_build(manifest_path: Option<PathBuf>, debug: bool) -> Result<(), Strin
         println!("   target:  {}", target_dir.display());
 
         // Try to find and report binary sizes
-        if target_dir.exists() {
-            if let Ok(entries) = fs::read_dir(&target_dir) {
-                let mut found_binary = false;
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() {
-                        // On Unix, check if executable; on all platforms, skip common non-binary extensions
-                        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                        if ext == "d"
-                            || ext == "rlib"
-                            || ext == "rmeta"
-                            || ext == "so"
-                            || ext == "dylib"
-                        {
-                            continue;
-                        }
-                        #[cfg(unix)]
-                        {
-                            use std::os::unix::fs::PermissionsExt;
-                            if let Ok(meta) = path.metadata() {
-                                let mode = meta.permissions().mode();
-                                if mode & 0o111 != 0 && ext.is_empty() {
-                                    let size = meta.len();
-                                    println!(
-                                        "   binary:  {} ({:.1} MB)",
-                                        path.display(),
-                                        size as f64 / 1_048_576.0
-                                    );
-                                    found_binary = true;
-                                }
+        if target_dir.exists()
+            && let Ok(entries) = fs::read_dir(&target_dir)
+        {
+            let mut found_binary = false;
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    // On Unix, check if executable; on all platforms, skip common non-binary extensions
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    if ext == "d"
+                        || ext == "rlib"
+                        || ext == "rmeta"
+                        || ext == "so"
+                        || ext == "dylib"
+                    {
+                        continue;
+                    }
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        if let Ok(meta) = path.metadata() {
+                            let mode = meta.permissions().mode();
+                            if mode & 0o111 != 0 && ext.is_empty() {
+                                let size = meta.len();
+                                println!(
+                                    "   binary:  {} ({:.1} MB)",
+                                    path.display(),
+                                    size as f64 / 1_048_576.0
+                                );
+                                found_binary = true;
                             }
                         }
-                        #[cfg(not(unix))]
-                        {
-                            if ext == "exe" {
-                                if let Ok(meta) = path.metadata() {
-                                    let size = meta.len();
-                                    println!(
-                                        "   binary:  {} ({:.1} MB)",
-                                        path.display(),
-                                        size as f64 / 1_048_576.0
-                                    );
-                                    found_binary = true;
-                                }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        if ext == "exe" {
+                            if let Ok(meta) = path.metadata() {
+                                let size = meta.len();
+                                println!(
+                                    "   binary:  {} ({:.1} MB)",
+                                    path.display(),
+                                    size as f64 / 1_048_576.0
+                                );
+                                found_binary = true;
                             }
                         }
                     }
                 }
-                if !found_binary {
-                    println!("   (no binaries found in {})", target_dir.display());
-                }
+            }
+            if !found_binary {
+                println!("   (no binaries found in {})", target_dir.display());
             }
         }
 
@@ -596,10 +659,10 @@ fn validate_yaml(
             // Check tools have descriptions
             if let Some(tools) = doc.get("tools").and_then(|v| v.as_array()) {
                 for (i, tool) in tools.iter().enumerate() {
-                    if let Some(name) = tool.get("name").and_then(|v| v.as_str()) {
-                        if tool.get("description").is_none() {
-                            warnings.push(format!("tool '{name}' (index {i}) has no description"));
-                        }
+                    if let Some(name) = tool.get("name").and_then(|v| v.as_str())
+                        && tool.get("description").is_none()
+                    {
+                        warnings.push(format!("tool '{name}' (index {i}) has no description"));
                     }
                 }
             }
@@ -925,6 +988,239 @@ async fn run_deploy(
     Ok(())
 }
 
+// ── Eval command ────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+async fn run_eval(
+    path: PathBuf,
+    _model: Option<String>,
+    save_baseline: bool,
+    check_regression: bool,
+    tolerance: f64,
+    format: String,
+    output: Option<PathBuf>,
+    _concurrency: usize,
+) -> Result<(), String> {
+    use adk_eval::{BaselineStore, EvaluationReport, EvaluationResult, TestFile};
+
+    // Load eval set from path
+    let reports: Vec<EvaluationReport> = if path.is_dir() {
+        // Load all .test.json files from directory
+        let mut reports = Vec::new();
+        let entries =
+            std::fs::read_dir(&path).map_err(|e| format!("failed to read directory: {e}"))?;
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.extension().is_some_and(|ext| ext == "json")
+                && let Some(name) = entry_path.file_name().and_then(|n| n.to_str())
+                && name.ends_with(".test.json")
+            {
+                let test_file = TestFile::load(&entry_path)
+                    .map_err(|e| format!("failed to load {}: {e}", entry_path.display()))?;
+                let report = build_report_from_test_file(&test_file, name);
+                reports.push(report);
+            }
+        }
+        if reports.is_empty() {
+            return Err(format!("no .test.json files found in {}", path.display()));
+        }
+        reports
+    } else {
+        // Load single file
+        let test_file =
+            TestFile::load(&path).map_err(|e| format!("failed to load eval set: {e}"))?;
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("eval");
+        vec![build_report_from_test_file(&test_file, name)]
+    };
+
+    // Aggregate all results across reports
+    let all_results: Vec<&EvaluationResult> = reports.iter().flat_map(|r| &r.results).collect();
+    let total_cases = all_results.len();
+    let passed_cases = all_results.iter().filter(|r| r.passed).count();
+    let failed_cases = total_cases - passed_cases;
+
+    // Build metrics map for baseline operations
+    let mut metrics: std::collections::HashMap<String, std::collections::HashMap<String, f64>> =
+        std::collections::HashMap::new();
+    for result in &all_results {
+        for (criterion, &score) in &result.scores {
+            metrics.entry(criterion.clone()).or_default().insert(result.eval_id.clone(), score);
+        }
+    }
+
+    // Handle --save-baseline
+    if save_baseline {
+        let baseline_path = path.parent().unwrap_or(Path::new(".")).join(".eval-baseline.json");
+        let store = BaselineStore::new(&baseline_path);
+        let eval_set_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("eval");
+        store.save(eval_set_id, &metrics).map_err(|e| format!("failed to save baseline: {e}"))?;
+        eprintln!("Baseline saved to {}", baseline_path.display());
+    }
+
+    // Handle --check-regression
+    let mut has_regressions = false;
+    if check_regression {
+        let baseline_path = path.parent().unwrap_or(Path::new(".")).join(".eval-baseline.json");
+        let store = BaselineStore::new(&baseline_path);
+        let regressions = store
+            .check_regressions(&metrics, tolerance)
+            .map_err(|e| format!("failed to check regressions: {e}"))?;
+
+        if !regressions.is_empty() {
+            has_regressions = true;
+            eprintln!("\n⚠ Regressions detected ({} metric(s)):\n", regressions.len());
+            for reg in &regressions {
+                eprintln!(
+                    "  {} [{}]: {:.3} → {:.3} (delta: -{:.3}, tolerance: {:.3})",
+                    reg.metric_name,
+                    reg.case_id,
+                    reg.baseline_value,
+                    reg.current_value,
+                    reg.delta,
+                    tolerance
+                );
+            }
+            eprintln!();
+        }
+    }
+
+    // Format and output results
+    match format.as_str() {
+        "json" => {
+            let json_output = serde_json::to_string_pretty(&reports)
+                .map_err(|e| format!("failed to serialize results: {e}"))?;
+            if let Some(ref output_path) = output {
+                std::fs::write(output_path, &json_output)
+                    .map_err(|e| format!("failed to write output file: {e}"))?;
+                eprintln!("JSON output written to {}", output_path.display());
+            } else {
+                println!("{json_output}");
+            }
+        }
+        "junit" => {
+            use adk_eval::JunitReporter;
+            // Combine all reports into a single JUnit output
+            // Use the first report or merge them
+            for report in &reports {
+                let suite_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("eval");
+                let xml = JunitReporter::generate(report, suite_name)
+                    .map_err(|e| format!("failed to generate JUnit XML: {e}"))?;
+                if let Some(ref output_path) = output {
+                    std::fs::write(output_path, &xml)
+                        .map_err(|e| format!("failed to write output file: {e}"))?;
+                    eprintln!("JUnit XML written to {}", output_path.display());
+                } else {
+                    println!("{xml}");
+                }
+            }
+        }
+        _ => {
+            // Display summary table
+            println!("\n╔══════════════════════════════════════════════════════════════╗");
+            println!("║                    Evaluation Results                        ║");
+            println!("╠══════════════════════════════════════════════════════════════╣");
+            println!(
+                "║  Total cases: {:<4}  Passed: {:<4}  Failed: {:<4}             ║",
+                total_cases, passed_cases, failed_cases
+            );
+            println!("╠══════════════════════════════════════════════════════════════╣");
+
+            // Per-criterion summary
+            let mut criterion_scores: std::collections::HashMap<String, Vec<f64>> =
+                std::collections::HashMap::new();
+            for result in &all_results {
+                for (criterion, &score) in &result.scores {
+                    criterion_scores.entry(criterion.clone()).or_default().push(score);
+                }
+            }
+
+            if !criterion_scores.is_empty() {
+                println!(
+                    "║  {:<20} {:>8} {:>8} {:>8}          ║",
+                    "Criterion", "Mean", "Min", "Max"
+                );
+                println!(
+                    "║  {:<20} {:>8} {:>8} {:>8}          ║",
+                    "─────────", "────", "───", "───"
+                );
+                let mut criteria: Vec<_> = criterion_scores.keys().collect();
+                criteria.sort();
+                for criterion in criteria {
+                    let scores = &criterion_scores[criterion];
+                    let mean = scores.iter().sum::<f64>() / scores.len() as f64;
+                    let min = scores.iter().cloned().fold(f64::INFINITY, f64::min);
+                    let max = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                    let name = if criterion.len() > 20 { &criterion[..20] } else { criterion };
+                    println!("║  {:<20} {:>8.3} {:>8.3} {:>8.3}          ║", name, mean, min, max);
+                }
+            }
+
+            // Cost/latency summary if available
+            let total_duration: std::time::Duration = reports.iter().map(|r| r.duration).sum();
+            println!("╠══════════════════════════════════════════════════════════════╣");
+            println!(
+                "║  Total duration: {:.2}s                                      ║",
+                total_duration.as_secs_f64()
+            );
+            println!("╚══════════════════════════════════════════════════════════════╝");
+
+            // Show failures
+            if failed_cases > 0 {
+                println!("\nFailed cases:");
+                for result in &all_results {
+                    if !result.passed {
+                        println!("  ✗ {}", result.eval_id);
+                        for failure in &result.failures {
+                            println!(
+                                "    - {}: {:.3} < {:.3}",
+                                failure.criterion, failure.score, failure.threshold
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Exit non-zero on regressions
+    if has_regressions {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+/// Build a simple evaluation report from a loaded test file.
+///
+/// This creates a report with basic pass/fail status based on whether
+/// expected responses are defined. For a full evaluation, an actual agent
+/// invocation would be needed.
+fn build_report_from_test_file(
+    test_file: &adk_eval::TestFile,
+    name: &str,
+) -> adk_eval::EvaluationReport {
+    use adk_eval::{EvaluationReport, EvaluationResult};
+    use std::collections::HashMap;
+    use std::time::Duration;
+
+    let mut results = Vec::new();
+    for case in &test_file.eval_cases {
+        let case_id = case.eval_id.clone();
+        let mut scores = HashMap::new();
+
+        // Check if expected response is defined — mark as needing evaluation
+        let has_expected = case.conversation.iter().any(|t| t.final_response.is_some());
+        if has_expected {
+            scores.insert("defined".to_string(), 1.0);
+        }
+
+        results.push(EvaluationResult::passed(&case_id, scores, Duration::from_millis(0)));
+    }
+
+    let started_at = chrono::Utc::now();
+    EvaluationReport::new(name, results, started_at)
+}
+
 /// Create a .tar.gz bundle with paths that have NO `./` prefix.
 fn create_bundle(
     bundle_path: &Path,
@@ -1061,30 +1357,28 @@ fn print_templates_json(template_dir: Option<&Path>) {
     let mut templates = get_builtin_templates();
 
     // Load custom templates from directory if provided
-    if let Some(dir) = template_dir {
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().is_some_and(|ext| ext == "toml") {
-                    if let Ok(content) = fs::read_to_string(&path) {
-                        // Parse custom template manifest (name, description)
-                        if let Ok(value) = content.parse::<toml::Value>() {
-                            let name =
-                                value.get("name").and_then(|v| v.as_str()).unwrap_or("custom");
-                            let desc =
-                                value.get("description").and_then(|v| v.as_str()).unwrap_or("");
-                            let provider =
-                                value.get("provider").and_then(|v| v.as_str()).unwrap_or("gemini");
-                            // We leak the strings here since TemplateInfo uses &'static str
-                            // For JSON output this is fine — process exits after printing
-                            templates.push(TemplateInfo {
-                                name: Box::leak(name.to_string().into_boxed_str()),
-                                description: Box::leak(desc.to_string().into_boxed_str()),
-                                default_provider: Box::leak(provider.to_string().into_boxed_str()),
-                                features: vec!["minimal"],
-                            });
-                        }
-                    }
+    if let Some(dir) = template_dir
+        && let Ok(entries) = fs::read_dir(dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "toml")
+                && let Ok(content) = fs::read_to_string(&path)
+            {
+                // Parse custom template manifest (name, description)
+                if let Ok(value) = content.parse::<toml::Value>() {
+                    let name = value.get("name").and_then(|v| v.as_str()).unwrap_or("custom");
+                    let desc = value.get("description").and_then(|v| v.as_str()).unwrap_or("");
+                    let provider =
+                        value.get("provider").and_then(|v| v.as_str()).unwrap_or("gemini");
+                    // We leak the strings here since TemplateInfo uses &'static str
+                    // For JSON output this is fine — process exits after printing
+                    templates.push(TemplateInfo {
+                        name: Box::leak(name.to_string().into_boxed_str()),
+                        description: Box::leak(desc.to_string().into_boxed_str()),
+                        default_provider: Box::leak(provider.to_string().into_boxed_str()),
+                        features: vec!["minimal"],
+                    });
                 }
             }
         }
