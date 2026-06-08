@@ -96,7 +96,9 @@ dependencies = [
  "adk-guardrail",
  "adk-model",
  "adk-plugin",
+ "adk-runner",
  "adk-sandbox",
+ "adk-session",
  "adk-skill",
  "adk-telemetry",
  "adk-tool",
@@ -581,13 +583,9 @@ dependencies = [
 name = "adk-model"
 version = "1.0.0"
 dependencies = [
- "adk-agent",
  "adk-anthropic",
  "adk-core",
  "adk-gemini",
- "adk-runner",
- "adk-server",
- "adk-session",
  "adk-telemetry",
  "anyhow",
  "async-openai",

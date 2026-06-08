@@ -1,74 +1,68 @@
 #!/bin/zsh
 # Publish all workspace crates to crates.io in correct dependency order.
-# Waits 10s after new publishes, 1s for skips.
+# Tiers generated from `cargo metadata` dependency graph (no dev-deps).
+# Waits for crates.io indexing between publishes.
 #
-# Dependency graph (verified May 2026):
-#   Tier 1: adk-core, awp-types (no internal deps)
-#   Tier 2: depends only on Tier 1
-#   Tier 3: depends on Tier 1-2
-#   Tier 4: depends on Tier 1-3
-#   Tier 5: depends on Tier 1-4
-#   Tier 6: depends on Tier 1-5
-#   Tier 7: depends on Tier 1-6
-#   Tier 8: depends on Tier 1-7
-#   Tier 9: umbrella (depends on everything)
+# Usage:
+#   ./publish.sh          # publish all
+#   ./publish.sh --resume # skip already-published crates
+
+set -euo pipefail
 
 CRATES=(
-  # Tier 1: no internal deps
+  # Tier 1: no internal library deps
   adk-core
+  adk-anthropic
+  adk-deploy
+  adk-enterprise
+  adk-rust-macros
+  adk-telemetry
   awp-types
 
-  # Tier 2: depends on adk-core only (or awp-types)
-  adk-telemetry
-  adk-memory
-  adk-artifact
-  adk-plugin
-  adk-guardrail
-  adk-gemini
-  adk-anthropic
-  adk-rust-macros
-  adk-sandbox
+  # Tier 2: depends on Tier 1
   adk-action
-  adk-deploy
-  adk-mistralrs    # depends on adk-core + adk-telemetry (now publishable)
-  adk-awp          # depends on awp-types + adk-core
+  adk-artifact
+  adk-awp
+  adk-browser
+  adk-gemini
+  adk-guardrail
+  adk-memory
+  adk-mistralrs
+  adk-plugin
+  adk-sandbox
+  adk-session
 
-  # Tier 3: depends on Tier 2
-  adk-skill        # depends on adk-plugin
-  adk-code         # depends on adk-sandbox
-  adk-realtime     # depends on adk-gemini (optional)
-  adk-session      # depends on adk-core
-  adk-model        # depends on adk-gemini, adk-telemetry
+  # Tier 3: depends on Tier 1-2
+  adk-code
+  adk-graph
+  adk-model
+  adk-rag
+  adk-realtime
+  adk-retry-reflect
+  adk-skill
 
-  # Tier 4: depends on Tier 3
-  adk-tool         # depends on adk-code (optional), adk-rust-macros, adk-telemetry
-  adk-browser      # depends on adk-core
-  adk-audio        # depends on adk-realtime (optional)
+  # Tier 4: depends on Tier 1-3
+  adk-agent
+  adk-audio
+  adk-runner
+  adk-tool
 
-  # Tier 5: depends on Tier 4
-  adk-agent        # depends on adk-tool (dev), adk-skill, adk-plugin, adk-telemetry
-  adk-graph        # depends on adk-action (optional)
-  adk-runner       # depends on adk-session, adk-artifact, adk-plugin, adk-skill
+  # Tier 5: depends on Tier 1-4
+  adk-acp
+  adk-eval
+  adk-managed
+  adk-server
 
-  # Tier 6: depends on Tier 5
-  adk-eval         # depends on adk-runner, adk-model
-  adk-rag          # depends on adk-core
-  adk-server       # depends on adk-runner, adk-agent
-  adk-retry-reflect # depends on adk-runner, adk-plugin
-  adk-bench        # depends on adk-runner, adk-model, adk-eval
+  # Tier 6: depends on Tier 1-5
+  adk-auth
+  adk-bench
+  adk-cli
 
-  # Tier 7: depends on Tier 6
-  adk-auth         # depends on adk-server (optional)
-  adk-acp          # depends on adk-runner (optional server feature)
-  cargo-adk        # depends on adk-deploy
+  # Tier 7: depends on Tier 1-6
+  adk-payments
+  cargo-adk
 
-  # Tier 8: depends on Tier 7
-  adk-cli          # depends on adk-server, adk-deploy
-  adk-payments     # depends on adk-auth
-  adk-enterprise   # depends on adk-core (experimental)
-  adk-managed      # depends on adk-runner, adk-session (experimental)
-
-  # Tier 9: umbrella — always last
+  # Tier 8: umbrella (depends on everything)
   adk-rust
 )
 
@@ -99,13 +93,12 @@ for crate in "${CRATES[@]}"; do
   elif [ $STATUS -eq 0 ]; then
     echo "✅ Published"
     PUBLISHED=$((PUBLISHED + 1))
-    echo "⏳ Waiting 10s for indexing..."
-    sleep 10
+    echo "⏳ Waiting for crates.io indexing..."
+    sleep 15
   else
     echo "❌ FAILED (exit $STATUS)"
     FAILED=$((FAILED + 1))
     FAILED_CRATES+=("$crate")
-    sleep 2
   fi
 
   echo ""
@@ -116,11 +109,12 @@ echo "=== SUMMARY ==="
 echo "✅ Published: $PUBLISHED"
 echo "⏭  Skipped:   $SKIPPED"
 echo "❌ Failed:    $FAILED"
+
 if [ ${#FAILED_CRATES[@]} -gt 0 ]; then
   echo ""
   echo "Failed crates:"
-  for fc in "${FAILED_CRATES[@]}"; do
-    echo "  - $fc"
+  for c in "${FAILED_CRATES[@]}"; do
+    echo "- $c"
   done
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

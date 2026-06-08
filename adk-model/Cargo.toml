@@ -24,7 +24,6 @@ serde_json.workspace = true
 serde = { workspace = true }
 async-openai = { version = "0.33", optional = true, default-features = false, features = ["rustls", "chat-completion", "responses"] }
 adk-anthropic = { workspace = true, optional = true }
-adk-server = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 anyhow.workspace = true
@@ -45,8 +44,8 @@ gemini-interactions = ["gemini", "adk-gemini/interactions"]
 openai = ["dep:async-openai", "dep:reqwest"]
 openai-ws = ["openai", "dep:tokio-tungstenite"]
 openai-conversations = ["openai"]
-openai-webhooks = ["openai", "dep:adk-server"]
-openai-responses-full = ["openai-ws", "openai-conversations", "openai-webhooks"]
+# openai-webhooks feature removed — moved to adk-model-webhooks crate (breaks circular dep)
+openai-responses-full = ["openai-ws", "openai-conversations"]
 xai = ["openai"]
 anthropic = ["dep:adk-anthropic"]
 deepseek = ["dep:reqwest"]
@@ -69,13 +68,6 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 futures = "0.3"
 wiremock = "0.6"
-# Used by the `#[ignore]` runtime integration tests that drive a real
-# `Runner` + `LlmAgent` through the Interactions transport. These crates do not
-# depend on `adk-model` in their library graph, so using them as dev-deps here
-# does not introduce a cycle.
-adk-agent = { workspace = true }
-adk-runner = { workspace = true }
-adk-session = { workspace = true }
 dotenvy = "0.15"
 
 # Examples require the openrouter feature — skip when not enabled.
@@ -110,7 +102,3 @@ required-features = ["openai"]
 [[test]]
 name = "openai_schema_property_tests"
 required-features = ["openai"]
-
-[[test]]
-name = "interactions_runtime_integration_tests"
-required-features = ["gemini-interactions"]

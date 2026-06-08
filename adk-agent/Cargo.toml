@@ -43,7 +43,9 @@ record-payloads = []
 ambient = ["dep:cron", "dep:notify", "dep:axum"]
 
 [dev-dependencies]
-adk-model = { workspace = true, features = ["gemini"] }
+adk-model = { workspace = true, features = ["gemini", "gemini-interactions"] }
+adk-runner = { workspace = true }
+adk-session = { workspace = true }
 adk-tool = { workspace = true }
 dotenvy = "0.15"
 proptest = "1.5"
