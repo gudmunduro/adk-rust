@@ -134,7 +134,17 @@ fi
 echo ""
 echo "Git hooks (quality gates):"
 
-# lefthook — runs fmt + clippy on pre-commit, nextest on pre-push (see lefthook.yml)
+# Shell-script linter — backs the pre-commit shellcheck gate (see lefthook.yml).
+# devenv users get this for free via git-hooks.hooks; install it here so the
+# non-Nix lefthook path reaches the same parity.
+if command -v shellcheck &>/dev/null; then
+  ok "shellcheck $(shellcheck --version | awk '/^version:/ {print $2}')"
+else
+  miss "shellcheck — shell-script linter for the pre-commit gate"
+  install_pkg shellcheck
+fi
+
+# lefthook — runs fmt + clippy + shellcheck on pre-commit, nextest on pre-push (see lefthook.yml)
 if command -v lefthook &>/dev/null; then
   ok "lefthook $(lefthook version 2>/dev/null | head -1)"
 else

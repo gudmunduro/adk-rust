@@ -12,10 +12,16 @@
 # every gate.
 #
 # Each gate globs just the inputs that affect it:
-#   - fmt     Rust sources, rustfmt.toml, and the toolchain.
-#   - clippy  also Cargo manifests, the lockfile, .cargo/config.toml, and
-#             .clippy.toml (anything that changes compilation or lints).
-#   - nextest mirrors clippy's compile inputs plus .config/nextest.toml.
+#   - fmt        Rust sources, rustfmt.toml, and the toolchain.
+#   - clippy     also Cargo manifests, the lockfile, .cargo/config.toml, and
+#                .clippy.toml (anything that changes compilation or lints).
+#   - shellcheck shell scripts only. The non-Nix counterpart to the shellcheck
+#                hook in devenv.nix. Lints just the staged scripts. Runs at
+#                --severity=warning so info-level notes (e.g. SC1091 about
+#                sourced files that can't be followed) don't block commits;
+#                real warnings and errors still fail. `publish.sh` is excluded
+#                because it's zsh and shellcheck only supports sh/bash/dash/ksh.
+#   - nextest    mirrors clippy's compile inputs plus .config/nextest.toml.
 #
 # Glob notes (lefthook's matcher): `*` crosses `/`, so `adk-*/*.rs` matches
 # Rust files at any depth under an `adk-*` crate, and patterns are anchored at
@@ -53,6 +59,13 @@ pre-commit:
         - ".clippy.toml"
       run: cargo clippy --workspace --all-targets -- -D warnings
       fail_text: "Clippy found warnings. Fix them before committing (zero-warnings policy)."
+    shellcheck:
+      tags: lint
+      glob: "*.sh"
+      exclude:
+        - "publish.sh"
+      run: shellcheck --severity=warning {staged_files}
+      fail_text: "shellcheck found issues. Run `shellcheck --severity=warning <file>` to see them."
 
 pre-push:
   commands:

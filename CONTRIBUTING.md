@@ -47,7 +47,7 @@ Branch naming conventions:
 
 CI enforces three gates: format, lint, and test. The easiest way to catch failures before they reach CI is to let [lefthook](https://github.com/evilmartians/lefthook) run them automatically as git hooks (see [Git Hooks with Lefthook](#git-hooks-with-lefthook)):
 
-- **pre-commit** runs `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets -- -D warnings`
+- **pre-commit** runs `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets -- -D warnings`, plus `shellcheck --severity=warning` on any staged shell scripts
 - **pre-push** runs `cargo nextest run --workspace`
 
 Once installed, these run on every `git commit` and `git push` — no extra steps required.
@@ -152,8 +152,10 @@ cp .env.example .env
 
 The repo ships a `lefthook.yml` that wires the [Quality Gates](#quality-gates) into git hooks, so they run automatically:
 
-- **pre-commit** — format check (`cargo fmt --all -- --check`) and lint (`cargo clippy --workspace --all-targets -- -D warnings`)
+- **pre-commit** — format check (`cargo fmt --all -- --check`), lint (`cargo clippy --workspace --all-targets -- -D warnings`), and shell-script lint (`shellcheck --severity=warning` on staged `*.sh`, mirroring the shellcheck hook in `devenv.nix`)
 - **pre-push** — the full test suite (`cargo nextest run --workspace`)
+
+The shellcheck gate only runs when shell scripts are staged, and runs at `--severity=warning` so informational notes (e.g. SC1091 about sourced files that can't be followed) don't block commits. `publish.sh` is skipped because it's a zsh script, which shellcheck doesn't support. Install shellcheck with `brew install shellcheck` (macOS) or `apt install shellcheck` (Debian/Ubuntu); `scripts/setup-dev.sh` installs it for you.
 
 Install [lefthook](https://github.com/evilmartians/lefthook):
 
@@ -169,7 +171,7 @@ Then register the hooks in your local clone (run once, from the repo root):
 lefthook install
 ```
 
-From now on, commits run fmt + clippy and pushes run the test suite. If a gate fails, the commit or push is blocked with guidance on how to fix it.
+From now on, commits run fmt + clippy (and shellcheck on staged shell scripts) and pushes run the test suite. If a gate fails, the commit or push is blocked with guidance on how to fix it.
 
 Need to bypass a hook in an emergency? Use `LEFTHOOK=0 git commit ...` or `git commit --no-verify` — but CI will still enforce the gates, so prefer fixing the issue.
 
