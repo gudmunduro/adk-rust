@@ -323,7 +323,8 @@ verbatim into the request body.
 cargo run -p adk-model --features openai --example gemini_openai_compat
 
 # The same compat client driving a normal LlmAgent in a Runner.
-cargo run -p adk-model --features openai --example gemini_openai_compat_agent
+# (Lives in adk-agent: it exercises the agent layer, which sits above adk-model.)
+cargo run -p adk-agent --example gemini_openai_compat_agent
 ```
 
 ### Reasoning Effort (o1, o3 Models)
