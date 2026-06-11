@@ -17,10 +17,10 @@ Plugins run in a priority-ordered pipeline, enabling composable middleware stack
 
 ```toml
 [dependencies]
-adk-plugin = "1.0.0"
+adk-plugin = "1.0.1"
 
 # Or via umbrella crate (included in standard tier)
-adk-rust = { version = "1.0.0", features = ["standard"] }
+adk-rust = { version = "1.0.1", features = ["standard"] }
 ```
 
 ## Quick Start

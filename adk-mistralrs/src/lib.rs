@@ -8,7 +8,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! adk-mistralrs = "1.0.0"
+//! adk-mistralrs = "1.0.1"
 //! ```
 //!
 //! ## Features
@@ -145,7 +145,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! adk-mistralrs = { version = "1.0.0", features = ["cuda"] }
+//! adk-mistralrs = { version = "1.0.1", features = ["cuda"] }
 //! ```
 //!
 //! Available features:

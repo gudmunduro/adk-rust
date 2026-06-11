@@ -197,6 +197,16 @@ jobs:
       run: |
         CI=true devenv shell bash scripts/check-example-name-collisions.sh
         CI=true devenv shell bash scripts/check-doc-examples.sh
+        # Doc rot guard: dependency-snippet versions in docs/READMEs/lib.rs must
+        # match the workspace version, and every adk-rust feature named in docs
+        # must exist in adk-rust/Cargo.toml (catches stale "0.8.2" snippets and
+        # phantom features like the removed `labs`).
+        CI=true devenv shell bash scripts/check-doc-versions.sh
+        # Publish-order guard: publish.sh tiers must satisfy the workspace
+        # dependency graph, including versioned dev-deps (what broke v1.0.0).
+        CI=true devenv shell bash scripts/check-publish-order.sh
+        # Scaffold every advertised template — including addon combos and
+        # default-provider resolution — and cargo-check the generated projects.
         CI=true devenv shell bash scripts/check-cargo-adk-templates.sh
 
   # ── Cross-platform: macOS build + test ─────────────────────────

@@ -39,7 +39,7 @@ cargo new my_agent && cd my_agent
 
 ```toml
 [dependencies]
-adk-rust = "1.0.0"
+adk-rust = "1.0.1"
 tokio = { version = "1.40", features = ["full"] }
 dotenvy = "0.15"
 ```
@@ -289,34 +289,31 @@ cargo run -- serve --port 8080
 ## Installation Options
 
 ```toml
-# Standard (default) — agents, models, tools, sessions, runner, guardrails, auth
-adk-rust = "1.0.0"
+# Minimal (default) — agents, Gemini, runner, sessions (fastest build)
+adk-rust = "1.0.1"
 
-# Full — standard + all stable specialist crates (graph, realtime, browser, eval, rag)
-# Does NOT include experimental crates (code, sandbox, audio) — use `labs` for those
-adk-rust = { version = "1.0.0", features = ["full"] }
+# Standard — minimal + tools, memory, OpenAI, Anthropic, server, auth,
+# graph, eval, guardrails, skills, plugins, artifacts, telemetry
+adk-rust = { version = "1.0.1", features = ["standard"] }
 
-# Labs — standard + experimental crates (code, sandbox, audio)
-adk-rust = { version = "1.0.0", features = ["labs"] }
+# Enterprise — standard + realtime, browser, rag, payments, awp
+adk-rust = { version = "1.0.1", features = ["enterprise"] }
 
-# Full + Labs — everything including experimental crates
-adk-rust = { version = "1.0.0", features = ["full", "labs"] }
-
-# Minimal
-adk-rust = { version = "1.0.0", default-features = false, features = ["minimal"] }
+# Full — enterprise + experimental crates (audio, code, sandbox)
+adk-rust = { version = "1.0.1", features = ["full"] }
 
 # Custom
-adk-rust = { version = "1.0.0", default-features = false, features = ["agents", "gemini", "tools"] }
+adk-rust = { version = "1.0.1", default-features = false, features = ["agents", "gemini", "tools"] }
 
 # With new providers (forwarded to adk-model)
-adk-model = { version = "1.0.0", features = ["fireworks", "together", "mistral", "perplexity", "cerebras", "sambanova", "bedrock", "azure-ai"] }
+adk-model = { version = "1.0.1", features = ["fireworks", "together", "mistral", "perplexity", "cerebras", "sambanova", "bedrock", "azure-ai"] }
 ```
 
 ## Documentation
 
 - [API Reference](https://docs.rs/adk-rust)
 - [Official Guides](https://github.com/zavora-ai/adk-rust/tree/main/docs/official_docs)
-- [Examples](https://github.com/zavora-ai/adk-rust/tree/main/examples) — 120+ working examples
+- [Examples](https://github.com/zavora-ai/adk-rust/tree/main/examples) — 75+ working examples in-repo, 120+ in the [playground](https://github.com/zavora-ai/adk-playground)
 - [Wiki](https://github.com/zavora-ai/adk-rust/wiki) — Comprehensive guides and tutorials
 
 ## License

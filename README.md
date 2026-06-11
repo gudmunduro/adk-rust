@@ -80,7 +80,7 @@ cargo adk new my-agent
 cd my-agent && cargo run
 ```
 
-Or pick a template: `--template tools` | `rag` | `api` | `openai` | `a2a` | `graph` | `realtime`. Combine with addons: `--addon telemetry` | `docker` | `ci`. See [Quick Start](#quick-start) for details.
+Or pick a template: `--template tools` | `rag` | `api` | `openai` | `a2a` | `graph` | `realtime` | `sequential` | `parallel` | `loop`. Combine with addons: `--addon telemetry` | `auth` | `sessions` | `memory` | `mcp` | `guardrails` | `eval` | `browser` | `server`. Run `cargo adk templates` and `cargo adk addons` for the full list, and see [Quick Start](#quick-start) for details.
 
 ## Overview
 
@@ -98,7 +98,7 @@ ADK-Rust provides a comprehensive framework for building AI agents in Rust, feat
 - **Agentic commerce**: ACP and AP2 payment orchestration with durable transaction journals and evidence-backed recall
 - **Agentic Web Protocol (AWP)**: Make websites agent-native with discovery, capability manifests, trust levels, rate limiting, consent, and health monitoring
 - **Production features**: Session management, artifact storage, memory systems with project-scoped isolation, REST/A2A APIs
-- **Developer experience**: Interactive CLI, 120+ working examples, comprehensive documentation
+- **Developer experience**: Interactive CLI, 75+ in-repo examples (120+ in the [playground](https://github.com/zavora-ai/adk-playground)), comprehensive documentation
 
 **Status**: Production-ready, actively maintained
 
@@ -192,7 +192,7 @@ Built-in tools:
 - **Session Management**: In-memory and SQLite-backed sessions with state persistence, encrypted sessions with AES-256-GCM and key rotation
 - **Memory System**: Long-term memory with semantic search, vector embeddings, and project-scoped isolation
 - **Servers**: REST API with SSE streaming, A2A v1.0.0 protocol for agent-to-agent communication
-- **A2A Quick Start**: `A2aServer::quick_start(agent)` — expose any agent via A2A in one line. Or use `cargo adk new --template a2a` to scaffold a complete project.
+- **A2A Quick Start**: `A2aServer::quick_start(agent)` — expose any agent via A2A in one line. Or use `cargo adk new --template a2a-server` to scaffold a complete project.
 - **Guardrails**: PII redaction, content filtering, JSON schema validation
 - **Tool Authorization**: Human-in-the-loop confirmation, before-tool callbacks, RBAC, graph interrupts
 - **Payments**: ACP and AP2 commerce support through `adk-payments`
@@ -241,18 +241,19 @@ Built-in tools:
 ```bash
 cargo install cargo-adk
 
-cargo adk new my-agent                    # basic Gemini agent
-cargo adk new my-agent --template tools   # agent with #[tool] custom tools
-cargo adk new my-agent --template rag     # RAG with vector search
-cargo adk new my-agent --template api     # REST server
-cargo adk new my-agent --template openai  # OpenAI-powered agent
-cargo adk new my-agent --template a2a     # A2A protocol agent
-cargo adk new my-agent --template graph   # graph workflow agent
-cargo adk new my-agent --template realtime # realtime voice agent
+cargo adk new my-agent                       # basic Gemini agent
+cargo adk new my-agent --template tools      # agent with #[tool] custom tools
+cargo adk new my-agent --template rag        # RAG with vector search
+cargo adk new my-agent --template api        # REST server
+cargo adk new my-agent --template openai     # OpenAI-powered agent
+cargo adk new my-agent --template a2a        # A2A protocol agent
+cargo adk new my-agent --template graph      # graph workflow agent
+cargo adk new my-agent --template realtime   # realtime voice agent
+cargo adk new my-agent --template sequential # sequential multi-agent pipeline
 
 # Compose with addons
-cargo adk new my-agent --template tools --addon telemetry --addon docker
-cargo adk new my-agent --template api --addon ci --addon monitoring
+cargo adk new my-agent --template tools --addon telemetry --addon sessions
+cargo adk new my-agent --addon mcp --addon guardrails
 
 cd my-agent
 cp .env.example .env    # add your API key
@@ -267,13 +268,13 @@ Requires Rust 1.94 or later (Rust 2024 edition). Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-adk-rust = "1.0.0"  # Minimal (default): Gemini + agent runtime + sessions
+adk-rust = "1.0.1"  # Minimal (default): Gemini + agent runtime + sessions
 
 # Need server, auth, graph workflows, eval?
-# adk-rust = { version = "1.0.0", features = ["standard"] }
+# adk-rust = { version = "1.0.1", features = ["standard"] }
 
 # Need everything (realtime, browser, RAG, payments, AWP)?
-# adk-rust = { version = "1.0.0", features = ["enterprise"] }
+# adk-rust = { version = "1.0.1", features = ["enterprise"] }
 ```
 
 **Feature tiers:**
@@ -376,7 +377,7 @@ async fn main() -> AnyhowResult<()> {
 
 ### OpenAI Example
 
-Enable OpenAI with `adk-rust = { version = "1.0.0", features = ["openai"] }`.
+Enable OpenAI with `adk-rust = { version = "1.0.1", features = ["openai"] }`.
 
 ```rust
 use adk_rust::prelude::*;
@@ -426,7 +427,7 @@ async fn main() -> AnyhowResult<()> {
 
 ### Anthropic Example
 
-Enable Anthropic with `adk-rust = { version = "1.0.0", features = ["anthropic"] }`.
+Enable Anthropic with `adk-rust = { version = "1.0.1", features = ["anthropic"] }`.
 
 ```rust
 use adk_rust::prelude::*;
@@ -450,7 +451,7 @@ async fn main() -> AnyhowResult<()> {
 
 ### DeepSeek Example
 
-Enable DeepSeek with `adk-rust = { version = "1.0.0", features = ["deepseek"] }`.
+Enable DeepSeek with `adk-rust = { version = "1.0.1", features = ["deepseek"] }`.
 
 ```rust
 use adk_rust::prelude::*;
@@ -479,7 +480,7 @@ async fn main() -> AnyhowResult<()> {
 
 ### Groq Example (Ultra-Fast)
 
-Enable Groq with `adk-rust = { version = "1.0.0", features = ["groq"] }`.
+Enable Groq with `adk-rust = { version = "1.0.1", features = ["groq"] }`.
 
 ```rust
 use adk_rust::prelude::*;
@@ -503,7 +504,7 @@ async fn main() -> AnyhowResult<()> {
 
 ### Ollama Example (Local)
 
-Enable Ollama with `adk-rust = { version = "1.0.0", features = ["ollama"] }`.
+Enable Ollama with `adk-rust = { version = "1.0.1", features = ["ollama"] }`.
 
 ```rust
 use adk_rust::prelude::*;
@@ -819,7 +820,7 @@ async fn main() -> anyhow::Result<()> {
 
 `adk-mistralrs` is published to crates.io as a workspace member. GPU features are opt-in:
 ```toml
-adk-mistralrs = { version = "1.0.0", features = ["metal"] }  # macOS Apple Silicon
+adk-mistralrs = { version = "1.0.1", features = ["metal"] }  # macOS Apple Silicon
 # Or: features = ["cuda"] for NVIDIA GPU
 ```
 
@@ -897,26 +898,26 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 # Minimal (default) — Gemini, agents, runner, sessions
-adk-rust = "1.0.0"
+adk-rust = "1.0.1"
 
 # Add a provider explicitly when you need it
-adk-rust = { version = "1.0.0", features = ["openai"] }
+adk-rust = { version = "1.0.1", features = ["openai"] }
 
 # Production tier without CLI provider fan-out
-adk-rust = { version = "1.0.0", features = ["standard"] }
+adk-rust = { version = "1.0.1", features = ["standard"] }
 
 # Full — enterprise plus audio, code execution, sandbox
-adk-rust = { version = "1.0.0", features = ["full"] }
+adk-rust = { version = "1.0.1", features = ["full"] }
 
 # Minimal — just agents + Gemini + runner (fastest build)
-adk-rust = { version = "1.0.0", default-features = false, features = ["minimal"] }
+adk-rust = { version = "1.0.1", default-features = false, features = ["minimal"] }
 
 # Or individual crates for finer control
-adk-core = "1.0.0"
-adk-agent = "1.0.0"
-adk-model = { version = "1.0.0", features = ["openai", "anthropic"] }
-adk-tool = "1.0.0"
-adk-runner = "1.0.0"
+adk-core = "1.0.1"
+adk-agent = "1.0.1"
+adk-model = { version = "1.0.1", features = ["openai", "anthropic"] }
+adk-tool = "1.0.1"
+adk-runner = "1.0.1"
 ```
 
 ## Examples
@@ -975,7 +976,7 @@ cargo build --release
 - **Wiki**: [GitHub Wiki](https://github.com/zavora-ai/adk-rust/wiki) - Comprehensive guides and tutorials
 - **API Reference**: [docs.rs/adk-rust](https://docs.rs/adk-rust) - Full API documentation
 - **Official payments docs**: [Payments and Commerce](docs/official_docs/security/payments.md) - ACP/AP2 support, agentic commerce journeys, and validation paths
-- **Examples**: [examples/README.md](examples/README.md) - 120+ working examples with detailed explanations
+- **Examples**: [examples/README.md](examples/README.md) - 75+ working examples with detailed explanations
 
 ## Performance
 
@@ -1042,7 +1043,7 @@ Contributions welcome! Please open an issue or pull request on GitHub.
 **v1.0.0** (current) — first stable release:
 - **Composable Template System** — 8 base templates, 9 addons, 5 enterprise patterns via `cargo adk new --addon`.
 - **Cargo Adk Build** — compile-without-deploy subcommand for pre-deployment verification.
-- **A2A Simple Scaffolding** — `A2aServer::quick_start`, `A2aServer::builder`, and `cargo adk new --template a2a`.
+- **A2A Simple Scaffolding** — `A2aServer::quick_start`, `A2aServer::builder`, and `cargo adk new --template a2a-server`.
 - **Security** — hickory-proto 0.26.1, openssl 0.10.80, rubato 3.0, similar 3.
 
 <details>

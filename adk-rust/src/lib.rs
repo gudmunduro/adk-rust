@@ -40,7 +40,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! adk-rust = "0.8.2"
+//! adk-rust = "1.0.1"
 //! tokio = { version = "1.40", features = ["full"] }
 //! dotenvy = "0.15"  # For loading .env files
 //! ```
@@ -48,24 +48,21 @@
 //! ### Feature Presets
 //!
 //! ```toml
-//! # Standard (default) — agents, models, tools, sessions, runner, guardrails, auth
-//! adk-rust = "0.8.2"
+//! # Minimal (default) — agents, Gemini, runner, sessions (fastest build)
+//! adk-rust = "1.0.1"
 //!
-//! # Full — standard + all stable specialist crates (graph, realtime, browser, eval, rag)
-//! # Does NOT include experimental crates (code, sandbox, audio) — use `labs` for those
-//! adk-rust = { version = "0.8.2", features = ["full"] }
+//! # Standard — minimal + tools, memory, OpenAI, Anthropic, server, auth,
+//! # graph, eval, guardrails, skills, plugins, artifacts, telemetry
+//! adk-rust = { version = "1.0.1", features = ["standard"] }
 //!
-//! # Labs — standard + experimental crates (code, sandbox, audio)
-//! adk-rust = { version = "0.8.2", features = ["labs"] }
+//! # Enterprise — standard + realtime, browser, rag, payments, awp
+//! adk-rust = { version = "1.0.1", features = ["enterprise"] }
 //!
-//! # Full + Labs — everything including experimental crates
-//! adk-rust = { version = "0.8.2", features = ["full", "labs"] }
-//!
-//! # Minimal — just agents + Gemini + runner (fastest build)
-//! adk-rust = { version = "0.8.2", default-features = false, features = ["minimal"] }
+//! # Full — enterprise + experimental crates (audio, code, sandbox)
+//! adk-rust = { version = "1.0.1", features = ["full"] }
 //!
 //! # Custom — pick exactly what you need
-//! adk-rust = { version = "0.8.2", default-features = false, features = [
+//! adk-rust = { version = "1.0.1", default-features = false, features = [
 //!     "agents", "gemini", "tools", "sessions", "openai", "openrouter"
 //! ] }
 //! ```
@@ -408,29 +405,33 @@
 //!
 //! | Feature | Description | Preset |
 //! |---------|-------------|--------|
-//! | `agents` | Agent implementations | standard |
-//! | `models` | Model integrations | standard |
-//! | `gemini` | Gemini model support | standard |
+//! | `agents` | Agent implementations | minimal (default) |
+//! | `models` | Model integrations | minimal (default) |
+//! | `gemini` | Gemini model support | minimal (default) |
+//! | `runner` | Execution runtime | minimal (default) |
+//! | `sessions` | Session management | minimal (default) |
 //! | `tools` | Tool system | standard |
 //! | `skills` | Skill discovery | standard |
-//! | `sessions` | Session management | standard |
 //! | `artifacts` | Artifact storage | standard |
 //! | `memory` | Semantic memory | standard |
-//! | `runner` | Execution runtime | standard |
 //! | `telemetry` | OpenTelemetry | standard |
 //! | `guardrail` | Input/output validation | standard |
 //! | `auth` | Access control | standard |
 //! | `plugin` | Plugin system | standard |
 //! | `server` | HTTP server + A2A | standard |
-//! | `cli` | CLI launcher | standard |
-//! | `graph` | Graph workflows | full |
-//! | `browser` | Browser automation | full |
-//! | `eval` | Agent evaluation | full |
-//! | `realtime` | Voice/audio streaming | full |
-//! | `rag` | RAG pipeline | full |
-//! | `code` | Code execution | labs (experimental) |
-//! | `sandbox` | Sandboxed execution | labs (experimental) |
-//! | `audio` | Audio processing | labs (experimental) |
+//! | `graph` | Graph workflows | standard |
+//! | `eval` | Agent evaluation | standard |
+//! | `openai` | OpenAI model support | standard |
+//! | `anthropic` | Anthropic model support | standard |
+//! | `realtime` | Voice/audio streaming | enterprise |
+//! | `browser` | Browser automation | enterprise |
+//! | `rag` | RAG pipeline | enterprise |
+//! | `payments` | Agentic commerce (ACP/AP2) | enterprise |
+//! | `awp` | Agentic Web Protocol | enterprise |
+//! | `code` | Code execution | full (experimental) |
+//! | `sandbox` | Sandboxed execution | full (experimental) |
+//! | `audio` | Audio processing | full (experimental) |
+//! | `cli` | CLI launcher | (opt-in, any preset) |
 //!
 //! ## Examples
 //!
@@ -647,7 +648,7 @@ pub mod graph {
     pub use adk_graph::*;
 }
 
-/// Code execution substrate (experimental — `labs` preset).
+/// Code execution substrate (experimental — `full` preset).
 ///
 /// First-class code execution for agents, Studio, and generated projects:
 /// - [`CodeExecutor`](code::CodeExecutor) - Backend trait for execution
@@ -663,7 +664,7 @@ pub mod code {
     pub use adk_code::*;
 }
 
-/// Isolated code execution runtime (experimental — `labs` preset).
+/// Isolated code execution runtime (experimental — `full` preset).
 ///
 /// Provides the [`SandboxBackend`](sandbox::SandboxBackend) trait and built-in backends:
 /// - [`ProcessBackend`](sandbox::ProcessBackend) - Subprocess execution with timeout and env isolation
@@ -787,7 +788,7 @@ pub mod plugin {
     pub use adk_plugin::*;
 }
 
-/// Audio processing pipeline (experimental — `labs` preset).
+/// Audio processing pipeline (experimental — `full` preset).
 ///
 /// Provides audio capabilities for agents:
 /// - [`TtsProvider`](audio::TtsProvider) - Text-to-speech synthesis
