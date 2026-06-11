@@ -19,8 +19,7 @@
 #                hook in devenv.nix. Lints just the staged scripts. Runs at
 #                --severity=warning so info-level notes (e.g. SC1091 about
 #                sourced files that can't be followed) don't block commits;
-#                real warnings and errors still fail. `publish.sh` is excluded
-#                because it's zsh and shellcheck only supports sh/bash/dash/ksh.
+#                real warnings and errors still fail.
 #   - nextest    mirrors clippy's compile inputs plus .config/nextest.toml.
 #
 # Glob notes (lefthook's matcher): `*` crosses `/`, so `adk-*/*.rs` matches
@@ -37,6 +36,7 @@ pre-commit:
       tags: format
       glob:
         - "adk-*/*.rs"
+        - "xtask/*.rs"
         - "awp-*/*.rs"
         - "cargo-adk/*.rs"
         - "rustfmt.toml"
@@ -47,9 +47,11 @@ pre-commit:
       tags: lint
       glob:
         - "adk-*/*.rs"
+        - "xtask/*.rs"
         - "awp-*/*.rs"
         - "cargo-adk/*.rs"
         - "adk-*/Cargo.toml"
+        - "xtask/Cargo.toml"
         - "awp-*/Cargo.toml"
         - "cargo-adk/Cargo.toml"
         - "Cargo.toml"
@@ -62,8 +64,6 @@ pre-commit:
     shellcheck:
       tags: lint
       glob: "*.sh"
-      exclude:
-        - "publish.sh"
       run: shellcheck --severity=warning {staged_files}
       fail_text: "shellcheck found issues. Run `shellcheck --severity=warning <file>` to see them."
 
@@ -73,9 +73,11 @@ pre-push:
       tags: test
       glob:
         - "adk-*/*.rs"
+        - "xtask/*.rs"
         - "awp-*/*.rs"
         - "cargo-adk/*.rs"
         - "adk-*/Cargo.toml"
+        - "xtask/Cargo.toml"
         - "awp-*/Cargo.toml"
         - "cargo-adk/Cargo.toml"
         - "Cargo.toml"
