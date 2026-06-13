@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::{
     ToolBash20241022, ToolBash20250124, ToolParam, ToolTextEditor20250124, ToolTextEditor20250429,
-    ToolTextEditor20250728, WebSearchTool20250305,
+    ToolTextEditor20250728, WebFetchTool20250910, WebSearchTool20250305,
 };
 
 /// Union type for different tool parameter types.
@@ -44,6 +44,10 @@ pub enum ToolUnionParam {
     /// A web search tool for retrieving information from the internet
     #[serde(rename = "web_search_20250305")]
     WebSearch20250305(WebSearchTool20250305),
+
+    /// A web fetch tool for fetching the content of a user-provided URL (version 20250910)
+    #[serde(rename = "web_fetch_20250910")]
+    WebFetch20250910(WebFetchTool20250910),
 }
 
 impl ToolUnionParam {
@@ -82,6 +86,11 @@ impl ToolUnionParam {
         Self::WebSearch20250305(WebSearchTool20250305::new())
     }
 
+    /// Creates a new web fetch tool
+    pub fn new_web_fetch_tool() -> Self {
+        Self::WebFetch20250910(WebFetchTool20250910::new())
+    }
+
     /// Check if this tool has strict mode enabled.
     ///
     /// Only custom tools can have strict mode enabled. All other tool types
@@ -95,7 +104,8 @@ impl ToolUnionParam {
             | Self::TextEditor20250124(_)
             | Self::TextEditor20250429(_)
             | Self::TextEditor20250728(_)
-            | Self::WebSearch20250305(_) => false,
+            | Self::WebSearch20250305(_)
+            | Self::WebFetch20250910(_) => false,
         }
     }
 }

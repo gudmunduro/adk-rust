@@ -111,6 +111,9 @@ fn clear_cache_control_on_block(block: &mut ContentBlock) {
         ContentBlock::WebSearchToolResult(web_search_result) => {
             web_search_result.cache_control = None;
         }
+        ContentBlock::WebFetchToolResult(web_fetch_result) => {
+            web_fetch_result.cache_control = None;
+        }
         // Thinking blocks don't support cache_control.
         ContentBlock::Thinking(_)
         | ContentBlock::RedactedThinking(_)
@@ -155,6 +158,7 @@ fn set_cache_control_on_block(block: &mut ContentBlock) {
         | ContentBlock::Document(_)
         | ContentBlock::ServerToolUse(_)
         | ContentBlock::WebSearchToolResult(_)
+        | ContentBlock::WebFetchToolResult(_)
         | ContentBlock::Thinking(_)
         | ContentBlock::RedactedThinking(_)
         | ContentBlock::CodeExecutionResult(_)
@@ -172,6 +176,9 @@ fn block_has_cache_control(block: &ContentBlock) -> bool {
         ContentBlock::ServerToolUse(server_tool_use) => server_tool_use.cache_control.is_some(),
         ContentBlock::WebSearchToolResult(web_search_result) => {
             web_search_result.cache_control.is_some()
+        }
+        ContentBlock::WebFetchToolResult(web_fetch_result) => {
+            web_fetch_result.cache_control.is_some()
         }
         ContentBlock::Thinking(_) | ContentBlock::RedactedThinking(_) => false,
         ContentBlock::CodeExecutionResult(_) | ContentBlock::ProgrammaticToolUse(_) => false,

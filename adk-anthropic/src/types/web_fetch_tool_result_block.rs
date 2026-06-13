@@ -1,0 +1,114 @@
+use serde::{Deserialize, Serialize};
+
+use crate::types::{CacheControlEphemeral, WebFetchToolResultBlockContent};
+
+/// A block containing the result of a web fetch tool operation.
+///
+/// WebFetchToolResultBlock contains either a successfully fetched document or an error.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type")]
+#[serde(rename = "web_fetch_tool_result")]
+pub struct WebFetchToolResultBlock {
+    /// The content of the web fetch tool result.
+    pub content: WebFetchToolResultBlockContent,
+
+    /// The ID of the tool use that this result is for.
+    pub tool_use_id: String,
+
+    /// Create a cache control breakpoint at this content block.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_control: Option<CacheControlEphemeral>,
+}
+
+impl WebFetchToolResultBlock {
+    /// Creates a new WebFetchToolResultBlock.
+    pub fn new<S: Into<String>>(content: WebFetchToolResultBlockContent, tool_use_id: S) -> Self {
+        Self { content, tool_use_id: tool_use_id.into(), cache_control: None }
+    }
+
+    /// Add a cache control to this web fetch tool result block.
+    pub fn with_cache_control(mut self, cache_control: CacheControlEphemeral) -> Self {
+        self.cache_control = Some(cache_control);
+        self
+    }
+
+    /// Returns true if the web fetch result contains a successful result.
+    pub fn has_result(&self) -> bool {
+        self.content.is_result()
+    }
+
+    /// Returns true if the web fetch result contains an error.
+    pub fn has_error(&self) -> bool {
+        self.content.is_error()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{
+        DocumentBlock, DocumentSource, PlainTextSource, WebFetchErrorCode, WebFetchResultContent,
+        WebFetchToolResultError,
+    };
+    use serde_json::Value;
+
+    fn make_text_doc(text: &str) -> DocumentBlock {
+        DocumentBlock::new(DocumentSource::PlainText(PlainTextSource::new(text.to_string())))
+    }
+
+    #[test]
+    fn result_serialization() {
+        let doc = make_text_doc("page content");
+        let result = WebFetchResultContent::new("https://example.com", doc);
+        let content = WebFetchToolResultBlockContent::with_result(result);
+        let block = WebFetchToolResultBlock::new(content, "tool-123");
+
+        let json = serde_json::to_string(&block).unwrap();
+        let actual: Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(actual["type"], "web_fetch_tool_result");
+        assert_eq!(actual["tool_use_id"], "tool-123");
+        assert_eq!(actual["content"]["url"], "https://example.com");
+    }
+
+    #[test]
+    fn error_serialization() {
+        let error = WebFetchToolResultError::new(WebFetchErrorCode::Unavailable);
+        let content = WebFetchToolResultBlockContent::with_error(error);
+        let block = WebFetchToolResultBlock::new(content, "tool-123");
+
+        let json = serde_json::to_string(&block).unwrap();
+        let actual: Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(actual["type"], "web_fetch_tool_result");
+        assert_eq!(actual["tool_use_id"], "tool-123");
+        assert_eq!(actual["content"]["error_code"], "unavailable");
+    }
+
+    #[test]
+    fn deserialization() {
+        let doc = make_text_doc("page content");
+        let result = WebFetchResultContent::new("https://example.com", doc);
+        let content = WebFetchToolResultBlockContent::with_result(result);
+        let block = WebFetchToolResultBlock::new(content, "tool-123");
+
+        let json = serde_json::to_string(&block).unwrap();
+        let deserialized: WebFetchToolResultBlock = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.tool_use_id, "tool-123");
+        assert!(deserialized.has_result());
+        assert!(!deserialized.has_error());
+        assert!(deserialized.cache_control.is_none());
+    }
+
+    #[test]
+    fn with_cache_control() {
+        let doc = make_text_doc("page content");
+        let result = WebFetchResultContent::new("https://example.com", doc);
+        let content = WebFetchToolResultBlockContent::with_result(result);
+        let cache_control = CacheControlEphemeral::new();
+        let block =
+            WebFetchToolResultBlock::new(content, "tool-123").with_cache_control(cache_control);
+
+        assert_eq!(block.tool_use_id, "tool-123");
+        assert!(block.has_result());
+        assert!(block.cache_control.is_some());
+    }
+}

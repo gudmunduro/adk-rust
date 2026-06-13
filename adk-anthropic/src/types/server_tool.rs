@@ -18,8 +18,10 @@ pub enum ServerTool {
     TextEditor20250728,
     /// Web search version 20250305.
     WebSearch20250305,
-    /// Web fetch version 20250124.
+    /// Web fetch version 20250124 (deprecated; use WebFetch20250910).
     WebFetch20250124,
+    /// Web fetch version 20250910.
+    WebFetch20250910,
     /// Code execution version 20250522.
     CodeExecution20250522,
     /// Computer use version 20241022.
@@ -43,6 +45,7 @@ impl ServerTool {
             Self::TextEditor20250728 => "text_editor_20250728",
             Self::WebSearch20250305 => "web_search_20250305",
             Self::WebFetch20250124 => "web_fetch_20250124",
+            Self::WebFetch20250910 => "web_fetch_20250910",
             Self::CodeExecution20250522 => "code_execution_20250522",
             Self::ComputerUse20241022 => "computer_20241022",
             Self::ComputerUse20250124 => "computer_20250124",
@@ -62,6 +65,7 @@ impl From<&str> for ServerTool {
             "text_editor_20250728" => Self::TextEditor20250728,
             "web_search_20250305" => Self::WebSearch20250305,
             "web_fetch_20250124" => Self::WebFetch20250124,
+            "web_fetch_20250910" => Self::WebFetch20250910,
             "code_execution_20250522" => Self::CodeExecution20250522,
             "computer_20241022" => Self::ComputerUse20241022,
             "computer_20250124" => Self::ComputerUse20250124,
@@ -129,6 +133,7 @@ mod tests {
             ServerTool::TextEditor20250728,
             ServerTool::WebSearch20250305,
             ServerTool::WebFetch20250124,
+            ServerTool::WebFetch20250910,
             ServerTool::CodeExecution20250522,
             ServerTool::ComputerUse20241022,
             ServerTool::ComputerUse20250124,

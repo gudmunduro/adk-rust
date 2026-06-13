@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::{
     CodeExecutionResultBlock, DocumentBlock, ImageBlock, ProgrammaticToolUseBlock,
     RedactedThinkingBlock, ServerToolUseBlock, TextBlock, ThinkingBlock, ToolResultBlock,
-    ToolUseBlock, WebSearchToolResultBlock,
+    ToolUseBlock, WebFetchToolResultBlock, WebSearchToolResultBlock,
 };
 
 /// A block of content in a message.
@@ -32,6 +32,10 @@ pub enum ContentBlock {
     /// A web search tool result block
     #[serde(rename = "web_search_tool_result")]
     WebSearchToolResult(WebSearchToolResultBlock),
+
+    /// A web fetch tool result block
+    #[serde(rename = "web_fetch_tool_result")]
+    WebFetchToolResult(WebFetchToolResultBlock),
 
     /// A tool result block
     #[serde(rename = "tool_result")]
@@ -82,6 +86,11 @@ impl ContentBlock {
     /// Returns true if this block is a web search tool result block
     pub fn is_web_search_tool_result(&self) -> bool {
         matches!(self, ContentBlock::WebSearchToolResult(_))
+    }
+
+    /// Returns true if this block is a web fetch tool result block
+    pub fn is_web_fetch_tool_result(&self) -> bool {
+        matches!(self, ContentBlock::WebFetchToolResult(_))
     }
 
     /// Returns true if this block is a tool result block
@@ -145,6 +154,15 @@ impl ContentBlock {
     pub fn as_web_search_tool_result(&self) -> Option<&WebSearchToolResultBlock> {
         match self {
             ContentBlock::WebSearchToolResult(block) => Some(block),
+            _ => None,
+        }
+    }
+
+    /// Returns a reference to the inner WebFetchToolResultBlock if this is a WebFetchToolResult variant,
+    /// or None otherwise.
+    pub fn as_web_fetch_tool_result(&self) -> Option<&WebFetchToolResultBlock> {
+        match self {
+            ContentBlock::WebFetchToolResult(block) => Some(block),
             _ => None,
         }
     }
@@ -242,6 +260,12 @@ impl From<ServerToolUseBlock> for ContentBlock {
 impl From<WebSearchToolResultBlock> for ContentBlock {
     fn from(block: WebSearchToolResultBlock) -> Self {
         ContentBlock::WebSearchToolResult(block)
+    }
+}
+
+impl From<WebFetchToolResultBlock> for ContentBlock {
+    fn from(block: WebFetchToolResultBlock) -> Self {
+        ContentBlock::WebFetchToolResult(block)
     }
 }
 

@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (doc snippet versions must match the workspace version; documented adk-rust
   features must exist), and `scripts/check-publish-order.sh` (a valid publish
   order must exist; warns on versioned internal dev-deps).
+- **adk-anthropic**: added support for WebFetch to mirror the support
+  for WebSearch.
 
 ### Fixed
 
