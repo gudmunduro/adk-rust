@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacky Memory: Mindfulness with Mia</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* ─── Top Bar ─────────────────────────────────────────── */
+        .top-bar {
+            background: #2d2d44;
+            color: #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 24px;
+            font-size: 13px;
+            border-bottom: 1px solid #3a3a5c;
+            position: relative;
+        }
+        .top-bar .title { font-weight: 500; }
+        .top-bar .actions {
+            position: absolute;
+            right: 24px;
+            display: flex;
+            gap: 16px;
+        }
+        .top-bar .actions button {
+            background: none;
+            border: 1px solid #555;
+            color: #aaa;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .top-bar .actions button:hover { border-color: #888; color: #fff; }
+
+        /* ─── Sub Bar ─────────────────────────────────────────── */
+        .sub-bar {
+            background: #0d7377;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 24px;
+            font-size: 12px;
+        }
+        .sub-bar .label { font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sub-bar .time { opacity: 0.7; }
+
+        /* ─── Main Layout ─────────────────────────────────────── */
+        .main-container {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            min-height: calc(100vh - 80px);
+            background: #f0f2f5;
+        }
+
+        /* ─── Left Panel (Voice Session) ──────────────────────── */
+        .left-panel {
+            background: #fff;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 32px 24px 24px;
+        }
+
+        .coach-badge {
+            color: #0d7377;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .coach-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 2px;
+        }
+        .coach-title .name { color: #0d7377; }
+
+        .coach-subtitle {
+            font-size: 13px;
+            color: #888;
+            font-style: italic;
+            margin-bottom: 24px;
+        }
+
+        .avatar-container {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .avatar {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f5e6d3, #e8d5c4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 4px solid #fff;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .avatar svg { width: 100px; height: 100px; }
+
+        .pause-btn {
+            position: absolute;
+            bottom: -8px;
+            right: -8px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #333;
+            color: #fff;
+            border: 3px solid #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .pause-btn:hover { background: #555; }
+
+        /* ─── Memory Cache Section ────────────────────────────── */
+        .memory-cache {
+            width: 100%;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .memory-cache-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .memory-cache-header .label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #0d7377;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .memory-cache-header .label::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #0d7377;
+            border-radius: 50%;
+        }
+        .memory-cache-header .count {
+            font-size: 11px;
+            color: #0d7377;
+            font-weight: 600;
+        }
+
+        .memory-item {
+            font-size: 12px;
+            color: #555;
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .memory-item:last-child { border-bottom: none; }
+        .memory-item .tag {
+            font-size: 10px;
+            font-weight: 600;
+            color: #0d7377;
+            white-space: nowrap;
+        }
+
+        .coaching-guidelines {
+            width: 100%;
+            padding: 12px 0;
+            border-top: 1px solid #eee;
+            margin-top: 8px;
+        }
+        .coaching-guidelines .header {
+            font-size: 11px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .coaching-guidelines .item {
+            font-size: 12px;
+            color: #555;
+            padding: 4px 0;
+        }
+
+        /* ─── Status Bar ──────────────────────────────────────── */
+        .status-bar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            margin-top: auto;
+        }
+        .status-item {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #4caf50;
+        }
+        .status-dot.inactive { background: #ccc; }
+
+        .voice-status {
+            text-align: center;
+            padding: 12px 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: #0d7377;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .voice-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 1.5s infinite;
+        }
+        .voice-status.inactive .dot { background: #ccc; animation: none; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        /* ─── Control Buttons ─────────────────────────────────── */
+        .controls {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            margin-top: 16px;
+        }
+
+        .btn-mute {
+            flex: 1;
+            padding: 14px;
+            border: 2px solid #ddd;
+            background: #fff;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-mute:hover { border-color: #999; }
+        .btn-mute.muted { background: #fee; border-color: #e53935; color: #e53935; }
+
+        .btn-hangup {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            background: #e53935;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-hangup:hover { background: #c62828; }
+        .btn-hangup:disabled { background: #ccc; cursor: not-allowed; }
+
+        .btn-connect {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            background: #0d7377;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 16px;
+        }
+        .btn-connect:hover { background: #0a5c5f; }
+        .btn-connect:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* ─── Right Panel (Insights) ──────────────────────────── */
+        .right-panel {
+            padding: 24px 32px;
+            overflow-y: auto;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: #333; }
+        .tab.active {
+            color: #0d7377;
+            border-bottom-color: #0d7377;
+        }
+        .tab .badge {
+            display: inline-block;
+            background: #0d7377;
+            color: #fff;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            margin-left: 6px;
+        }
+
+        /* ─── Tab Actions ─────────────────────────────────────── */
+        .tab-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .tab-action-btn {
+            font-size: 12px;
+            padding: 6px 14px;
+            border: 1px solid #ddd;
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #555;
+        }
+        .tab-action-btn:hover { border-color: #999; }
+        .tab-action-btn.danger { color: #e53935; border-color: #e53935; }
+        .tab-action-btn.danger:hover { background: #fee; }
+
+        /* ─── Insights Section ────────────────────────────────── */
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 4px;
+        }
+        .section-subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        /* ─── Add Insight Row ─────────────────────────────────── */
+        .add-insight-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 12px 16px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .add-insight-row input {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+        }
+        .add-insight-row input:focus { border-color: #0d7377; }
+        .add-insight-row select {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+            outline: none;
+        }
+        .add-insight-row .btn-add {
+            padding: 8px 16px;
+            background: #0d7377;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .add-insight-row .btn-add:hover { background: #0a5c5f; }
+
+        .add-insight-row .labels {
+            display: contents;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #666;
+            letter-spacing: 0.5px;
+        }
+
+        /* ─── Insight Cards ───────────────────────────────────── */
+        .insights-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .insight-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 16px;
+            position: relative;
+        }
+        .insight-card .category {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .insight-card .date {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 10px;
+            color: #aaa;
+        }
+        .insight-card .content {
+            font-size: 13px;
+            color: #444;
+            line-height: 1.5;
+            font-style: italic;
+        }
+        .insight-card .content::before { content: '"'; }
+        .insight-card .content::after { content: '"'; }
+
+        /* ─── Responsive ──────────────────────────────────────── */
+        @media (max-width: 900px) {
+            .main-container { grid-template-columns: 1fr; }
+            .right-panel { border-top: 1px solid #e0e0e0; }
+        }
+
+        /* ─── Transcript ──────────────────────────────────────── */
+        .transcript-container {
+            margin-top: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            display: none;
+        }
+        .transcript-container.visible { display: block; }
+        .transcript-entry {
+            font-size: 12px;
+            color: #555;
+            padding: 4px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .transcript-entry:last-child { border-bottom: none; }
+        .transcript-entry .role {
+            font-weight: 600;
+            color: #0d7377;
+        }
+        .transcript-entry .role.user { color: #333; }
+        .provider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #555;
+        }
+        .provider-row label { font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .provider-row select {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #fff;
+            font-size: 12px;
+            color: #222;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <span class="title">Hacky Memory: Mindfulness with Mia</span>
+        <div class="actions">
+            <button onclick="location.reload()">↻ Remix</button>
+            <button>⊡ Device</button>
+        </div>
+    </div>
+
+    <!-- Sub Bar -->
+    <div class="sub-bar">
+        <span class="label">Mindfulness Orchestration Engine</span>
+        <span class="time" id="clock"></span>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="main-container">
+        <!-- Left Panel: Voice Session -->
+        <div class="left-panel">
+            <div class="coach-badge">ACTIVE MINDFULNESS COACH</div>
+            <h1 class="coach-title">Mindfulness with <span class="name">Mia</span></h1>
+            <p class="coach-subtitle">"Find your center, take a breath..."</p>
+
+            <div class="avatar-container">
+                <div class="avatar">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Simple avatar face -->
+                        <circle cx="50" cy="40" r="25" fill="#d4a574"/>
+                        <ellipse cx="50" cy="75" rx="30" ry="20" fill="#4a90a4"/>
+                        <!-- Hair -->
+                        <path d="M25 35 Q30 15 50 15 Q70 15 75 35 Q72 25 50 22 Q28 25 25 35" fill="#5c3a21"/>
+                        <path d="M25 35 Q22 50 25 60" fill="#5c3a21" stroke="none"/>
+                        <path d="M75 35 Q78 50 75 60" fill="#5c3a21" stroke="none"/>
+                        <!-- Eyes -->
+                        <circle cx="42" cy="38" r="2" fill="#333"/>
+                        <circle cx="58" cy="38" r="2" fill="#333"/>
+                        <!-- Smile -->
+                        <path d="M43 48 Q50 53 57 48" stroke="#333" stroke-width="1.5" fill="none"/>
+                    </svg>
+                </div>
+                <button class="pause-btn" id="pauseBtn" onclick="togglePause()">⏸</button>
+            </div>
+
+            <!-- Memory Cache -->
+            <div class="memory-cache">
+                <div class="memory-cache-header">
+                    <span class="label">ACTIVE ENGINE MEMORY CACHE</span>
+                    <span class="count" id="contextCount">0 LOADED CONTEXTS</span>
+                </div>
+                <div id="memoryItems">
+                    <div class="memory-item">
+                        <span class="tag">PERSONAL BACKGROUND:</span>
+                        <span>User's name is Shai (sp...</span>
+                    </div>
+                    <div class="memory-item">
+                        <span class="tag">COACHING PREFERENCE:</span>
+                        <span>Explicitly stated it is extr...</span>
+                    </div>
+                    <div class="memory-item">
+                        <span class="tag">COACHING PREFERENCE:</span>
+                        <span>Explicitly rejected a gro...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="coaching-guidelines">
+                <div class="header">ACTIVE COACHING GUIDELINES LOADED:</div>
+                <div class="item">• Always address the user by name (Shai, spelled S-H-A-I), ensuring it is inte...</div>
+            </div>
+
+            <!-- Status -->
+            <div class="status-bar">
+                <div class="status-item">◎ MIA: <span id="miaStatus">0%</span></div>
+                <div class="status-item">USER MISC: <span id="userStatus">23%</span> <span class="status-dot"></span></div>
+            </div>
+
+            <div class="voice-status" id="voiceStatus">
+                <span class="dot"></span>
+                VOICE SESSION ACTIVE
+            </div>
+
+            <!-- Controls -->
+            <div class="controls" id="sessionControls" style="display:none;">
+                <button class="btn-mute" id="muteBtn" onclick="toggleMute()">
+                    🎙 MUTE MIC
+                </button>
+                <button class="btn-hangup" onclick="hangUp()">
+                    ✕ HANG UP
+                </button>
+            </div>
+            <!-- Provider selector -->
+            <div class="provider-row" id="providerRow">
+                <label for="providerSelect">Voice model</label>
+                <select id="providerSelect">
+                    <option value="openai">OpenAI — gpt-realtime (marin)</option>
+                    <option value="gemini">Gemini Live — native audio (Kore)</option>
+                </select>
+            </div>
+            <button class="btn-connect" id="connectBtn" onclick="startSession()">
+                🎤 START VOICE SESSION
+            </button>
+
+            <!-- Transcript -->
+            <div class="transcript-container" id="transcript"></div>
+        </div>
+
+        <!-- Right Panel: Insights -->
+        <div class="right-panel">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab(this, 'insights')">👤 User Memory Insights</div>
+                <div class="tab" onclick="switchTab(this, 'strategy')">⚠ Coaching Strategy</div>
+                <div class="tab" onclick="switchTab(this, 'decisions')">✓ Pipeline Decisions <span class="badge" id="decisionCount">1</span></div>
+            </div>
+
+            <!-- Tab Content: Insights -->
+            <div id="tab-insights">
+                <div class="tab-actions">
+                    <button class="tab-action-btn" onclick="configureGuidelines()">Configure Guidelines</button>
+                    <button class="tab-action-btn danger" onclick="resetSystem()">Reset System</button>
+                </div>
+
+                <h2 class="section-title">Persistent User Profile & Insights</h2>
+                <p class="section-subtitle">Learned incrementally and decided by the persistent agent pipeline.</p>
+
+                <!-- Add Insight Form -->
+                <div class="add-insight-row">
+                    <input type="text" id="insightInput" placeholder="e.g., Loves beach white-noise background sounds during me...">
+                    <select id="insightCategory">
+                        <option>Emotional State</option>
+                        <option>Personal Background</option>
+                        <option>Coaching Preference</option>
+                    </select>
+                    <button class="btn-add" onclick="addInsight()">ADD ROW</button>
+                </div>
+
+                <!-- Insight Cards -->
+                <div class="insights-grid" id="insightsGrid">
+                    <!-- Cards populated by JS -->
+                </div>
+            </div>
+
+            <!-- Tab Content: Strategy (hidden) -->
+            <div id="tab-strategy" style="display:none;">
+                <h2 class="section-title">Coaching Strategy</h2>
+                <p class="section-subtitle">Active coaching patterns and adaptation rules.</p>
+                <div class="insight-card" style="margin-top: 16px;">
+                    <div class="category">ACTIVE STRATEGY</div>
+                    <div class="content" style="font-style: normal;">
+                        Mia uses a gentle, non-directive approach. She mirrors the user's energy level and avoids somatic grounding exercises per user preference. Focus on breath awareness and cognitive reframing.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Decisions (hidden) -->
+            <div id="tab-decisions" style="display:none;">
+                <h2 class="section-title">Pipeline Decisions</h2>
+                <p class="section-subtitle">Real-time decisions made by the orchestration engine.</p>
+                <div id="decisionsLog">
+                    <div class="insight-card" style="margin-top: 16px;">
+                        <div class="category">CONTEXT LOAD</div>
+                        <div class="date">just now</div>
+                        <div class="content" style="font-style: normal;">Loaded 5 memory contexts for session initialization. User preferences applied to coaching guidelines.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ─── State ───────────────────────────────────────────────────────────────
+    // Transport: the browser streams mic PCM to the Rust backend over a
+    // WebSocket; the backend owns the realtime session (IntegratedRealtimeRunner)
+    // and streams the assistant's PCM audio back. No direct browser↔provider link.
+    let ws = null;            // WebSocket to the Rust backend
+    let micStream = null;     // MediaStream from getUserMedia
+    let captureCtx = null;    // AudioContext for mic capture (rate = inputRate)
+    let captureNode = null;   // ScriptProcessor pumping PCM frames
+    let playbackCtx = null;   // AudioContext for assistant playback (rate = outputRate)
+    let nextPlayTime = 0;     // scheduling cursor for gapless playback
+    let liveSources = [];     // scheduled buffer sources (for barge-in flush)
+    let isMuted = false;
+    let isPaused = false;
+    // Sample rates are negotiated per provider via the server's `ready` message
+    // (OpenAI: 24 kHz in/out; Gemini Live: 16 kHz in / 24 kHz out).
+    let inputRate = 24000;
+    let outputRate = 24000;
+
+    const insights = [
+        { category: 'EMOTIONAL STATE', date: '2025-01-11', content: 'User Shai relocated to the Bay area with their family last week and is house hunting.' },
+        { category: 'EMOTIONAL STATE', date: '2025-01-11', content: 'User is frustrated with the Bay Area housing market. Paying to "Apply" just to see a house is insane!' },
+        { category: 'PERSONAL BACKGROUND', date: '2025-01-11', content: 'User\'s name is Shai (spelled S-H-A-I).' },
+        { category: 'COACHING PREFERENCE', date: '2025-01-12', content: 'Explicitly stated it is extremely important to be addressed by name.' },
+        { category: 'COACHING PREFERENCE', date: '2025-01-12', content: 'Explicitly rejected a grounding exercise suggestion, indicating a preference away from somatic grounding.' },
+    ];
+
+    // ─── Init ────────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        renderInsights();
+        updateClock();
+        setInterval(updateClock, 1000);
+        updateContextCount();
+    });
+
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').textContent =
+            `Local Time UTC: ${now.toISOString().slice(0, 16).replace('T', ' ')}`;
+    }
+
+    function updateContextCount() {
+        document.getElementById('contextCount').textContent = `${insights.length} LOADED CONTEXTS`;
+    }
+
+    // ─── Render Insights ─────────────────────────────────────────────────────
+    function renderInsights() {
+        const grid = document.getElementById('insightsGrid');
+        grid.innerHTML = insights.map(i => `
+            <div class="insight-card">
+                <div class="category">${i.category}</div>
+                <div class="date">${i.date}</div>
+                <div class="content">${i.content}</div>
+            </div>
+        `).join('');
+    }
+
+    function addInsight() {
+        const input = document.getElementById('insightInput');
+        const category = document.getElementById('insightCategory');
+        if (!input.value.trim()) return;
+        insights.unshift({
+            category: category.value.toUpperCase(),
+            date: new Date().toISOString().slice(0, 10),
+            content: input.value.trim()
+        });
+        input.value = '';
+        renderInsights();
+        updateContextCount();
+    }
+
+    // ─── Tab Switching ───────────────────────────────────────────────────────
+    function switchTab(el, tabId) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('tab-insights').style.display = tabId === 'insights' ? 'block' : 'none';
+        document.getElementById('tab-strategy').style.display = tabId === 'strategy' ? 'block' : 'none';
+        document.getElementById('tab-decisions').style.display = tabId === 'decisions' ? 'block' : 'none';
+    }
+
+    // ─── Voice Session (server-side bridge) ──────────────────────────────────
+    // The Rust backend runs the realtime session via IntegratedRealtimeRunner.
+    // We open a WebSocket, stream mic PCM16 up, and play PCM16 the server sends
+    // back. Transcripts, status, tool calls and persistence all happen on the
+    // server and arrive here as small JSON control messages.
+    async function startSession() {
+        const btn = document.getElementById('connectBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Connecting...';
+
+        try {
+            const provider = document.getElementById('providerSelect').value;
+
+            // 1. Microphone access
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+            });
+            addDecision('Microphone access granted.');
+
+            // 2. Connect to the Rust backend (it owns the realtime session).
+            //    Audio contexts are created only after the server's `ready`
+            //    message tells us the provider's sample rates.
+            ws = new WebSocket(`ws://${location.host}/ws?provider=${encodeURIComponent(provider)}`);
+            ws.binaryType = 'arraybuffer';
+            ws.onopen = () => addDecision(`Connecting voice session (${provider})…`);
+            ws.onmessage = (evt) => handleServerMessage(JSON.parse(evt.data));
+            ws.onclose = () => { addDecision('Backend disconnected.'); };
+            ws.onerror = () => { addDecision('Backend connection error.'); };
+
+        } catch (e) {
+            btn.disabled = false;
+            btn.textContent = '🎤 START VOICE SESSION (retry)';
+            addDecision('Error: ' + e.message);
+            console.error('Session start failed:', e);
+        }
+    }
+
+    // Activate the session once the server has negotiated sample rates.
+    function activateSession(provider) {
+        document.getElementById('connectBtn').style.display = 'none';
+        document.getElementById('providerRow').style.display = 'none';
+        document.getElementById('sessionControls').style.display = 'flex';
+        document.getElementById('voiceStatus').innerHTML =
+            `<span class="dot"></span> VOICE SESSION ACTIVE — ${provider.toUpperCase()}`;
+        document.getElementById('voiceStatus').classList.remove('inactive');
+        document.getElementById('transcript').classList.add('visible');
+
+        playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: outputRate });
+        nextPlayTime = 0;
+        startMicCapture();
+    }
+
+    // ─── Mic capture → PCM16 → WebSocket ─────────────────────────────────────
+    function startMicCapture() {
+        captureCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: inputRate });
+        const source = captureCtx.createMediaStreamSource(micStream);
+        // ScriptProcessor is deprecated but universally available and adequate
+        // for a demo; an AudioWorklet would be the production choice.
+        captureNode = captureCtx.createScriptProcessor(2048, 1, 1);
+        captureNode.onaudioprocess = (e) => {
+            if (isMuted || !ws || ws.readyState !== WebSocket.OPEN) return;
+            const input = e.inputBuffer.getChannelData(0); // Float32 @ inputRate
+            const pcm16 = floatTo16BitPCM(input);
+            ws.send(JSON.stringify({ type: 'input_audio', audio: bytesToBase64(pcm16) }));
+        };
+        source.connect(captureNode);
+        captureNode.connect(captureCtx.destination); // keep the node alive
+    }
+
+    // ─── Handle control/audio messages from the backend ──────────────────────
+    function handleServerMessage(msg) {
+        switch (msg.type) {
+            case 'ready':
+                inputRate = msg.input_rate || 24000;
+                outputRate = msg.output_rate || 24000;
+                addDecision(`Session ready — ${msg.provider}, mic ${inputRate / 1000}kHz / out ${outputRate / 1000}kHz.`);
+                activateSession(msg.provider || 'openai');
+                break;
+            case 'audio':
+                playPcmChunk(msg.audio);
+                document.getElementById('miaStatus').textContent = 'speaking...';
+                break;
+            case 'assistant_transcript':
+                appendAssistantDelta(msg.delta); // streaming — coalesces into one bubble
+                break;
+            case 'user_transcript':
+                appendUserUtterance(msg.text);
+                break;
+            case 'user_transcript_delta':
+                appendUserDelta(msg.delta); // Gemini streams the user transcript
+                break;
+            case 'user_speaking':
+                document.getElementById('userStatus').textContent = 'speaking...';
+                endAssistantTurn();      // a new user turn closes Mia's bubble
+                flushPlayback();         // barge-in: stop assistant audio immediately
+                break;
+            case 'user_stopped':
+                document.getElementById('userStatus').textContent = 'listening';
+                document.getElementById('miaStatus').textContent = 'thinking...';
+                endUserTurn();           // finalize the user's bubble
+                break;
+            case 'response_done':
+                document.getElementById('miaStatus').textContent = 'idle';
+                endAssistantTurn();      // finalize the current bubble
+                break;
+            case 'tool':
+                addDecision(`Tool ${msg.name}(${msg.args}) → ${msg.result}`);
+                break;
+            case 'decision':
+                addDecision(msg.text);
+                break;
+            case 'error':
+                addDecision('Backend error: ' + msg.message);
+                break;
+        }
+    }
+
+    // ─── PCM helpers ─────────────────────────────────────────────────────────
+    function floatTo16BitPCM(float32) {
+        const out = new Int16Array(float32.length);
+        for (let i = 0; i < float32.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32[i]));
+            out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        }
+        return new Uint8Array(out.buffer);
+    }
+
+    function bytesToBase64(bytes) {
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+    }
+
+    function base64ToInt16(b64) {
+        const bin = atob(b64);
+        const buf = new ArrayBuffer(bin.length);
+        const view = new Uint8Array(buf);
+        for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+        return new Int16Array(buf);
+    }
+
+    // Schedule a PCM16 chunk for gapless playback.
+    function playPcmChunk(b64) {
+        if (!playbackCtx || isPaused) return;
+        const pcm16 = base64ToInt16(b64);
+        const buf = playbackCtx.createBuffer(1, pcm16.length, outputRate);
+        const ch = buf.getChannelData(0);
+        for (let i = 0; i < pcm16.length; i++) ch[i] = pcm16[i] / 0x8000;
+        const src = playbackCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(playbackCtx.destination);
+        const now = playbackCtx.currentTime;
+        if (nextPlayTime < now) nextPlayTime = now;
+        src.start(nextPlayTime);
+        nextPlayTime += buf.duration;
+        liveSources.push(src);
+        src.onended = () => { liveSources = liveSources.filter(s => s !== src); };
+    }
+
+    // Stop all scheduled assistant audio (barge-in / interruption).
+    function flushPlayback() {
+        liveSources.forEach(s => { try { s.stop(); } catch (_) {} });
+        liveSources = [];
+        nextPlayTime = 0;
+    }
+
+    // ─── Transcript Display ──────────────────────────────────────────────────
+    // The assistant transcript streams as many small deltas. Rather than create
+    // a line per delta, we keep one bubble per turn and append into it. `null`
+    // means no turn is in progress, so the next delta starts a fresh bubble.
+    let assistantTextEl = null;
+    let userTextEl = null;
+
+    function newBubble(role) {
+        const container = document.getElementById('transcript');
+        const entry = document.createElement('div');
+        entry.className = 'transcript-entry';
+        const label = document.createElement('span');
+        label.className = `role ${role}`;
+        label.textContent = role === 'user' ? 'You:' : 'Mia:';
+        const text = document.createElement('span');
+        text.className = 'text';
+        entry.appendChild(label);
+        entry.appendChild(document.createTextNode(' '));
+        entry.appendChild(text);
+        container.appendChild(entry);
+        container.scrollTop = container.scrollHeight;
+        return text; // the span that holds the spoken text
+    }
+
+    function appendAssistantDelta(delta) {
+        if (!delta) return;
+        endUserTurn();                   // Mia speaking closes the user's bubble
+        if (!assistantTextEl) assistantTextEl = newBubble('assistant');
+        assistantTextEl.textContent += delta; // textContent: no markup injection
+        document.getElementById('transcript').scrollTop = 1e9;
+    }
+
+    function endAssistantTurn() {
+        assistantTextEl = null;
+    }
+
+    // Streaming user transcript (Gemini): coalesce deltas into one bubble.
+    function appendUserDelta(delta) {
+        if (!delta) return;
+        endAssistantTurn();              // a new user turn closes Mia's bubble
+        if (!userTextEl) userTextEl = newBubble('user');
+        userTextEl.textContent += delta;
+        document.getElementById('transcript').scrollTop = 1e9;
+    }
+
+    function endUserTurn() {
+        userTextEl = null;
+    }
+
+    // Completed user transcript (OpenAI): one finalized bubble.
+    function appendUserUtterance(text) {
+        endUserTurn();
+        endAssistantTurn();              // close any open assistant bubble first
+        if (!text) return;
+        newBubble('user').textContent = text;
+        document.getElementById('transcript').scrollTop = 1e9;
+    }
+
+    // ─── Controls ────────────────────────────────────────────────────────────
+    function toggleMute() {
+        isMuted = !isMuted; // gates mic frames in the capture callback
+        const btn = document.getElementById('muteBtn');
+        btn.textContent = isMuted ? '🔇 UNMUTE' : '🎙 MUTE MIC';
+        btn.classList.toggle('muted', isMuted);
+    }
+
+    function togglePause() {
+        isPaused = !isPaused;
+        document.getElementById('pauseBtn').textContent = isPaused ? '▶' : '⏸';
+        if (!playbackCtx) return;
+        if (isPaused) { flushPlayback(); playbackCtx.suspend(); }
+        else { playbackCtx.resume(); }
+    }
+
+    function hangUp() {
+        if (ws) { try { ws.send(JSON.stringify({ type: 'hangup' })); } catch (_) {} ws.close(); }
+        if (captureNode) captureNode.disconnect();
+        if (captureCtx) captureCtx.close();
+        if (playbackCtx) playbackCtx.close();
+        if (micStream) micStream.getTracks().forEach(t => t.stop());
+        flushPlayback();
+        endAssistantTurn();
+        endUserTurn();
+        ws = micStream = captureCtx = captureNode = playbackCtx = null;
+
+        document.getElementById('connectBtn').style.display = 'block';
+        document.getElementById('connectBtn').disabled = false;
+        document.getElementById('connectBtn').textContent = '🎤 START VOICE SESSION';
+        document.getElementById('providerRow').style.display = 'flex';
+        document.getElementById('sessionControls').style.display = 'none';
+        document.getElementById('voiceStatus').innerHTML = '<span class="dot"></span> SESSION ENDED';
+        document.getElementById('voiceStatus').classList.add('inactive');
+        addDecision('Session ended.');
+    }
+
+    function configureGuidelines() {
+        addDecision('Guidelines configuration opened.');
+    }
+
+    function resetSystem() {
+        if (confirm('Reset all memory and insights?')) {
+            insights.length = 0;
+            renderInsights();
+            updateContextCount();
+            addDecision('System reset. All memory contexts cleared.');
+        }
+    }
+
+    function addDecision(text) {
+        const count = document.getElementById('decisionCount');
+        count.textContent = parseInt(count.textContent) + 1;
+        const log = document.getElementById('decisionsLog');
+        const card = document.createElement('div');
+        card.className = 'insight-card';
+        card.style.marginTop = '16px';
+        card.innerHTML = `
+            <div class="category">PIPELINE DECISION</div>
+            <div class="date">${new Date().toLocaleTimeString()}</div>
+            <div class="content" style="font-style: normal;">${text}</div>
+        `;
+        log.insertBefore(card, log.firstChild);
+    }
+    </script>
+</body>
+</html>
