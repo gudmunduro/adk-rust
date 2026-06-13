@@ -235,9 +235,28 @@ impl RealtimeRunnerBuilder {
         self.tool(definition, FnToolHandler::new(handler))
     }
 
+    /// Register a tool with an `Arc<dyn ToolHandler>` directly.
+    ///
+    /// This is useful when you already have a shared handler and want to avoid
+    /// an extra `Arc` wrapping that the `tool()` method would perform.
+    pub fn tool_arc(mut self, definition: ToolDefinition, handler: Arc<dyn ToolHandler>) -> Self {
+        let name = definition.name.clone();
+        self.tools.insert(name, (definition, handler));
+        self
+    }
+
     /// Set the event handler.
     pub fn event_handler(mut self, handler: impl EventHandler + 'static) -> Self {
         self.event_handler = Some(Arc::new(handler));
+        self
+    }
+
+    /// Set the event handler from an `Arc<dyn EventHandler>` directly.
+    ///
+    /// This is useful when you already have a shared handler and want to avoid
+    /// an extra `Arc` wrapping that the `event_handler()` method would perform.
+    pub fn event_handler_arc(mut self, handler: Arc<dyn EventHandler>) -> Self {
+        self.event_handler = Some(handler);
         self
     }
 
@@ -281,7 +300,7 @@ impl RealtimeRunnerBuilder {
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
-///     let model = OpenAIRealtimeModel::new(api_key, "gpt-4o-realtime-preview-2024-12-17");
+///     let model = OpenAIRealtimeModel::new(api_key, "gpt-realtime");
 ///
 ///     let runner = RealtimeRunner::builder()
 ///         .model(Box::new(model))
@@ -656,6 +675,23 @@ impl RealtimeRunner {
     pub async fn send_tool_response(&self, response: ToolResponse) -> Result<()> {
         let session = self.session_handle().await?;
         session.send_tool_response(response).await
+    }
+
+    /// Execute a tool call against the registered handlers, sending the result
+    /// back to the model when `auto_respond_tools` is enabled.
+    ///
+    /// This is the same dispatch the [`run`](Self::run) loop performs for a
+    /// `response.function_call_arguments.done` event, exposed so that callers
+    /// driving the session manually via [`next_event`](Self::next_event) — such
+    /// as [`IntegratedRealtimeRunner`](crate::integration::IntegratedRealtimeRunner) —
+    /// can execute tools without re-implementing the lookup/respond logic.
+    pub async fn dispatch_tool_call(
+        &self,
+        call_id: &str,
+        name: &str,
+        arguments: &str,
+    ) -> Result<()> {
+        self.execute_tool_call(call_id, name, arguments).await
     }
 
     /// Run the event loop, processing events until disconnected.
