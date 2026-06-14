@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-<meta name="theme-color" content="#0a0f1d" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#070b15" media="(prefers-color-scheme: dark)" />
 <title>Live Translation</title>
 <style>
   /* ── Palette ─────────────────────────────────────────────────────────── */
@@ -22,32 +22,39 @@
     --shadow: 0 1px 3px rgba(16,24,40,.08), 0 10px 28px rgba(16,24,40,.07);
     --radius: 16px;
   }
-  /* Dark — explicit, and system-when-OS-is-dark. */
+  /* Dark — explicit, and system-when-OS-is-dark.
+     Elevation hierarchy so shapes read clearly: page (darkest) <
+     recessed input (panel-2) < raised card (panel), with visible borders. */
   :root[data-theme="dark"] {
-    --bg: #0a0f1d; --bg-grad: #11203a;
-    --panel: #0f1626; --panel-2: #0c1322; --panel-3: #131d31;
-    --line: #1f2a40; --line-strong: #2a3957;
-    --fg: #e9eefc; --muted: #93a4c6; --faint: #647698;
-    --brand: #5b8cff; --brand-ink: #06122c;
-    --accent: #2ad59a; --accent-soft: #0f2a22;
+    --bg: #070b15; --bg-grad: #16294a;
+    --panel: #18223a; --panel-2: #0e1626; --panel-3: #222e4c;
+    --line: #2c3a57; --line-strong: #41527a;
+    --fg: #eaf0fd; --muted: #9fb0d1; --faint: #6f819f;
+    --brand: #6b97ff; --brand-ink: #05122e;
+    --accent: #2fdca0; --accent-soft: #163728;
     --danger: #ff6b6b;
-    --ring: rgba(91,140,255,.4);
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-    --shadow: 0 1px 3px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.45);
+    --ring: rgba(107,151,255,.45);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.55);
+    --shadow: 0 2px 6px rgba(0,0,0,.5), 0 18px 44px rgba(0,0,0,.55);
   }
   @media (prefers-color-scheme: dark) {
     :root[data-theme="system"] {
-      --bg: #0a0f1d; --bg-grad: #11203a;
-      --panel: #0f1626; --panel-2: #0c1322; --panel-3: #131d31;
-      --line: #1f2a40; --line-strong: #2a3957;
-      --fg: #e9eefc; --muted: #93a4c6; --faint: #647698;
-      --brand: #5b8cff; --brand-ink: #06122c;
-      --accent: #2ad59a; --accent-soft: #0f2a22;
+      --bg: #070b15; --bg-grad: #16294a;
+      --panel: #18223a; --panel-2: #0e1626; --panel-3: #222e4c;
+      --line: #2c3a57; --line-strong: #41527a;
+      --fg: #eaf0fd; --muted: #9fb0d1; --faint: #6f819f;
+      --brand: #6b97ff; --brand-ink: #05122e;
+      --accent: #2fdca0; --accent-soft: #163728;
       --danger: #ff6b6b;
-      --ring: rgba(91,140,255,.4);
-      --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-      --shadow: 0 1px 3px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.45);
+      --ring: rgba(107,151,255,.45);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.55);
+      --shadow: 0 2px 6px rgba(0,0,0,.5), 0 18px 44px rgba(0,0,0,.55);
     }
+  }
+  /* Faint top highlight lifts cards off the dark page (light from above). */
+  :root[data-theme="dark"] .card { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05); }
+  @media (prefers-color-scheme: dark) {
+    :root[data-theme="system"] .card { box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.05); }
   }
 
   * { box-sizing: border-box; }
