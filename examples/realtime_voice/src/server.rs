@@ -185,15 +185,8 @@ async fn seed_profile(kg: &GraphMemoryService) -> anyhow::Result<()> {
             entity_type: "background".into(),
             observations: vec!["Recently relocated with family; settling in.".into()],
         },
-        CreateEntityInput {
-            name: "Coaching Preference".into(),
-            entity_type: "preference".into(),
-            observations: vec![
-                "Extremely important to be addressed by name.".into(),
-                "Rejected somatic grounding; prefers breath awareness and cognitive reframing."
-                    .into(),
-            ],
-        },
+        // Coaching guidelines/strategy are intentionally NOT seeded — they start
+        // empty and are populated via "Configure Guidelines" (or learned).
     ];
     kg.create_entities(APP_NAME, USER_ID, entities).await.map_err(|e| anyhow::anyhow!("{e}"))?;
     let relations = vec![
@@ -206,11 +199,6 @@ async fn seed_profile(kg: &GraphMemoryService) -> anyhow::Result<()> {
             source: "Shai".into(),
             relation_type: "feels".into(),
             target: "Emotional State".into(),
-        },
-        CreateRelationInput {
-            source: "Shai".into(),
-            relation_type: "has_preference".into(),
-            target: "Coaching Preference".into(),
         },
     ];
     kg.create_relations(APP_NAME, USER_ID, relations).await.map_err(|e| anyhow::anyhow!("{e}"))?;
