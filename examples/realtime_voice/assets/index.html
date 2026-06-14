@@ -727,7 +727,7 @@
             <div class="tabs">
                 <div class="tab active" onclick="switchTab(this, 'insights')">👤 User Memory Insights</div>
                 <div class="tab" onclick="switchTab(this, 'strategy')">⚠ Coaching Strategy</div>
-                <div class="tab" onclick="switchTab(this, 'decisions')">✓ Pipeline Decisions <span class="badge" id="decisionCount">1</span></div>
+                <div class="tab" onclick="switchTab(this, 'decisions')">✓ Pipeline Decisions <span class="badge" id="decisionCount">0</span></div>
             </div>
 
             <!-- Tab Content: Insights -->
@@ -763,9 +763,7 @@
                 <p class="section-subtitle">Active coaching patterns and adaptation rules.</p>
                 <div class="insight-card" style="margin-top: 16px;">
                     <div class="category">ACTIVE STRATEGY</div>
-                    <div class="content" style="font-style: normal;">
-                        Mia uses a gentle, non-directive approach. She mirrors the user's energy level and avoids somatic grounding exercises per user preference. Focus on breath awareness and cognitive reframing.
-                    </div>
+                    <div class="content" style="font-style: normal;" id="strategyBody">Loading…</div>
                 </div>
             </div>
 
@@ -773,13 +771,8 @@
             <div id="tab-decisions" style="display:none;">
                 <h2 class="section-title">Pipeline Decisions</h2>
                 <p class="section-subtitle">Real-time decisions made by the orchestration engine.</p>
-                <div id="decisionsLog">
-                    <div class="insight-card" style="margin-top: 16px;">
-                        <div class="category">CONTEXT LOAD</div>
-                        <div class="date">just now</div>
-                        <div class="content" style="font-style: normal;">Loaded 5 memory contexts for session initialization. User preferences applied to coaching guidelines.</div>
-                    </div>
-                </div>
+                <div id="decisionsLog"></div>
+                <p class="section-subtitle" id="decisionsEmpty" style="margin-top:16px;">No decisions yet — they appear here as the session runs (tool calls, memory writes, status changes).</p>
             </div>
         </div>
     </div>
@@ -873,13 +866,17 @@
     // graph — the same observations injected into Mia's instruction at session
     // start. Render them from the live graph (no static text).
     function renderGuidelines(entities) {
-        const box = document.getElementById('guidelinesList');
-        if (!box) return;
         const pref = entities.find(e => (e.name || '').toLowerCase() === 'coaching preference');
         const items = (pref && pref.observations) || [];
-        box.innerHTML = items.length
+        const box = document.getElementById('guidelinesList');
+        if (box) box.innerHTML = items.length
             ? items.map(o => `<div class="item">• ${escapeHtml(o)}</div>`).join('')
             : '<div class="item" style="color:var(--faint)">None yet — add one with “Configure Guidelines”.</div>';
+        // The Coaching Strategy tab reflects the same live preferences.
+        const strat = document.getElementById('strategyBody');
+        if (strat) strat.textContent = items.length
+            ? 'Mia adapts to your active coaching preferences: ' + items.join(' ')
+            : 'No coaching preferences set yet — add one with “Configure Guidelines”.';
     }
 
     function renderInsights() {
@@ -1239,6 +1236,7 @@
             renderMemoryCache();
             renderGuidelines(data.entities || []);
             updateContextCount();
+            clearDecisions();   // also clear the session-scoped pipeline log
             addDecision('Memory reset to the seeded baseline profile.');
         } catch (e) {
             console.error(e);
@@ -1249,6 +1247,8 @@
     function addDecision(text) {
         const count = document.getElementById('decisionCount');
         count.textContent = parseInt(count.textContent) + 1;
+        const empty = document.getElementById('decisionsEmpty');
+        if (empty) empty.style.display = 'none';
         const log = document.getElementById('decisionsLog');
         const card = document.createElement('div');
         card.className = 'insight-card';
@@ -1259,6 +1259,14 @@
             <div class="content" style="font-style: normal;">${text}</div>
         `;
         log.insertBefore(card, log.firstChild);
+    }
+
+    // Clear the session-scoped Pipeline Decisions log (used by Reset System).
+    function clearDecisions() {
+        document.getElementById('decisionsLog').innerHTML = '';
+        document.getElementById('decisionCount').textContent = '0';
+        const empty = document.getElementById('decisionsEmpty');
+        if (empty) empty.style.display = '';
     }
     </script>
 </body>
