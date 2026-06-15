@@ -64,6 +64,14 @@ pub trait RealtimeSession: Send + Sync {
     /// Send a text message.
     async fn send_text(&self, text: &str) -> Result<()>;
 
+    /// Send a single video/image frame (base64-encoded, e.g. a JPEG) to the
+    /// model for multimodal input. `mime_type` is the frame's media type
+    /// (e.g. `image/jpeg`). The default is a no-op for providers/sessions that
+    /// don't accept visual input.
+    async fn send_video_frame(&self, _mime_type: &str, _data_base64: &str) -> Result<()> {
+        Ok(())
+    }
+
     /// Send a tool/function response (output **and** a response trigger).
     async fn send_tool_response(&self, response: ToolResponse) -> Result<()>;
 

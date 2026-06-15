@@ -241,6 +241,24 @@ impl<T: OpenAITransportLink> RealtimeSession for OpenAIProtocolHandler<T> {
         self.transport.send_raw(&event).await
     }
 
+    async fn send_video_frame(&self, mime_type: &str, data_base64: &str) -> Result<()> {
+        // OpenAI Realtime accepts images as an input_image content part on a
+        // conversation item (data URL). Callers should throttle frames — this is
+        // image-in-context, not a continuous video stream like Gemini.
+        let event = json!({
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "user",
+                "content": [{
+                    "type": "input_image",
+                    "image_url": format!("data:{mime_type};base64,{data_base64}")
+                }]
+            }
+        });
+        self.transport.send_raw(&event).await
+    }
+
     async fn send_tool_output(&self, response: ToolResponse) -> Result<()> {
         let output = match &response.output {
             Value::String(s) => s.clone(),

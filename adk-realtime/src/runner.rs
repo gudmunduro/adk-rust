@@ -611,6 +611,14 @@ impl RealtimeRunner {
         session.send_text(text).await
     }
 
+    /// Send a base64-encoded video/image frame (e.g. `image/jpeg`) for
+    /// multimodal input, where the provider supports it (Gemini Live; OpenAI as
+    /// an image-in-context item).
+    pub async fn send_video_frame(&self, mime_type: &str, data_base64: &str) -> Result<()> {
+        let session = self.session_handle().await?;
+        session.send_video_frame(mime_type, data_base64).await
+    }
+
     /// Commit the audio buffer (for manual VAD mode).
     pub async fn commit_audio(&self) -> Result<()> {
         let session = self.session_handle().await?;

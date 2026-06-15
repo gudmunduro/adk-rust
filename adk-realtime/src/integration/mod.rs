@@ -281,6 +281,12 @@ impl IntegratedRealtimeRunner {
         self.runner.send_text(text).await
     }
 
+    /// Send a base64-encoded video/image frame (e.g. `image/jpeg`) for
+    /// multimodal input. Delegates to the underlying [`RealtimeRunner`].
+    pub async fn send_video_frame(&self, mime_type: &str, data_base64: &str) -> Result<()> {
+        self.runner.send_video_frame(mime_type, data_base64).await
+    }
+
     /// Trigger a response from the model.
     ///
     /// Delegates to the underlying [`RealtimeRunner`].

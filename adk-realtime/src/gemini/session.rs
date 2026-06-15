@@ -685,6 +685,24 @@ impl RealtimeSession for GeminiRealtimeSession {
         self.send_raw(&msg).await
     }
 
+    async fn send_video_frame(&self, mime_type: &str, data_base64: &str) -> Result<()> {
+        // Gemini Live accepts image frames as realtimeInput media chunks.
+        let msg = GeminiClientMessage {
+            setup: None,
+            realtime_input: Some(GeminiRealtimeInput {
+                audio: None,
+                media_chunks: Some(vec![GeminiMediaChunk {
+                    mime_type: mime_type.to_string(),
+                    data: data_base64.to_string(),
+                }]),
+                text: None,
+            }),
+            tool_response: None,
+            client_content: None,
+        };
+        self.send_raw(&msg).await
+    }
+
     async fn send_text(&self, text: &str) -> Result<()> {
         // Use client_content with turns (correct Gemini Live API format)
         let msg = GeminiClientMessage {
