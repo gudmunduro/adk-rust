@@ -28,6 +28,20 @@ Welcome to the official documentation for ADK-Rust (Agent Development Kit for Ru
 - [Graph Agents](agents/graph-agents.md) - LangGraph-style workflow orchestration
 - [Realtime Agents](agents/realtime-agents.md) - Voice-enabled agents with OpenAI/Gemini
 
+## Realtime & Multimodal
+
+A dedicated, newcomer-friendly guide to building voice + multimodal agents — architecture, concepts, and runnable examples.
+
+- [Overview](realtime/index.md) - Start here: the mental model, install, and a 60-second quick start
+- [Architecture](realtime/architecture.md) - The four layers, event loop, audio pipeline, and turn lifecycle
+- [Providers](realtime/providers.md) - OpenAI Realtime & Gemini Live models, voices, and how to choose
+- [Tools](realtime/tools.md) - Server-side actions: native handlers, bridged `adk_core::Tool`s, parallel calls
+- [Multimodal](realtime/multimodal.md) - Video input via `send_video_frame` and browser camera capture
+- [Affective Dialogue](realtime/affective-dialogue.md) - Emotion-aware responses on Gemini native-audio
+- [Memory](realtime/memory.md) - Context injection, turn storage, and knowledge-graph self-curation
+- [Building Web Apps](realtime/building-web-apps.md) - The server-side bridge, WS protocol, and Web Audio
+- [Examples](realtime/examples.md) - The four runnable examples and a suggested learning path
+
 ## Tools
 
 - [Function Tools](tools/function-tools.md) - Create custom tools with async Rust functions
@@ -45,6 +59,16 @@ Welcome to the official documentation for ADK-Rust (Agent Development Kit for Ru
 
 - [Sessions](sessions/sessions.md) - Session management and lifecycle
 - [State Management](sessions/state.md) - Managing conversation state with prefixes
+
+## Memory
+
+Long-term memory that outlives a session — the persistent counterpart to session state. A dedicated, newcomer-friendly guide to both the semantic store and the bi-temporal knowledge graph.
+
+- [Overview](memory/index.md) - Start here: the two kinds of memory, the mental model, install, and a quick start
+- [Concepts](memory/concepts.md) - `MemoryEntry`, the `MemoryService` trait, search, project scoping, GDPR erasure
+- [Backends](memory/backends.md) - The six stores (InMemory, SQLite, Postgres+pgvector, Redis, MongoDB, Neo4j) and how to choose
+- [Knowledge Graph](memory/knowledge-graph.md) - `GraphMemoryService`: entities, observations, relations, and why bi-temporal matters
+- [Tools & Agents](memory/tools-and-agents.md) - Wiring memory into agents; `remember`/`relate` and the memory tools
 
 ## Callbacks & Events
 

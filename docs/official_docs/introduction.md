@@ -216,7 +216,7 @@ Available features:
 - `tools`: Tool system and built-in tools
 - `sessions`: Session management
 - `artifacts`: Artifact storage
-- `memory`: Memory system with semantic search
+- `memory`: Memory system with semantic search and a bi-temporal knowledge-graph backend (`GraphMemoryService`)
 - `runner`: Agent execution runtime
 - `server`: HTTP server (REST + A2A)
 - `telemetry`: tracing helpers; add `telemetry-otlp` only when exporting OTLP
@@ -224,7 +224,7 @@ Available features:
 - `mcp`: Model Context Protocol integration for `adk-tool`
 - `record-payloads`: opt in to full tracing payload capture
 - `graph`: Graph-based workflows (standard preset)
-- `realtime`: Voice/audio streaming (enterprise preset)
+- `realtime`: Voice + multimodal streaming — OpenAI Realtime & Gemini Live, bidirectional audio, video frames, affective dialogue, server-side tools (enterprise preset)
 - `browser`: Browser automation (enterprise preset)
 - `eval`: Agent evaluation (standard preset)
 - `rag`: RAG pipeline (enterprise preset)

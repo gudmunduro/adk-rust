@@ -5,10 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2026-06-11
+## [1.1.0] - 2026-06-15
 
 ### Added
 
+- **adk-realtime: GA realtime providers + integration tool dispatch** — OpenAI
+  `gpt-realtime` and Gemini Live wired end-to-end through
+  `IntegratedRealtimeRunner`, with **server-side tool execution**, transcript and
+  memory integration, and a per-provider audio-rate handshake. Revives the
+  realtime stack after the preview-model shutdowns; verified live against both
+  providers.
+- **adk-realtime: multimodal video input** — new `RealtimeSession::send_video_frame`
+  (exposed on `RealtimeRunner` and `IntegratedRealtimeRunner`) sends image frames
+  to the model: Gemini Live as continuous `realtimeInput` media chunks, OpenAI
+  Realtime as `input_image` conversation items. Lets an agent see what the user
+  shows the camera. The default trait impl is a no-op, so other backends are
+  unaffected.
+- **adk-realtime: affective dialogue** — `RealtimeConfig::with_affective_dialog`
+  emits `enableAffectiveDialog` (inside `generationConfig`) for Gemini Live
+  native-audio models, so the model adapts its tone to the user's emotion.
+- **adk-memory: bi-temporal knowledge-graph memory** (`graph-memory` feature) —
+  `GraphMemoryService`, a SQLite-backed knowledge graph (entities, typed
+  relations, and time-stamped observations with `valid_from`/`valid_to`
+  supersession) implementing `MemoryService`. Serves a compact **profile card**
+  for prompt injection and records episodic turns off the hot path; recall is
+  token-based so `search` / `load_memory` actually retrieve relevant facts.
+- **adk-tool: knowledge-graph curation tools** (`graph-memory-tools` feature) —
+  agent-callable `remember` / `relate` write tools plus a `GraphMemoryToolset`,
+  so any `LlmAgent` can curate structured long-term memory (recall continues via
+  `LoadMemoryTool` over any `MemoryService`).
+- **adk-model: configurable parallel tool calls for OpenAI** — opt in/out of
+  `parallel_tool_calls` on the OpenAI client (#387).
+- **New examples**:
+  - `customer_service` — multimodal customer-support agent (camera vision, tone,
+    server-side `process_refund` / `connect_to_human` tools), OpenAI or Gemini.
+  - `live_translation` — real-time speech-to-speech translation via the dedicated
+    translation models (OpenAI `gpt-realtime-translate`, Gemini
+    `gemini-3.5-live-translate-preview`).
+  - `knowledge_graph_agent` — a plain text `LlmAgent` with KG memory that persists
+    across sessions.
+  - `realtime_tools` — headless function-calling demo over the GA realtime API.
+  - `realtime_voice` ("Mia") reworked to be backed by a real knowledge graph.
+  - All web-UI examples ship **system / light / dark** themes.
 - **adk-telemetry: direct SQLite span export** (`sqlite` feature; facade forwards
   as `telemetry-sqlite`) — zero-infrastructure tracing with no collector or
   backend to deploy (#373, export half):
@@ -57,6 +95,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **adk-realtime: one `response.create` per turn for parallel tool calls** — the
+  runner fired a response per tool, so two tools in one turn hit OpenAI's
+  *"conversation already has an active response in progress"* and stalled the
+  session. Tool outputs are now sent as they complete and a single response is
+  triggered once the dispatch response finishes (`send_tool_output` +
+  `respond_after_tools`); works for both the `run()` loop and the
+  `IntegratedRealtimeRunner` pull-loop. Regression tests added.
+- **adk-model (OpenAI-compatible): reasoning-field fallback** — providers that
+  return reasoning under a `reasoning` field are now surfaced correctly (#388).
 - **adk-gemini: fix tool definition for Gemini 3 compatibility** — renamed
   `function_declarations` field to `functionDeclarations` to match the
   `camelCase` requirement of the Gemini 3 / 2.5 REST API.

@@ -190,7 +190,7 @@ Built-in tools:
 ### Production Features
 
 - **Session Management**: In-memory and SQLite-backed sessions with state persistence, encrypted sessions with AES-256-GCM and key rotation
-- **Memory System**: Long-term memory with semantic search, vector embeddings, and project-scoped isolation
+- **Memory System**: Long-term memory with semantic search, vector embeddings, project-scoped isolation, and a bi-temporal **knowledge-graph** backend (`GraphMemoryService`) with agent-callable `remember`/`relate` tools
 - **Servers**: REST API with SSE streaming, A2A v1.0.0 protocol for agent-to-agent communication
 - **A2A Quick Start**: `A2aServer::quick_start(agent)` — expose any agent via A2A in one line. Or use `cargo adk new --template a2a-server` to scaffold a complete project.
 - **Guardrails**: PII redaction, content filtering, JSON schema validation
@@ -212,7 +212,7 @@ Built-in tools:
 | `adk-tool` | Tool system and extensibility | `FunctionTool`, Google Search, MCP protocol with elicitation, schema validation |
 | `adk-session` | Session and state management | SQLite/in-memory backends, conversation history, state persistence |
 | `adk-artifact` | Artifact storage system | File-based storage, MIME type handling, image/PDF/video support |
-| `adk-memory` | Long-term memory | Vector embeddings, semantic search, project-scoped isolation, 6 backends |
+| `adk-memory` | Long-term memory | Vector embeddings, semantic search, project-scoped isolation, bi-temporal knowledge graph (`GraphMemoryService`), 6 backends |
 | `adk-payments` | Agentic commerce orchestration | ACP/AP2 adapters, canonical transaction kernel, durable journals, evidence-backed payment flows |
 | `awp-types` | AWP protocol types | Trust levels, requester types, discovery documents, capability manifests, payment intents, typed A2A messages — zero `adk-*` deps |
 | `adk-awp` | Agentic Web Protocol implementation | Business context loading, discovery/manifest generation, rate limiting, consent, events, health state machine, AWP routes |
@@ -221,7 +221,7 @@ Built-in tools:
 | `adk-runner` | Agent execution runtime | Context management, event streaming, session lifecycle, callbacks |
 | `adk-server` | Production API servers | REST API, A2A v1.0.0 protocol (all 11 operations), middleware, health checks |
 | `adk-cli` | Command-line interface | Interactive REPL, session management, MCP server integration |
-| `adk-realtime` | Real-time voice agents | OpenAI Realtime API, Gemini Live API, bidirectional audio, VAD |
+| `adk-realtime` | Real-time voice & multimodal agents | OpenAI Realtime + Gemini Live, bidirectional audio, video frames, VAD, affective dialogue, server-side tools via `IntegratedRealtimeRunner` |
 | `adk-graph` | Graph-based workflows | LangGraph-style orchestration, state management, checkpointing, human-in-the-loop |
 | `adk-browser` | Browser automation | 46 WebDriver tools, navigation, forms, screenshots, PDF generation |
 | `adk-eval` | Agent evaluation | Test definitions, trajectory validation, LLM-judged scoring, rubrics |
@@ -583,7 +583,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - Bidirectional audio streaming (PCM16, G711, Opus)
 - Server-side Voice Activity Detection (VAD)
 - Mid-session context mutation — swap instructions and tools without dropping the call
-- Real-time tool calling during voice conversations
+- Real-time tool calling during voice conversations (server-side, via `IntegratedRealtimeRunner`)
+- **Multimodal video input** — stream camera frames to the model with `send_video_frame` (Gemini continuous; OpenAI image items)
+- **Affective dialogue** — tone-aware responses on Gemini native-audio models (`with_affective_dialog`)
 - Multi-agent handoffs for complex workflows
 - Zero-allocation LiveKit audio output path
 
@@ -604,6 +606,21 @@ cargo run -p adk-realtime --example openai_webrtc --features openai-webrtc
 
 # Gemini Live context mutation
 cargo run -p adk-realtime --example gemini_context_mutation --features gemini
+```
+
+**Multimodal & web-UI example apps** (standalone crates in `examples/`, OpenAI or Gemini, with system/light/dark themed UIs):
+```bash
+# Multimodal customer-service agent — sees the camera, reads tone, runs refund/handoff tools
+cargo run --manifest-path examples/customer_service/Cargo.toml      # → http://localhost:3066
+
+# "Mindfulness with Mia" — voice agent backed by a real knowledge graph
+cargo run --manifest-path examples/realtime_voice/Cargo.toml        # → http://localhost:3033
+
+# Live speech-to-speech translation (gpt-realtime-translate / Gemini Live Translate)
+cargo run --manifest-path examples/live_translation/Cargo.toml      # → http://localhost:3055
+
+# Headless function-calling smoke test over the GA realtime API
+cargo run --manifest-path examples/realtime_tools/Cargo.toml -- probe openai
 ```
 
 ### Agentic Web Protocol (AWP)
