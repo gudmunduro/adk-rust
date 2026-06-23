@@ -196,6 +196,53 @@ let runtime = Arc::new(
 );
 ```
 
+### OS access
+
+Operating-system effects a script attempts — filesystem reads/writes,
+`os.getenv`/`os.environ`, and `date.today()`/`datetime.now()` — are serviced
+*in place* against a host-controlled policy. They are **not** tools and never
+pause the agent loop. By default a runtime is fully sandboxed (no filesystem
+access, an empty environment, host clock enabled). Grant specific access with
+the builder:
+
+```rust,ignore
+use adk_codeact_monty::{MontyRuntime, PathAccess};
+
+let runtime = Arc::new(
+    MontyRuntime::builder()
+        // Mount host directories at virtual paths; Monty enforces the boundary
+        // (canonicalization + symlink-escape detection) so a script can never
+        // escape a mount. Reads/writes outside every mount raise PermissionError.
+        .allow_path("/data", "/srv/agent/data", PathAccess::ReadOnly)
+        .allow_path("/out", "/srv/agent/out", PathAccess::ReadWrite)
+        // Expose an explicit environment map to os.getenv / os.environ. Empty by
+        // default — the host process environment is never exposed implicitly.
+        .environ_var("PROJECT", "acme")
+        // date.today() / datetime.now() read the host clock (enabled by default).
+        .system_clock(true)
+        .build(),
+);
+```
+
+Network and subprocess access have no Monty OS-call surface and remain
+unavailable regardless of policy. The granted access is described to the model
+in the system prompt, so it knows which paths it may read or write and which
+environment variables exist.
+
+Monty implements only a subset of `pathlib.Path`, so when paths are mounted the
+prompt lists the exact supported methods (any other raises `AttributeError`):
+
+- **Read/query** (any mount): `exists()`, `is_file()`, `is_dir()`,
+  `is_symlink()`, `read_text()`, `read_bytes()`, `stat()`, `iterdir()`,
+  `resolve()`, `absolute()`, `open("r")`.
+- **Write** (read-write mounts only): `write_text()`, `write_bytes()`,
+  `append_text()`, `append_bytes()`, `mkdir()`, `unlink()`, `rmdir()`,
+  `rename()`, `open("w")`/`open("a")`.
+- **Pure path ops** (no I/O): the `/` operator and `joinpath()`,
+  `is_absolute()`, `with_name()`, `with_stem()`, `with_suffix()`, `as_posix()`,
+  and the `.name`, `.parent`, `.stem`, `.suffix`, `.suffixes`, `.parts`
+  properties.
+
 Tools are invoked through a single built-in function,
 `call_tool("name", {"arg": value, ...})` — the only way to call a tool; they are
 never in scope as bare callables. The tool name is a string literal and every

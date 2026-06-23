@@ -68,7 +68,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   argument, or a non-string argument key — is refused with a corrective error
   rather than silently dispatched. Kept outside the workspace (Monty is a git
   dependency, not yet on crates.io); a runnable `examples/codeact_monty_agent`
-  drives it offline.
+  drives it offline. **Configurable OS access:** filesystem, environment, and
+  clock OS calls are serviced *in place* (never tools, never pausing the agent
+  loop) against a host-controlled `OsAccess` policy. `MontyRuntimeBuilder`
+  exposes `allow_path(virtual, host, PathAccess::ReadOnly|ReadWrite)` to mount
+  host directories (boundary-enforced by Monty), `environ`/`environ_var` to
+  expose an explicit environment map to `os.getenv`/`os.environ`, and
+  `system_clock(bool)` to gate `date.today()`/`datetime.now()`. The default is
+  fully sandboxed (no filesystem access, empty environment, host clock enabled),
+  and the granted access is described to the model in the system prompt —
+  including the exact subset of `pathlib.Path` Monty implements (read/query,
+  write, and pure path ops) whenever paths are mounted, since Monty does not
+  support the full `pathlib.Path` API.
 - **adk-agent: `CodeRuntime` interpreter seam** — the language-agnostic contract
   a CodeAct runtime implements. `PendingCall` exposes a call's arguments the way
   an interpreter produces them — `positional_args()` and `keyword_args()`
