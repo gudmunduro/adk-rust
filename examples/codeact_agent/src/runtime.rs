@@ -1,10 +1,11 @@
 //! A tiny, self-contained [`CodeRuntime`] for the CodeAct example.
 //!
 //! Production CodeAct uses a real interpreter (the intended adapter wraps
-//! Pydantic's Monty, a Rust-native Python). To keep this example runnable with
-//! no native dependencies, `LineScriptRuntime` interprets a deliberately minimal
-//! *line script* language while still exercising the full [`CodeRuntime`] seam,
-//! including suspend/resume at a call boundary.
+//! Pydantic's Monty, a Rust-native Python; see the `adk-codeact-monty` crate).
+//! To keep this example runnable with no native dependencies, `LineScriptRuntime`
+//! interprets a deliberately minimal *line script* language while still
+//! exercising the full [`CodeRuntime`] seam, including suspend/resume at a call
+//! boundary.
 //!
 //! # Language
 //!
@@ -50,10 +51,14 @@ impl Program {
 /// call (with the remaining program as its continuation), while `OBSERVE`/`FINAL`
 /// complete the script. Blank and comment lines were already stripped in
 /// [`Program::parse`], so there is nothing to skip here.
+///
+/// Malformed instructions are the model's mistake, so they surface as
+/// [`RunStep::Raised`] (fed back to the model) — never a [`RuntimeError`], which
+/// is reserved for genuine host failures.
 fn step(mut program: Program) -> Result<RunStep, RuntimeError> {
     if program.lines.is_empty() {
         // No FINAL was reached: report it as a script error the model can react to.
-        return Ok(RunStep::Raised("script ended without a FINAL result".to_string()));
+        return Ok(RunStep::raised("script ended without a FINAL result"));
     }
     let line = program.lines.remove(0);
     let (op, rest) = match line.split_once(char::is_whitespace) {
@@ -66,35 +71,50 @@ fn step(mut program: Program) -> Result<RunStep, RuntimeError> {
                 .split_once(char::is_whitespace)
                 .map(|(n, a)| (n.trim(), a.trim()))
                 .unwrap_or((rest, "{}"));
-            let args: Value = serde_json::from_str(args_str)
-                .map_err(|e| RuntimeError::Parse(format!("bad CALL args: {e}")))?;
+            let args: Value = match serde_json::from_str(args_str) {
+                Ok(args) => args,
+                Err(e) => return Ok(RunStep::raised(format!("bad CALL args: {e}"))),
+            };
             let call_id = program.next_call_id;
             program.next_call_id += 1;
-            Ok(RunStep::Call(Box::new(LinePendingCall {
+            let (positional, keyword) = split_args(args);
+            Ok(RunStep::call(Box::new(LinePendingCall {
                 name: name.to_string(),
-                args,
+                positional,
+                keyword,
                 call_id,
                 remaining: program,
             })))
         }
-        "OBSERVE" => {
-            let value = resolve(rest, &program.last)?;
-            Ok(RunStep::Complete(json!({"type": "observation", "value": value})))
-        }
-        "FINAL" => {
-            let value = resolve(rest, &program.last)?;
-            Ok(RunStep::Complete(json!({"type": "final_result", "value": value})))
-        }
-        other => Ok(RunStep::Raised(format!("unknown instruction: {other}"))),
+        "OBSERVE" => match resolve(rest, &program.last) {
+            Ok(value) => Ok(RunStep::complete(json!({"type": "observation", "value": value}))),
+            Err(message) => Ok(RunStep::raised(message)),
+        },
+        "FINAL" => match resolve(rest, &program.last) {
+            Ok(value) => Ok(RunStep::complete(json!({"type": "final_result", "value": value}))),
+            Err(message) => Ok(RunStep::raised(message)),
+        },
+        other => Ok(RunStep::raised(format!("unknown instruction: {other}"))),
     }
 }
 
 /// Resolve a literal JSON argument, or the special `$last` token, to a value.
-fn resolve(text: &str, last: &Value) -> Result<Value, RuntimeError> {
+fn resolve(text: &str, last: &Value) -> Result<Value, String> {
     if text == "$last" {
         return Ok(last.clone());
     }
-    serde_json::from_str(text).map_err(|e| RuntimeError::Parse(format!("bad JSON value: {e}")))
+    serde_json::from_str(text).map_err(|e| format!("bad JSON value: {e}"))
+}
+
+/// Split JSON args into the positional/keyword shape the seam expects: an object
+/// becomes keyword args (the common case here), an array becomes positional.
+fn split_args(args: Value) -> (Vec<Value>, Vec<(String, Value)>) {
+    match args {
+        Value::Object(map) => (Vec::new(), map.into_iter().collect()),
+        Value::Array(items) => (items, Vec::new()),
+        Value::Null => (Vec::new(), Vec::new()),
+        other => (vec![other], Vec::new()),
+    }
 }
 
 /// A self-contained [`CodeRuntime`] over the line-script language.
@@ -115,7 +135,7 @@ impl CodeRuntime for LineScriptRuntime {
             }
             // A raised error in this toy language simply ends the script; a real
             // runtime would inject it at the call site so the script could catch it.
-            ResumeWith::Raise(message) => Ok(RunStep::Raised(message)),
+            ResumeWith::Raise(message) => Ok(RunStep::raised(message)),
         }
     }
 
@@ -134,7 +154,8 @@ impl CodeRuntime for LineScriptRuntime {
 /// A paused tool call: its continuation is just the remaining [`Program`].
 struct LinePendingCall {
     name: String,
-    args: Value,
+    positional: Vec<Value>,
+    keyword: Vec<(String, Value)>,
     call_id: u64,
     remaining: Program,
 }
@@ -144,8 +165,12 @@ impl PendingCall for LinePendingCall {
         &self.name
     }
 
-    fn args(&self) -> &Value {
-        &self.args
+    fn positional_args(&self) -> &[Value] {
+        &self.positional
+    }
+
+    fn keyword_args(&self) -> &[(String, Value)] {
+        &self.keyword
     }
 
     fn call_id(&self) -> u64 {
@@ -163,7 +188,7 @@ impl PendingCall for LinePendingCall {
                 remaining.last = value;
                 step(remaining)
             }
-            ResumeWith::Raise(message) => Ok(RunStep::Raised(message)),
+            ResumeWith::Raise(message) => Ok(RunStep::raised(message)),
         }
     }
 }

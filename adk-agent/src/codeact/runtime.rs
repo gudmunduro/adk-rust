@@ -5,9 +5,23 @@
 //! call decide whether to resume with a value, resume by raising an error, or
 //! suspend (serialize the continuation and stop).
 //!
-//! Errors are opaque strings produced by the runtime in whatever form the model
-//! expects for that engine (a Python traceback, a JS stack, a shell error). The
-//! framework never inspects them.
+//! # Errors: script vs. host
+//!
+//! Two error channels, kept deliberately distinct:
+//!
+//! - **Script errors** — anything the *model* should see and react to (a syntax
+//!   error, an uncaught exception, a resource-limit cancellation) are
+//!   [`RunStep::Raised`]: an opaque string the runtime renders however its
+//!   language expects (a Python traceback, a JS stack, a shell error). The
+//!   framework never inspects them; they are fed back to the model verbatim and
+//!   the run continues. **Returning `Ok(RunStep::Raised(..))` is always the right
+//!   move for a model mistake — including a parse/compile failure.**
+//! - **Host failures** — genuine interpreter/host breakage that should abort the
+//!   run (snapshot (de)serialization failure, an internal interpreter error) are
+//!   [`RuntimeError`].
+//!
+//! When in doubt: if the model could fix it by writing different code, it is a
+//! [`RunStep::Raised`], not a [`RuntimeError`].
 //!
 //! # Async note
 //!
@@ -33,19 +47,17 @@
 use std::sync::Arc;
 
 use adk_core::Tool;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use thiserror::Error;
 
 /// A host-level failure of the runtime itself (not a script-level error).
 ///
-/// Script errors are modelled as [`RunStep::Raised`] (an opaque string); this
-/// type is for genuine interpreter/host failures (parse failure, snapshot
-/// (de)serialization failure, internal interpreter errors).
+/// Script errors — including syntax/parse failures — are modelled as
+/// [`RunStep::Raised`] (an opaque string fed back to the model). This type is
+/// reserved for genuine interpreter/host failures that should abort the run:
+/// snapshot (de)serialization failure or an internal interpreter error.
 #[derive(Debug, Error)]
 pub enum RuntimeError {
-    /// The script could not be parsed/compiled.
-    #[error("failed to parse script: {0}")]
-    Parse(String),
     /// A snapshot could not be serialized or restored.
     #[error("snapshot error: {0}")]
     Snapshot(String),
@@ -68,28 +80,98 @@ pub enum ResumeWith {
 }
 
 /// The result of advancing the interpreter to its next host-relevant stop.
+///
+/// Every variant carries the `stdout` (e.g. `print`) the script produced *since
+/// the previous step*. Runtimes that capture output attach it (see
+/// [`RunStep::with_stdout`]); those that don't leave it empty. The driver
+/// surfaces captured output back to the model so it can see what its code
+/// printed. Construct values with [`RunStep::call`], [`RunStep::complete`], and
+/// [`RunStep::raised`].
 pub enum RunStep {
     /// The script called an external function (a tool). Resume it to continue.
-    Call(Box<dyn PendingCall>),
+    Call {
+        /// The paused external-function call.
+        call: Box<dyn PendingCall>,
+        /// Output the script produced since the previous step (empty if none or
+        /// if the runtime does not capture output).
+        stdout: String,
+    },
     /// The script ran to completion; carries the returned value (decoded to JSON).
-    Complete(Value),
-    /// The script failed: an error propagated to the top. The string is the
+    Complete {
+        /// The value the script returned, decoded to JSON.
+        value: Value,
+        /// Output the script produced since the previous step.
+        stdout: String,
+    },
+    /// The script failed: an error propagated to the top. The message is the
     /// runtime's native error rendering, fed back to the model verbatim. This
-    /// also covers resource-limit cancellations — the framework does not care
-    /// which; the message says so.
-    Raised(String),
+    /// also covers resource-limit cancellations and parse/compile failures — the
+    /// framework does not care which; the message says so.
+    Raised {
+        /// The runtime's native error rendering.
+        message: String,
+        /// Output the script produced before the error.
+        stdout: String,
+    },
+}
+
+impl RunStep {
+    /// A tool-call step with no captured output.
+    #[must_use]
+    pub fn call(call: Box<dyn PendingCall>) -> Self {
+        Self::Call { call, stdout: String::new() }
+    }
+
+    /// A completion step with no captured output.
+    #[must_use]
+    pub fn complete(value: Value) -> Self {
+        Self::Complete { value, stdout: String::new() }
+    }
+
+    /// A script-error step with no captured output.
+    #[must_use]
+    pub fn raised(message: impl Into<String>) -> Self {
+        Self::Raised { message: message.into(), stdout: String::new() }
+    }
+
+    /// Attach captured `stdout` to this step (builder-style).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use adk_agent::codeact::RunStep;
+    /// use serde_json::json;
+    ///
+    /// let step = RunStep::complete(json!({"type": "final_result", "value": 1}))
+    ///     .with_stdout("hello\n");
+    /// ```
+    #[must_use]
+    pub fn with_stdout(mut self, stdout: impl Into<String>) -> Self {
+        let slot = match &mut self {
+            Self::Call { stdout, .. } => stdout,
+            Self::Complete { stdout, .. } => stdout,
+            Self::Raised { stdout, .. } => stdout,
+        };
+        *slot = stdout.into();
+        self
+    }
 }
 
 impl std::fmt::Debug for RunStep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Call(call) => f
+            Self::Call { call, stdout } => f
                 .debug_struct("Call")
                 .field("function_name", &call.function_name())
                 .field("call_id", &call.call_id())
+                .field("stdout", stdout)
                 .finish(),
-            Self::Complete(value) => f.debug_tuple("Complete").field(value).finish(),
-            Self::Raised(message) => f.debug_tuple("Raised").field(message).finish(),
+            Self::Complete { value, stdout } => {
+                f.debug_struct("Complete").field("value", value).field("stdout", stdout).finish()
+            }
+            Self::Raised { message, stdout } => {
+                f.debug_struct("Raised").field("message", message).field("stdout", stdout).finish()
+            }
         }
     }
 }
@@ -98,11 +180,23 @@ impl std::fmt::Debug for RunStep {
 ///
 /// It can be resumed exactly once (consuming it), or its continuation can be
 /// serialized with [`dump`](Self::dump) for suspend-to-store before resuming.
+///
+/// # Arguments
+///
+/// A call exposes its arguments the way an interpreter actually produces them —
+/// [`positional_args`](Self::positional_args) and
+/// [`keyword_args`](Self::keyword_args), separately. The driver binds them onto
+/// the tool's parameter names (via [`bind_call_args`]) before invoking the tool,
+/// so a runtime never needs the tool's schema to name positional arguments. A
+/// runtime whose language has only keyword arguments returns an empty positional
+/// slice; one with only positional arguments returns an empty keyword slice.
 pub trait PendingCall: Send {
     /// The name of the external function (tool) the script called.
     fn function_name(&self) -> &str;
-    /// The positional/keyword arguments, marshalled to JSON.
-    fn args(&self) -> &Value;
+    /// The positional arguments, in call order, marshalled to JSON.
+    fn positional_args(&self) -> &[Value];
+    /// The keyword arguments, in call order, marshalled to JSON.
+    fn keyword_args(&self) -> &[(String, Value)];
     /// The interpreter-assigned unique id for this call.
     fn call_id(&self) -> u64;
     /// Serialize the suspended continuation to bytes (valid while paused here).
@@ -120,7 +214,9 @@ pub trait CodeRuntime: Send + Sync {
     /// call, completion, or error.
     ///
     /// `script_name` is used by the runtime for error messages (e.g. a
-    /// traceback filename).
+    /// traceback filename). A parse/compile failure is a *model* mistake and
+    /// should be returned as `Ok(`[`RunStep::Raised`]`)`, not as a
+    /// [`RuntimeError`].
     fn start(&self, script: &str, script_name: &str) -> Result<RunStep, RuntimeError>;
 
     /// Restore a suspended continuation (from [`PendingCall::dump`]) and resume
@@ -144,10 +240,16 @@ pub trait CodeRuntime: Send + Sync {
     /// and conventions.
     ///
     /// How a tool is *named and called* is language-dependent, so the runtime
-    /// owns this rendering. The default emits a generic, language-neutral
-    /// listing via [`default_tool_catalog`]; a language-specific runtime (e.g. a
-    /// Python runtime) overrides this to emit idiomatic signatures or stubs the
-    /// model should call. Returns an empty string when there are no tools.
+    /// owns this rendering. This is a **pure function of `tools`** — called once
+    /// per invocation purely to produce prompt text. A runtime does not need to
+    /// remember anything from it: argument binding is handled centrally by the
+    /// driver (see [`bind_call_args`]), so there is no need to stash schemas or
+    /// parameter orderings here.
+    ///
+    /// The default emits a generic, language-neutral listing via
+    /// [`default_tool_catalog`]; a language-specific runtime (e.g. a Python
+    /// runtime) overrides this to emit idiomatic signatures or stubs the model
+    /// should call. Returns an empty string when there are no tools.
     fn render_tools(&self, tools: &[Arc<dyn Tool>]) -> String {
         let catalog = default_tool_catalog(tools);
         if catalog.trim().is_empty() {
@@ -155,6 +257,78 @@ pub trait CodeRuntime: Send + Sync {
         }
         format!("Available tools:\n{catalog}")
     }
+}
+
+/// Bind a call's positional and keyword arguments onto a tool's parameters,
+/// producing the single JSON object a [`Tool`] expects.
+///
+/// This is the *one* place positional arguments are mapped onto names, so no
+/// runtime needs the tool's schema at the call boundary. Keyword arguments are
+/// inserted by name; positional arguments are matched, in order, against the
+/// tool's parameter names (the schema's `required` list first, then any
+/// remaining `properties`). A positional argument with no corresponding name
+/// (or for a tool with no schema) falls back to `arg0`, `arg1`, ... so nothing
+/// is silently dropped. A keyword always wins over a positional for the same
+/// name.
+///
+/// # Example
+///
+/// ```
+/// use std::sync::Arc;
+/// use adk_agent::codeact::bind_call_args;
+/// # use adk_core::{Tool, ToolContext};
+/// # use async_trait::async_trait;
+/// use serde_json::{json, Value};
+///
+/// # struct Add;
+/// # #[async_trait]
+/// # impl Tool for Add {
+/// #     fn name(&self) -> &str { "add" }
+/// #     fn description(&self) -> &str { "add" }
+/// #     fn parameters_schema(&self) -> Option<Value> {
+/// #         Some(json!({"type": "object", "properties": {"a": {}, "b": {}}, "required": ["a", "b"]}))
+/// #     }
+/// #     async fn execute(&self, _c: Arc<dyn ToolContext>, _a: Value) -> adk_core::Result<Value> { Ok(Value::Null) }
+/// # }
+/// let tool = Add;
+/// let bound = bind_call_args(&tool, &[json!(1), json!(2)], &[]);
+/// assert_eq!(bound, json!({"a": 1, "b": 2}));
+/// ```
+pub fn bind_call_args(tool: &dyn Tool, positional: &[Value], keyword: &[(String, Value)]) -> Value {
+    let mut map = Map::new();
+    for (name, value) in keyword {
+        map.insert(name.clone(), value.clone());
+    }
+    if !positional.is_empty() {
+        let names = ordered_parameter_names(tool);
+        for (index, value) in positional.iter().enumerate() {
+            let key = names.get(index).cloned().unwrap_or_else(|| format!("arg{index}"));
+            map.entry(key).or_insert_with(|| value.clone());
+        }
+    }
+    Value::Object(map)
+}
+
+/// The tool's parameter names in positional order: `required` (ordered) first,
+/// then any remaining `properties` keys.
+fn ordered_parameter_names(tool: &dyn Tool) -> Vec<String> {
+    let Some(schema) = tool.parameters_schema() else {
+        return Vec::new();
+    };
+    let required: Vec<String> = schema
+        .get("required")
+        .and_then(Value::as_array)
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+        .unwrap_or_default();
+    let mut ordered = required.clone();
+    if let Some(props) = schema.get("properties").and_then(Value::as_object) {
+        for key in props.keys() {
+            if !ordered.contains(key) {
+                ordered.push(key.clone());
+            }
+        }
+    }
+    ordered
 }
 
 /// A generic, language-neutral tool listing.
@@ -269,5 +443,30 @@ mod tests {
         // A roster of only server-side tools yields no callable catalog.
         assert!(rt.render_tools(&[builtin_tool()]).is_empty());
         assert!(rt.render_tools(&[echo_tool()]).starts_with("Available tools:"));
+    }
+
+    #[test]
+    fn bind_call_args_maps_positional_and_prefers_keyword() {
+        use crate::codeact::test_support::echo_tool;
+        use serde_json::json;
+        // echo_tool's schema has no parameters, so positional args fall back to
+        // arg0/arg1; keyword args bind by name.
+        let tool = echo_tool();
+        let bound =
+            bind_call_args(tool.as_ref(), &[json!(1)], &[("label".to_string(), json!("x"))]);
+        assert_eq!(bound, json!({"arg0": 1, "label": "x"}));
+    }
+
+    #[test]
+    fn run_step_constructors_and_with_stdout() {
+        use serde_json::json;
+        let step = RunStep::complete(json!(1)).with_stdout("hi");
+        match step {
+            RunStep::Complete { value, stdout } => {
+                assert_eq!(value, json!(1));
+                assert_eq!(stdout, "hi");
+            }
+            other => panic!("expected Complete, got {other:?}"),
+        }
     }
 }

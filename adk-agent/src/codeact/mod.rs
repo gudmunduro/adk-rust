@@ -110,11 +110,11 @@
 //! # Runtime
 //!
 //! Execution runs on a [`CodeRuntime`], the step-wise interpreter seam. The
-//! intended production adapter wraps [Monty](https://github.com/pydantic/monty),
-//! a Rust-native Python interpreter whose snapshot-at-call-boundary model makes
-//! suspend/resume a true continuation rather than a replay. That adapter is
-//! enabled by the `monty` feature once Monty's Rust API for continuation
-//! serialization and exception injection is wired in (see crate docs).
+//! production adapter wraps [Monty](https://github.com/pydantic/monty), a
+//! Rust-native Python interpreter whose snapshot-at-call-boundary model makes
+//! suspend/resume a true continuation rather than a replay. It lives in the
+//! `adk-codeact-monty` crate (kept outside the workspace because Monty is a git
+//! dependency, not yet on crates.io).
 
 pub mod agent;
 pub mod checkpoint;
@@ -134,5 +134,5 @@ pub use error_map::{denied_message, tool_error_message, unknown_tool_message};
 pub use output::ScriptOutput;
 pub use runtime::{
     CodeRuntime, PendingCall, ResumeWith, RunStep, RuntimeCapabilities, RuntimeError,
-    default_tool_catalog,
+    bind_call_args, default_tool_catalog,
 };

@@ -51,6 +51,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   max-iterations now an error; and confirmation suspends marked
   `interrupted`/`turn_complete`. New `examples/codeact_agent` demonstrates the
   loop end-to-end with a self-contained `CodeRuntime`.
+- **adk-codeact-monty: Python `CodeRuntime` backed by Pydantic Monty** — a
+  reusable, stateless `CodeRuntime` that runs LLM-authored Python in-process via
+  the [Monty](https://github.com/pydantic/monty) interpreter, with
+  snapshot-at-call-boundary suspend/resume, per-step `stdout` capture, and a
+  tool catalog the model invokes through a single built-in function,
+  `call_tool("name", {"arg": value})`. `MontyRuntime::new()` ships with
+  conservative default resource limits (per-advance time and memory caps) for
+  untrusted code; `MontyRuntime::builder().unlimited()` removes them for trusted
+  scripts. `call_tool` is the only way to call a tool — the tool name is a string
+  literal embedded in the call (so it survives suspend/resume with no host-side
+  name table) and every argument is a string-keyed entry in one dict, so any tool
+  name and any argument name is valid (hyphens, Python keywords, even
+  `"call_tool"`) and arguments bind by name exactly with no positional inference.
+  Any other form — a bare call, keyword arguments to `call_tool`, a non-dict
+  argument, or a non-string argument key — is refused with a corrective error
+  rather than silently dispatched. Kept outside the workspace (Monty is a git
+  dependency, not yet on crates.io); a runnable `examples/codeact_monty_agent`
+  drives it offline.
+- **adk-agent: `CodeRuntime` interpreter seam** — the language-agnostic contract
+  a CodeAct runtime implements. `PendingCall` exposes a call's arguments the way
+  an interpreter produces them — `positional_args()` and `keyword_args()`
+  separately — and the driver binds them onto a tool's parameters centrally via
+  `adk_agent::codeact::bind_call_args`, so a runtime never needs a tool schema at
+  the call boundary. `RunStep::{Call,Complete,Raised}` are struct variants that
+  each carry the `stdout` the script printed since the previous step (constructed
+  with `RunStep::{call,complete,raised}` + `with_stdout`); the agent surfaces
+  captured output back to the model and persists it into checkpoints so it
+  survives suspend/resume and crash recovery. Script-visible failures — including
+  syntax/parse errors — flow through `RunStep::Raised`, while `RuntimeError` is
+  strictly host failure (snapshot/internal). `render_tools` is a pure function of
+  the tool slice (no schema caching required).
 
 ## [1.1.0] - 2026-06-15
 

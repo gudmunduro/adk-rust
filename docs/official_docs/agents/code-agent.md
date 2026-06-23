@@ -145,10 +145,71 @@ pub trait CodeRuntime: Send + Sync {
 }
 ```
 
-- `RunStep::Call` surfaces exactly one pending call; resume it with a value or an
-  error, or `dump()` its continuation to suspend.
+- `RunStep` is a set of struct variants — `Call { call, stdout }`,
+  `Complete { value, stdout }`, and `Raised { message, stdout }`. Construct them
+  with the `RunStep::call` / `RunStep::complete` / `RunStep::raised` helpers and
+  attach captured output with `.with_stdout(..)`. `RunStep::Call` surfaces
+  exactly one pending call; resume it with a value or an error, or `dump()` its
+  continuation to suspend. The `stdout` a runtime attaches is surfaced back to
+  the model and persisted into checkpoints, so it survives suspend/resume.
+- A `PendingCall` reports its arguments the way the interpreter produced them —
+  `positional_args()` and `keyword_args()` separately. **Do not** map positional
+  arguments onto names yourself: the driver binds them onto the tool's parameters
+  centrally via `adk_agent::codeact::bind_call_args`, so a runtime needs no tool
+  schema at the call boundary and `render_tools` can be a pure function of the
+  tool slice.
+- **Script vs. host errors.** Anything the model could fix by writing different
+  code — a syntax/parse error, an uncaught exception, a resource-limit
+  cancellation — is a `RunStep::Raised` (an opaque string fed back to the model
+  verbatim). `RuntimeError` is reserved for genuine host failures (snapshot
+  (de)serialization, internal interpreter errors) and aborts the run.
 - `RuntimeCapabilities::supports_suspension` must be `true` to enable HITL and
   long-running deferral; `prompt` describes the language/environment to the model.
 
 See `examples/codeact_agent/src/runtime.rs` for a complete, minimal
 implementation that supports suspend/resume.
+
+## Python via Monty
+
+The intended production adapter is
+[`adk-codeact-monty`](https://github.com/zavora-ai/adk-rust/tree/main/adk-codeact-monty),
+a `CodeRuntime` backed by [Pydantic Monty](https://github.com/pydantic/monty). It
+lets the model *act by writing Python*, runs in-process with no container or
+subprocess, and snapshots a paused run to bytes — exactly what suspend/resume
+needs. It is kept outside the workspace because Monty is currently a git
+dependency (not yet on crates.io) and requires rustc 1.95+.
+
+```rust,ignore
+use adk_codeact_monty::MontyRuntime;
+
+// Conservative default resource limits (per-advance time + memory caps) make
+// `new()` safe for untrusted, LLM-generated code.
+let runtime = Arc::new(MontyRuntime::new());
+
+// Tighten or relax with the builder; `unlimited()` removes the caps for
+// trusted scripts only.
+let runtime = Arc::new(
+    MontyRuntime::builder()
+        .max_duration(std::time::Duration::from_secs(2))
+        .max_memory(64 * 1024 * 1024)
+        .build(),
+);
+```
+
+Tools are invoked through a single built-in function,
+`call_tool("name", {"arg": value, ...})` — the only way to call a tool; they are
+never in scope as bare callables. The tool name is a string literal and every
+argument is a string-keyed entry in one dict, so the real name travels inside the
+serialized continuation (surviving suspend/resume with no host-side name table),
+a tool *and each argument* may carry any name (not a valid Python identifier like
+`"fetch-cart"`, a Python keyword, or even `"call_tool"`), and the driver binds the
+dict's entries by name exactly — no positional inference. Each tool appears in the
+prompt as a `call_tool("name", {...})` usage line with its parameters and
+description. Anything but this one form — a bare `fetch_cart(...)`, keyword
+arguments, a non-dict argument, or a non-string key — is refused with a corrective
+error rather than silently dispatched, so the model has exactly one calling form
+to learn.
+
+The runnable
+[`examples/codeact_monty_agent`](https://github.com/zavora-ai/adk-rust/tree/main/examples/codeact_monty_agent)
+drives a `CodeAgent` against real Python entirely offline.

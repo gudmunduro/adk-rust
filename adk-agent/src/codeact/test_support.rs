@@ -28,6 +28,9 @@ pub(crate) enum Planned {
         args: Value,
         /// Interpreter call id.
         call_id: u64,
+        /// stdout the script printed before reaching this call (empty if none).
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        stdout: String,
     },
     /// The script completes, returning this value.
     Complete(Value),
@@ -38,7 +41,12 @@ pub(crate) enum Planned {
 impl Planned {
     /// Convenience constructor for a [`Planned::Call`].
     pub(crate) fn call(name: &str, args: Value, call_id: u64) -> Self {
-        Planned::Call { name: name.to_string(), args, call_id }
+        Planned::Call { name: name.to_string(), args, call_id, stdout: String::new() }
+    }
+
+    /// A [`Planned::Call`] that also reports `stdout` printed before the call.
+    pub(crate) fn call_with_stdout(name: &str, args: Value, call_id: u64, stdout: &str) -> Self {
+        Planned::Call { name: name.to_string(), args, call_id, stdout: stdout.to_string() }
     }
 }
 
@@ -100,15 +108,35 @@ impl ScriptedRuntime {
 
 fn step_from(mut remaining: Vec<Planned>, log: ResumeLog) -> RunStep {
     if remaining.is_empty() {
-        return RunStep::Complete(Value::Null);
+        return RunStep::complete(Value::Null);
     }
     let head = remaining.remove(0);
     match head {
-        Planned::Call { name, args, call_id } => {
-            RunStep::Call(Box::new(FakePendingCall { name, args, call_id, remaining, log }))
+        Planned::Call { name, args, call_id, stdout } => {
+            let (positional, keyword) = split_planned_args(args);
+            RunStep::call(Box::new(FakePendingCall {
+                name,
+                positional,
+                keyword,
+                call_id,
+                remaining,
+                log,
+            }))
+            .with_stdout(stdout)
         }
-        Planned::Complete(value) => RunStep::Complete(value),
-        Planned::Raised(message) => RunStep::Raised(message),
+        Planned::Complete(value) => RunStep::complete(value),
+        Planned::Raised(message) => RunStep::raised(message),
+    }
+}
+
+/// Split a planned call's JSON args into the positional/keyword shape the seam
+/// now uses: an object becomes keyword args, an array becomes positional args.
+fn split_planned_args(args: Value) -> (Vec<Value>, Vec<(String, Value)>) {
+    match args {
+        Value::Object(map) => (Vec::new(), map.into_iter().collect()),
+        Value::Array(items) => (items, Vec::new()),
+        Value::Null => (Vec::new(), Vec::new()),
+        other => (vec![other], Vec::new()),
     }
 }
 
@@ -276,7 +304,8 @@ impl State for MockState {
 
 struct FakePendingCall {
     name: String,
-    args: Value,
+    positional: Vec<Value>,
+    keyword: Vec<(String, Value)>,
     call_id: u64,
     remaining: Vec<Planned>,
     log: ResumeLog,
@@ -287,8 +316,12 @@ impl PendingCall for FakePendingCall {
         &self.name
     }
 
-    fn args(&self) -> &Value {
-        &self.args
+    fn positional_args(&self) -> &[Value] {
+        &self.positional
+    }
+
+    fn keyword_args(&self) -> &[(String, Value)] {
+        &self.keyword
     }
 
     fn call_id(&self) -> u64 {

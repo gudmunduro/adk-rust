@@ -47,7 +47,7 @@ use crate::codeact::error_map::{
     denied_message, render_value, tool_error_message, unknown_tool_message,
 };
 use crate::codeact::output::ScriptOutput;
-use crate::codeact::runtime::{CodeRuntime, ResumeWith, RunStep, RuntimeError};
+use crate::codeact::runtime::{CodeRuntime, ResumeWith, RunStep, RuntimeError, bind_call_args};
 use crate::guardrails::{GuardrailSet, enforce_guardrails};
 use crate::skill_shim::{SelectionPolicy, SkillIndex, select_skill_prompt_block};
 #[cfg(feature = "enhanced-plugins")]
@@ -376,7 +376,7 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
         }
 
         // ----- main loop -----
-        'turns: loop {
+        loop {
             let mut step = match pending_step.take() {
                 Some(step) => step,
                 None => {
@@ -404,13 +404,11 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                         }
                     };
                     transcript.push(Content::new("model").with_text(script.clone()));
+                    // A parse/compile failure arrives as `RunStep::Raised`, not a
+                    // `RuntimeError` — it is handled in the loop like any other
+                    // script error and fed back to the model.
                     match runtime.start(&script, "agent") {
                         Ok(step) => step,
-                        // A parse error is the model's mistake: feed it back.
-                        Err(RuntimeError::Parse(msg)) => {
-                            transcript.push(error_content(&truncate_middle(&msg, max_error_chars)));
-                            continue 'turns;
-                        }
                         Err(e) => {
                             yield Err(runtime_err(e));
                             return;
@@ -419,17 +417,22 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                 }
             };
 
+            // stdout (`print`) the script emits across this turn, accumulated
+            // step by step and surfaced to the model when the turn hands control
+            // back so it can see what its code printed. It is also baked into any
+            // checkpoint written mid-turn (see `transcript_with_stdout`) so it
+            // survives suspend/resume and crash recovery. On a *terminal* outcome
+            // (`final_result`, transfer, or a terminal tool signal) the run ends
+            // and there is no next turn, so the accumulated output is
+            // intentionally not surfaced — the final result is the answer.
+            let mut script_output = String::new();
+
             'script: loop {
                 match step {
-                    RunStep::Call(call) => {
+                    RunStep::Call { call, stdout } => {
+                        script_output.push_str(&stdout);
                         let name = call.function_name().to_string();
-                        let args = call.args().clone();
                         let call_id = call.call_id();
-                        let pcall = PendingToolCall {
-                            call_id,
-                            tool: name.clone(),
-                            args: args.clone(),
-                        };
 
                         let Some(tool) = tool_map.get(&name).cloned() else {
                             match call.resume(ResumeWith::Raise(unknown_tool_message(&name))) {
@@ -440,6 +443,20 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                                 }
                             }
                             continue 'script;
+                        };
+
+                        // Bind the call's positional + keyword arguments onto the
+                        // tool's parameters centrally, so runtimes never need a
+                        // schema at the call boundary.
+                        let args = bind_call_args(
+                            tool.as_ref(),
+                            call.positional_args(),
+                            call.keyword_args(),
+                        );
+                        let pcall = PendingToolCall {
+                            call_id,
+                            tool: name.clone(),
+                            args: args.clone(),
                         };
 
                         // Confirmation gate.
@@ -466,7 +483,11 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                                     };
                                     let cp = mk_checkpoint(
                                         iteration,
-                                        transcript,
+                                        transcript_with_stdout(
+                                            &transcript,
+                                            &script_output,
+                                            max_error_chars,
+                                        ),
                                         snapshot,
                                         pcall,
                                         Disposition::AwaitingConfirmation,
@@ -521,7 +542,11 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                                 Ok(handle) => {
                                     let cp = mk_checkpoint(
                                         iteration,
-                                        transcript,
+                                        transcript_with_stdout(
+                                            &transcript,
+                                            &script_output,
+                                            max_error_chars,
+                                        ),
                                         snapshot,
                                         pcall,
                                         Disposition::AwaitingCompletion { pending_handle: Some(handle) },
@@ -558,7 +583,11 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                             // SAVE-BEFORE (carries any deltas captured on resume).
                             let before = mk_checkpoint(
                                 iteration,
-                                transcript.clone(),
+                                transcript_with_stdout(
+                                    &transcript,
+                                    &script_output,
+                                    max_error_chars,
+                                ),
                                 snapshot.clone(),
                                 pcall.clone(),
                                 Disposition::PendingResult,
@@ -592,7 +621,11 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                             // SAVE-AFTER
                             let after = mk_checkpoint(
                                 iteration,
-                                transcript.clone(),
+                                transcript_with_stdout(
+                                    &transcript,
+                                    &script_output,
+                                    max_error_chars,
+                                ),
                                 snapshot,
                                 pcall,
                                 Disposition::Resolved(resolution.clone()),
@@ -629,7 +662,9 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                             }
                         }
                     }
-                    RunStep::Complete(value) => match ScriptOutput::decode(value) {
+                    RunStep::Complete { value, stdout } => {
+                        script_output.push_str(&stdout);
+                        match ScriptOutput::decode(value) {
                         ScriptOutput::Observation { value } => {
                             transcript.push(observation_content(&value));
                             break 'script;
@@ -706,12 +741,20 @@ fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>>
                             )));
                             break 'script;
                         }
-                    },
-                    RunStep::Raised(message) => {
+                        }
+                    }
+                    RunStep::Raised { message, stdout } => {
+                        script_output.push_str(&stdout);
                         transcript.push(error_content(&truncate_middle(&message, max_error_chars)));
                         break 'script;
                     }
                 }
+            }
+
+            // The turn handed control back to the model: surface any stdout the
+            // script printed so the model can see its own output next turn.
+            if !script_output.is_empty() {
+                transcript.push(stdout_content(&truncate_middle(&script_output, max_error_chars)));
             }
         }
     }
@@ -1292,6 +1335,29 @@ fn observation_content(value: &Value) -> Content {
 
 fn error_content(message: &str) -> Content {
     Content::new("user").with_text(format!("Error during execution:\n{message}"))
+}
+
+/// Surface captured stdout (`print` output) back to the model.
+fn stdout_content(output: &str) -> Content {
+    Content::new("user").with_text(format!("Output (stdout):\n{output}"))
+}
+
+/// A *copy* of `transcript` with any stdout printed this turn appended, for
+/// baking into a checkpoint.
+///
+/// The live transcript is left untouched — stdout is flushed onto it at the end
+/// of the turn instead. Persisting the same output into the checkpoint ensures
+/// anything the script printed *before* a suspend (HITL confirmation, a
+/// long-running deferral) or an inline write-ahead checkpoint survives the
+/// suspend/resume boundary and crash recovery, without being counted twice on
+/// the in-process path (a resumed continuation only re-emits output produced
+/// after the call boundary).
+fn transcript_with_stdout(transcript: &[Content], stdout: &str, max: usize) -> Vec<Content> {
+    let mut out = transcript.to_vec();
+    if !stdout.is_empty() {
+        out.push(stdout_content(&truncate_middle(stdout, max)));
+    }
+    out
 }
 
 fn truncate_middle(message: &str, max: usize) -> String {
@@ -2802,6 +2868,49 @@ mod tests {
         )
         .await;
         assert_eq!(final_text(events.last().unwrap()).as_deref(), Some("completed"));
+    }
+
+    #[tokio::test]
+    async fn stdout_before_a_suspend_is_persisted_in_the_checkpoint() {
+        // The script prints before calling a long-running tool; that output must
+        // ride along in the checkpoint transcript so it is not lost across the
+        // suspend/resume boundary.
+        let runtime = Arc::new(ScriptedRuntime::with_suspension(vec![vec![
+            Planned::call_with_stdout("slow", json!({}), 1, "working...\n"),
+            Planned::Complete(json!({"type": "final_result", "value": "completed"})),
+        ]]));
+
+        let events = drive(
+            FakeLlm::new("noop"),
+            runtime,
+            vec![long_running_tool()],
+            ToolConfirmationPolicy::Never,
+            HashMap::new(),
+            user("go"),
+            None,
+            true,
+        )
+        .await;
+
+        let cp = pending_in(events.last().unwrap()).expect("checkpoint persisted");
+        let printed = cp
+            .transcript
+            .iter()
+            .filter_map(|c| c.parts.first().and_then(Part::text))
+            .any(|t| t.contains("Output (stdout):") && t.contains("working..."));
+        assert!(printed, "stdout was not persisted in the checkpoint transcript: {cp:?}");
+    }
+
+    #[test]
+    fn transcript_with_stdout_appends_only_when_non_empty() {
+        let base = vec![Content::new("user").with_text("hi")];
+        assert_eq!(transcript_with_stdout(&base, "", 100).len(), 1);
+        let with = transcript_with_stdout(&base, "printed", 100);
+        assert_eq!(with.len(), 2);
+        assert!(
+            with[1].parts.first().and_then(Part::text).unwrap().contains("printed"),
+            "appended entry should carry the stdout"
+        );
     }
 
     #[tokio::test]
