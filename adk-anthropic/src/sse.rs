@@ -19,7 +19,7 @@ use crate::{
 const MAX_BUFFER_SIZE: usize = 1024 * 1024;
 
 /// Maximum event size (64KB)
-const MAX_EVENT_SIZE: usize = 64 * 1024;
+const MAX_EVENT_SIZE: usize = 1024 * 1024;
 
 /// Timeout for receiving data between chunks (30 seconds)
 const CHUNK_TIMEOUT: Duration = Duration::from_secs(30);
