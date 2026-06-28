@@ -26,6 +26,14 @@ Two safety behaviors worth knowing:
 - **`grep`** skips common build/VCS dirs (`target`, `.git`, `node_modules`, …)
   and binary/oversized files.
 
+The `bash` tool **streams** its stdout/stderr line-by-line via
+`ToolContext::emit_progress` as the command runs, so UIs can show a live
+terminal. Each chunk arrives as a partial event on the agent's `EventStream`
+(detect with `event.tool_progress_stream()`); the complete output is still
+returned as the tool's final result. See the
+[`streaming_bash` example](../events/events.md#streaming-tool-progress) and
+[Streaming Progress from a Tool](../tools/function-tools.md#streaming-progress-from-a-tool).
+
 ## The `Workspace`
 
 A `Workspace` roots every operation at a directory and enforces a small policy:

@@ -159,6 +159,38 @@ event.actions    // State changes, transfers, escalation
 event.provider_metadata  // HashMap<String, String>
 ```
 
+#### First-class tool events
+
+Events expose typed, render-ready views of tool activity, so UIs consume tool
+calls and results generically without matching `Part` internals:
+
+```rust
+for call in event.tool_calls() {       // Vec<ToolCallView>
+    println!("→ {} {}", call.name, call.args);
+}
+for result in event.tool_results() {   // Vec<ToolResultView>
+    println!("✓ {} {}", result.name, result.response);
+}
+```
+
+Because a tool's result is an ordinary event, the output of **any** tool —
+streaming or one-shot — is renderable. Use `call_id` to correlate a call with
+its result (and progress chunks).
+
+#### Streaming tool progress
+
+A tool can push intermediate output while still running via
+`ToolContext::emit_progress("stdout", chunk)`. The framework forwards each chunk
+as a partial event on the same `EventStream`; detect them with:
+
+```rust
+if let Some(stream_name) = event.tool_progress_stream() {  // "stdout" | "stderr" | custom
+    // render a live terminal line
+}
+```
+
+The default `emit_progress` is a no-op, so non-streaming tools are unaffected.
+
 ### EventActions
 
 ```rust
