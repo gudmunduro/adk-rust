@@ -10,10 +10,16 @@ to work on a codebase, scoped to a sandboxed workspace.
 | `edit_file` | Exact-string replacement; requires a prior `read_file`. |
 | `glob` | List files matching a pattern (e.g. `src/**/*.rs`). |
 | `grep` | Regex content search across the tree. |
-| `bash` | Run a shell command in the workspace root, with a timeout. |
+| `bash` | Run a shell command in the workspace root, with a timeout. Streams stdout/stderr line-by-line via `ToolContext::emit_progress`. |
 
 All operations are rooted at a [`Workspace`] and rejected if they escape it.
 Mutations require a writable workspace; `bash` requires bash to be enabled.
+
+The `bash` tool emits its output incrementally as it runs, so UIs can display a
+live terminal (see the `streaming_bash` example). The framework forwards each
+chunk as a partial event on the agent's `EventStream`; consumers detect them
+with `event.tool_progress_stream()`. The complete output is still returned as
+the tool's final result for the model.
 
 ## Usage
 

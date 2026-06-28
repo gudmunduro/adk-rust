@@ -132,6 +132,32 @@ pub trait ToolContext: CallbackContext {
     /// Searches memory for entries matching the query.
     async fn search_memory(&self, query: &str) -> Result<Vec<MemoryEntry>>;
 
+    /// Emit streaming progress output during long-running tool execution.
+    ///
+    /// Tools call this to push intermediate stdout/stderr to the UI layer
+    /// as it arrives, rather than waiting for the tool to finish. This enables
+    /// streaming terminal output for shell commands, build logs, etc.
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The output stream: `"stdout"`, `"stderr"`, or a custom label
+    /// * `chunk` - The text chunk to emit
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Inside a tool's execute() method:
+    /// ctx.emit_progress("stdout", "Compiling project...\n").await;
+    /// ctx.emit_progress("stdout", "Build successful!\n").await;
+    /// ctx.emit_progress("stderr", "warning: unused variable\n").await;
+    /// ```
+    ///
+    /// The default implementation is a no-op. Runners and UI layers that support
+    /// streaming output override this to forward chunks to the client.
+    async fn emit_progress(&self, _stream: &str, _chunk: &str) {
+        // Default: discard. Override in runners that support streaming tool output.
+    }
+
     /// Returns the scopes granted to the current user for this invocation.
     ///
     /// Implementations may resolve scopes from session state, JWT claims,

@@ -74,6 +74,24 @@ resume-across-restart.
 
 ---
 
+## `streaming_bash`
+
+A web UI (Axum + WebSocket) that renders an `LlmAgent`'s tool activity live from
+a **single `EventStream`**: streaming `bash` stdout/stderr plus one-shot
+`read_file` / `grep` / `glob` results, each as its own card.
+
+```bash
+cargo run --manifest-path examples/streaming_bash/Cargo.toml      # web UI
+cargo run --manifest-path examples/streaming_bash/Cargo.toml -- cli
+```
+
+Read it for: `ToolContext::emit_progress` streaming, and the first-class
+`Event::tool_calls()` / `Event::tool_results()` / `event.tool_progress_stream()`
+accessors that let a UI render **any** tool's output generically. See
+[Streaming Tool Progress](../events/events.md#streaming-tool-progress).
+
+---
+
 ## A suggested path
 
 1. **`coding_agent` (`tour`)** — see the harness solve tasks of rising complexity.

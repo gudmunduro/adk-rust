@@ -21,7 +21,7 @@ adk-plugin = { workspace = true, optional = true }
 adk-sandbox = { workspace = true, optional = true }
 adk-devtools = { workspace = true, optional = true }
 async-trait = { workspace = true }
-tokio = { workspace = true, features = ["time", "sync", "rt"] }
+tokio = { workspace = true, features = ["time", "sync", "rt", "macros"] }
 futures = { workspace = true }
 async-stream = { workspace = true }
 serde = { workspace = true }
