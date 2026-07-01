@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-06-28
+
+### Changed
+
+- **Breaking:** major version bump. Accumulated API changes since 1.0.0 include
+  new public enum variants in `adk-anthropic` (`ContentBlock::WebFetchToolResult`,
+  `ToolUnionParam::WebFetch20250910`, `ServerTool::WebFetch20250910`) and a new
+  public field on `adk-graph`'s `StateGraph` (`deferred_configs`), which require
+  a major release under semver.
 
 ### Added
 
@@ -94,10 +102,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strictly host failure (snapshot/internal). `render_tools` is a pure function of
   the tool slice (no schema caching required).
 
-## [1.1.0] - 2026-06-15
-
-### Added
-
+- **adk-core: streaming tool progress as events** — `ToolContext::emit_progress(stream, chunk)`
+  lets a tool push intermediate stdout/stderr (or any labelled channel) to the UI
+  *while it is still running*. The framework forwards each chunk as a partial
+  `Event` on the agent's `EventStream` — the same stream the model's reply
+  travels on — so UIs render live terminal output without a side channel or log
+  scraping. New `Event::tool_progress` constructor and `Event::tool_progress_stream()`
+  accessor; progress events carry the originating call id via
+  `TOOL_PROGRESS_CALL_ID_KEY`. The default `emit_progress` is a no-op, so
+  non-streaming tools and runners are unaffected.
+- **adk-core: first-class tool-call/result events** — `Event::tool_calls()` and
+  `Event::tool_results()` return typed, render-ready views (`ToolCallView`,
+  `ToolResultView`) over an event's tool activity, so UIs consume tool calls and
+  their results generically without matching `Part` internals. Because a tool's
+  result is an ordinary event, the output of **any** tool — streaming (`bash`) or
+  one-shot (`read_file`, `grep`, a web API) — is renderable, not just shell
+  tools. `call_id` correlates a call, its progress chunks, and its result.
+- **adk-devtools: `bash` streams output** — `BashTool` emits stdout/stderr
+  line-by-line via `emit_progress` as the command runs, so terminal output
+  appears live in UIs.
+- **New example: `streaming_bash`** — an `LlmAgent` with a web UI (Axum + WebSocket)
+  that renders live `bash` output and one-shot tool results (`read_file`, `grep`,
+  `glob`) from a single event feed. Also runs as a console demo (`-- cli`).
 - **adk-realtime: GA realtime providers + integration tool dispatch** — OpenAI
   `gpt-realtime` and Gemini Live wired end-to-end through
   `IntegratedRealtimeRunner`, with **server-side tool execution**, transcript and

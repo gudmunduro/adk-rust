@@ -1,9 +1,13 @@
 //! `bash` — run a shell command inside the workspace.
 //!
-//! Phase 1 executes host-local (`sh -c`) with the working directory pinned to the
-//! workspace root and a timeout. It is **not** strongly isolated; production
-//! deployments should run it behind a containerized `CodeExecutor` (see the
-//! coding-agent design, §9). Mutating use requires [`Workspace::bash_allowed`].
+//! Executes host-local (`sh -c`) with the working directory pinned to the
+//! workspace root and a timeout. Streams stdout/stderr incrementally via
+//! [`ToolContext::emit_progress`] for UI implementations that display live
+//! terminal output.
+//!
+//! **Not** strongly isolated; production deployments should run behind a
+//! containerized `CodeExecutor` (see the coding-agent design, §9).
+//! Mutating use requires [`Workspace::bash_allowed`].
 
 use std::process::Stdio;
 use std::sync::Arc;
@@ -12,13 +16,17 @@ use std::time::Duration;
 use adk_core::{Result, Tool, ToolContext};
 use async_trait::async_trait;
 use serde_json::{Value, json};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::error::DevToolError;
 use crate::tools::read::require_str;
 use crate::workspace::Workspace;
 
 /// Runs a shell command in the workspace root with a timeout.
+///
+/// Streams stdout and stderr line-by-line via [`ToolContext::emit_progress`]
+/// so UI layers can display live terminal output. The final result still
+/// contains the complete stdout/stderr for the model to consume.
 pub struct BashTool {
     workspace: Workspace,
 }
@@ -38,7 +46,7 @@ impl Tool for BashTool {
 
     fn description(&self) -> &str {
         "Run a shell command in the workspace root and return stdout, stderr, and the \
-         exit code. Use for builds, tests, and other commands. Has a timeout."
+         exit code. Streams output incrementally for live UI display. Has a timeout."
     }
 
     fn parameters_schema(&self) -> Option<Value> {
@@ -46,13 +54,13 @@ impl Tool for BashTool {
             "type": "object",
             "properties": {
                 "command": { "type": "string", "description": "The shell command to run." },
-                "timeout_secs": { "type": "integer", "description": "Optional timeout in seconds." }
+                "timeout_secs": { "type": "integer", "description": "Optional timeout in seconds (default: workspace setting)." }
             },
             "required": ["command"]
         }))
     }
 
-    async fn execute(&self, _ctx: Arc<dyn ToolContext>, args: Value) -> Result<Value> {
+    async fn execute(&self, ctx: Arc<dyn ToolContext>, args: Value) -> Result<Value> {
         if !self.workspace.bash_allowed() {
             return Err(DevToolError::BashDisabled.into());
         }
@@ -72,20 +80,44 @@ impl Tool for BashTool {
             .spawn()
             .map_err(DevToolError::from)?;
 
-        let mut stdout_pipe = child.stdout.take();
-        let mut stderr_pipe = child.stderr.take();
+        let stdout_pipe = child.stdout.take();
+        let stderr_pipe = child.stderr.take();
         let cap = self.workspace.max_output();
 
+        // Stream stdout and stderr concurrently, emitting lines as progress events
+        let ctx_out = ctx.clone();
+        let stdout_task = tokio::spawn(async move {
+            let mut output = String::new();
+            if let Some(pipe) = stdout_pipe {
+                let mut reader = BufReader::new(pipe).lines();
+                while let Ok(Some(line)) = reader.next_line().await {
+                    ctx_out.emit_progress("stdout", &format!("{line}\n")).await;
+                    output.push_str(&line);
+                    output.push('\n');
+                }
+            }
+            output
+        });
+
+        let ctx_err = ctx.clone();
+        let stderr_task = tokio::spawn(async move {
+            let mut output = String::new();
+            if let Some(pipe) = stderr_pipe {
+                let mut reader = BufReader::new(pipe).lines();
+                while let Ok(Some(line)) = reader.next_line().await {
+                    ctx_err.emit_progress("stderr", &format!("{line}\n")).await;
+                    output.push_str(&line);
+                    output.push('\n');
+                }
+            }
+            output
+        });
+
+        // Wait for completion with timeout
         let result = tokio::time::timeout(timeout, async {
             let status = child.wait().await?;
-            let mut stdout = String::new();
-            let mut stderr = String::new();
-            if let Some(mut p) = stdout_pipe.take() {
-                let _ = p.read_to_string(&mut stdout).await;
-            }
-            if let Some(mut p) = stderr_pipe.take() {
-                let _ = p.read_to_string(&mut stderr).await;
-            }
+            let stdout = stdout_task.await.unwrap_or_default();
+            let stderr = stderr_task.await.unwrap_or_default();
             Ok::<_, std::io::Error>((status, stdout, stderr))
         })
         .await;
@@ -105,6 +137,8 @@ impl Tool for BashTool {
             Ok(Err(e)) => Err(DevToolError::from(e).into()),
             Err(_) => {
                 let _ = child.start_kill();
+                ctx.emit_progress("stderr", &format!("\n[timeout after {}s]\n", timeout.as_secs()))
+                    .await;
                 Err(DevToolError::Timeout(timeout).into())
             }
         }

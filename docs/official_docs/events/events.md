@@ -460,6 +460,89 @@ if let Some(content) = &event.llm_response.content {
 }
 ```
 
+### First-Class Tool Accessors (recommended)
+
+Walking `content.parts` and matching `Part` variants works, but for building UIs
+the `Event` type exposes typed, render-ready accessors so you never touch part
+internals. They are the recommended way to consume tool activity from an
+`EventStream`:
+
+```rust
+// A model requested one or more tools.
+for call in event.tool_calls() {
+    println!("→ {} {}", call.name, call.args);     // call.call_id correlates this call
+}
+
+// A tool finished — surfaces the output of ANY tool, streaming or not.
+for result in event.tool_results() {
+    println!("✓ {} returned {}", result.name, result.response);
+}
+```
+
+`tool_calls()` returns `Vec<ToolCallView>` and `tool_results()` returns
+`Vec<ToolResultView>`:
+
+```rust
+pub struct ToolCallView<'a>   { pub call_id: Option<&'a str>, pub name: &'a str, pub args: &'a Value }
+pub struct ToolResultView<'a> { pub call_id: Option<&'a str>, pub name: &'a str, pub response: &'a Value }
+```
+
+Both views are empty for events that carry no tool activity, so a UI can call
+them on every event unconditionally. `tool_results()` is what makes a tool's
+output **first-class**: a one-shot tool (`read_file`, a weather API) has no
+streaming output, but its result still arrives as an ordinary event you can
+render — not just `bash`-style tools.
+
+**Correlation.** Use `call_id` to attach a result (and any progress chunks, see
+below) back to its originating call. Providers that omit call ids (e.g. Gemini)
+leave it `None`; fall back to `name` in that case.
+
+### Streaming Tool Progress
+
+Long-running tools (a shell command, a build, a download) can push intermediate
+output to the UI *while still executing*, rather than making the user wait for
+the final result. A tool calls
+[`ToolContext::emit_progress`](../tools/function-tools.md#streaming-progress-from-a-tool):
+
+```rust
+// inside Tool::execute, as output arrives:
+ctx.emit_progress("stdout", &format!("{line}\n")).await;
+ctx.emit_progress("stderr", &warning).await;
+```
+
+The framework forwards each chunk as a **partial event on the same
+`EventStream`** as everything else — no separate channel, no log scraping.
+Detect and route these events with `tool_progress_stream()`:
+
+```rust
+while let Some(event) = stream.next().await {
+    let event = event?;
+    if let Some(stream_name) = event.tool_progress_stream() {   // "stdout" | "stderr" | custom
+        // render a live terminal line from event.llm_response.content (role "tool")
+        continue;
+    }
+    // ... handle tool_calls(), tool_results(), and model text as usual
+}
+```
+
+Progress events are marked `partial = true` (so they are never mistaken for a
+final response) and carry the originating call id in `provider_metadata`
+(key `adk_core::TOOL_PROGRESS_CALL_ID_KEY`) so you can group them with the right
+`tool_calls()` / `tool_results()` entry. The default `emit_progress`
+implementation is a no-op, so tools that don't stream are unaffected.
+
+Putting it together, a complete tool lifecycle on the stream looks like:
+
+```
+tool_calls()          →  open a card  (name + args, correlated by call_id)
+tool_progress_stream()→  live stdout/stderr lines stream into the card
+tool_results()        →  finalize the card with the tool's output
+```
+
+This is exactly the pattern the `streaming_bash` example uses to render both
+streaming (`bash`) and one-shot (`read_file`, `grep`, `glob`) tools from a
+single web-socket feed.
+
 ## Common Event Patterns
 
 Here are typical event sequences you'll encounter:
