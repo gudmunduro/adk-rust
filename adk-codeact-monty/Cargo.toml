@@ -3,7 +3,7 @@ name = "adk-codeact-monty"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "Python CodeRuntime for the ADK-Rust CodeAgent, backed by the Pydantic Monty interpreter"
+description = "Python CodeRuntime for the ADK-Rust CodeActAgent, backed by the Pydantic Monty interpreter"
 license = "MIT OR Apache-2.0"
 
 # This crate is intentionally OUTSIDE the adk-rust workspace: it depends on

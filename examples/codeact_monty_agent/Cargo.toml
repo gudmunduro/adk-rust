@@ -3,7 +3,7 @@ name = "codeact-monty-agent-example"
 version = "0.0.1"
 edition = "2024"
 publish = false
-description = "Runs the ADK-Rust CodeAgent against a real Python interpreter via the Monty-backed CodeRuntime"
+description = "Runs the ADK-Rust CodeActAgent against a real Python interpreter via the Monty-backed CodeRuntime"
 
 # Standalone example crate with its own workspace, like the other examples. It
 # depends (transitively, through adk-codeact-monty) on `monty` via git, which

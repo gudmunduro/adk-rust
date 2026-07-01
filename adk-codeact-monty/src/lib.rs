@@ -1,8 +1,8 @@
-//! A Python [`CodeRuntime`] for the ADK-Rust [`CodeAgent`], backed by
+//! A Python [`CodeRuntime`] for the ADK-Rust [`CodeActAgent`], backed by
 //! [Pydantic Monty](https://github.com/pydantic/monty) — a minimal, secure,
 //! Rust-native Python interpreter built for running LLM-generated code.
 //!
-//! [`MontyRuntime`] lets a `CodeAgent` *act by writing Python*: the model emits a
+//! [`MontyRuntime`] lets a `CodeActAgent` *act by writing Python*: the model emits a
 //! script each turn, invokes your [`Tool`](adk_core::Tool)s with the built-in
 //! `call_tool("name", {"arg": value})` function, composes their results with real
 //! control flow, and returns a tagged value. Monty executes that script
@@ -39,11 +39,11 @@
 //!
 //! ```no_run
 //! use std::sync::Arc;
-//! use adk_agent::codeact::CodeAgent;
+//! use adk_agent::codeact::CodeActAgent;
 //! use adk_codeact_monty::MontyRuntime;
 //! # use adk_core::Llm;
 //! # fn wire(model: Arc<dyn Llm>) -> Result<(), Box<dyn std::error::Error>> {
-//! let agent = CodeAgent::builder()
+//! let agent = CodeActAgent::builder()
 //!     .name("python_agent")
 //!     .model(model)
 //!     .runtime(Arc::new(MontyRuntime::new()))
@@ -71,7 +71,7 @@
 //! # let _ = runtime;
 //! ```
 //!
-//! [`CodeAgent`]: adk_agent::codeact::CodeAgent
+//! [`CodeActAgent`]: adk_agent::codeact::CodeActAgent
 //! [`CodeRuntime`]: adk_agent::codeact::CodeRuntime
 
 #![warn(missing_docs)]

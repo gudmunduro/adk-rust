@@ -24,7 +24,7 @@
 //!
 //! # Transfer to another agent
 //!
-//! Like [`LlmAgent`](crate::LlmAgent), a `CodeAgent` can hand control to a
+//! Like [`LlmAgent`](crate::LlmAgent), a `CodeActAgent` can hand control to a
 //! sub-agent or to a peer/parent the Runner supplies via
 //! `RunConfig::transfer_targets`. The transfer output is only described to the
 //! model when at least one target exists; a transfer emits an event carrying
@@ -69,11 +69,11 @@
 //! [`ToolContext`](adk_core::ToolContext) that carries the interpreter's call id
 //! and otherwise delegates artifacts, memory, shared state, user scopes, and
 //! secrets to the live invocation — so a tool behaves identically whether it is
-//! driven by a `CodeAgent` or an `LlmAgent`.
+//! driven by a `CodeActAgent` or an `LlmAgent`.
 //!
 //! # Capabilities (parity with [`LlmAgent`](crate::LlmAgent))
 //!
-//! A `CodeAgent` mirrors `LlmAgent`'s configuration surface, differing only
+//! A `CodeActAgent` mirrors `LlmAgent`'s configuration surface, differing only
 //! where the CodeAct loop demands it:
 //!
 //! - **Model**: `generate_content_config` plus `temperature`/`top_p`/`top_k`/
@@ -126,7 +126,7 @@ pub mod runtime;
 pub(crate) mod test_support;
 
 pub use agent::{
-    CODEACT_SYSTEM_PROMPT, CodeAgent, CodeAgentBuilder, DEFAULT_MAX_ERROR_CHARS,
+    CODEACT_SYSTEM_PROMPT, CodeActAgent, CodeActAgentBuilder, DEFAULT_MAX_ERROR_CHARS,
     DEFAULT_MAX_ITERATIONS, ToolMap, build_tool_map, extract_code_block,
 };
 pub use checkpoint::{CodeActCheckpoint, Disposition, PENDING_STATE_KEY, PendingToolCall};

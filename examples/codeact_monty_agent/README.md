@@ -1,6 +1,6 @@
 # CodeAct × Monty agent example
 
-Runs the ADK-Rust [`CodeAgent`](../../adk-agent/src/codeact) against a **real
+Runs the ADK-Rust [`CodeActAgent`](../../adk-agent/src/codeact) against a **real
 Python interpreter** via [`adk-codeact-monty`](../../adk-codeact-monty) — the
 `CodeRuntime` backed by [Pydantic Monty](https://github.com/pydantic/monty).
 
@@ -82,7 +82,7 @@ checkpoints.
 ## The pieces
 
 - **`src/main.rs`** — `DemoLlm` (a deterministic model), the `fetch_cart` and
-  `tax_rate` tools, and the `CodeAgent` + `MontyRuntime` + `Runner` wiring.
+  `tax_rate` tools, and the `CodeActAgent` + `MontyRuntime` + `Runner` wiring.
 - **[`adk-codeact-monty`](../../adk-codeact-monty)** — the reusable Python
   `CodeRuntime` this example depends on.
 

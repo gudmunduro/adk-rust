@@ -22,7 +22,7 @@ Agent implementations for ADK-Rust (LLM, Custom, Workflow agents).
   [Coding Agent guide](https://github.com/zavora-ai/adk-rust/blob/main/docs/official_docs/coding-agent/index.md).
 - `LlmConditionalAgent` — LLM-powered multi-way routing to sub-agents
 - `LlmEventSummarizer` — LLM-based context compaction for long conversations
-- `CodeAgent` — (feature `codeact`) a peer to `LlmAgent` that **acts by writing
+- `CodeActAgent` — (feature `codeact`) a peer to `LlmAgent` that **acts by writing
   and running code** (the CodeAct loop): the model emits one script per turn,
   tools are exposed as callable functions, and the script returns a tagged
   result. Language-agnostic via the `CodeRuntime` interpreter seam. See the
@@ -360,7 +360,7 @@ let custom = CustomAgentBuilder::new("processor")
 
 ## CodeAct Agent (feature `codeact`)
 
-`CodeAgent` is a peer to `LlmAgent` that **acts by writing and running code**
+`CodeActAgent` is a peer to `LlmAgent` that **acts by writing and running code**
 instead of emitting one tool call at a time. Each turn the model produces a
 single script; tools are exposed as callable functions the script composes, and
 the script returns a tagged `ScriptOutput` (`observation` / `error` /
@@ -373,11 +373,11 @@ long-running tool deferral, which **suspend** into session state and **resume**
 on the next `run()` — the same save-rebuild-continue model as `LlmAgent`.
 
 ```rust,ignore
-use adk_agent::codeact::CodeAgent;
+use adk_agent::codeact::CodeActAgent;
 use std::sync::Arc;
 
 // `model` implements `adk_core::Llm`; `runtime` implements `CodeRuntime`.
-let agent = CodeAgent::builder()
+let agent = CodeActAgent::builder()
     .name("analyst")
     .model(model)
     .runtime(runtime)
@@ -448,7 +448,7 @@ Pass `compaction_config` to `RunnerConfig` to enable automatic compaction.
 |---------|-------------|
 | (default) | All agent types, callbacks, skills, toolsets, retry/circuit breaker |
 | `guardrails` | Input/output guardrails via `adk-guardrail` |
-| `codeact` | `CodeAgent` — the CodeAct loop (acts by writing/running code) |
+| `codeact` | `CodeActAgent` — the CodeAct loop (acts by writing/running code) |
 | `coding` | `CodingAgent` harness over `LlmAgent` via `adk-devtools` |
 | `enhanced-plugins` | `EnhancedPlugin` pipeline intercepting tool/model calls |
 

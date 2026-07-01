@@ -1,6 +1,6 @@
-# CodeAgent (CodeAct)
+# CodeActAgent (CodeAct)
 
-`CodeAgent` is a peer to [`LlmAgent`](llm-agent.md) that **acts by writing and
+`CodeActAgent` is a peer to [`LlmAgent`](llm-agent.md) that **acts by writing and
 running code** instead of emitting one tool call at a time. Each turn the model
 produces a single script; tools are exposed as callable functions the script can
 compose; and the script communicates its result by returning a tagged value.
@@ -40,7 +40,7 @@ freeform prompt. The intended production adapter wraps
 
 ## Durability: suspend and resume
 
-`CodeAgent` is stateless across invocations — durable state lives in the
+`CodeActAgent` is stateless across invocations — durable state lives in the
 **session**, exactly like `LlmAgent`. Two situations *suspend* the run:
 
 - a confirmation-gated tool with no decision yet (HITL), and
@@ -61,14 +61,14 @@ boundary as `LlmAgent`).
 This requires a runtime that can snapshot a paused call. A runtime that cannot
 runs long-running tools inline and rejects confirmation pauses.
 
-## Building a CodeAgent
+## Building a CodeActAgent
 
 ```rust,ignore
-use adk_agent::codeact::CodeAgent;
+use adk_agent::codeact::CodeActAgent;
 use std::sync::Arc;
 
 // `model` implements `adk_core::Llm`; `runtime` implements `CodeRuntime`.
-let agent = CodeAgent::builder()
+let agent = CodeActAgent::builder()
     .name("analyst")
     .model(model)
     .runtime(runtime)
@@ -109,7 +109,7 @@ The builder mirrors `LlmAgentBuilder`:
 
 Each tool call gets a fresh `ToolContext` that carries the interpreter call id
 and delegates artifacts, memory, shared state, user scopes, and secrets to the
-live invocation — so a tool behaves identically under `CodeAgent` or `LlmAgent`.
+live invocation — so a tool behaves identically under `CodeActAgent` or `LlmAgent`.
 
 ### Deliberate differences
 
@@ -259,4 +259,4 @@ to learn.
 
 The runnable
 [`examples/codeact_monty_agent`](https://github.com/zavora-ai/adk-rust/tree/main/examples/codeact_monty_agent)
-drives a `CodeAgent` against real Python entirely offline.
+drives a `CodeActAgent` against real Python entirely offline.

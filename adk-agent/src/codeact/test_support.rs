@@ -240,7 +240,7 @@ impl CallbackContext for MockInvocationContext {
 #[async_trait]
 impl InvocationContext for MockInvocationContext {
     fn agent(&self) -> Arc<dyn Agent> {
-        unimplemented!("MockInvocationContext::agent is not used by CodeAgent")
+        unimplemented!("MockInvocationContext::agent is not used by CodeActAgent")
     }
     fn memory(&self) -> Option<Arc<dyn Memory>> {
         None

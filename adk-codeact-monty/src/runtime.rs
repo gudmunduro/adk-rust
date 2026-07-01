@@ -67,14 +67,14 @@ type Tracker = LimitedTracker;
 /// A suspended/finished Monty run, parameterised on our tracker.
 type Progress = RunProgress<Tracker>;
 
-/// A Python [`CodeRuntime`] for the [`CodeAgent`](adk_agent::codeact::CodeAgent),
+/// A Python [`CodeRuntime`] for the [`CodeActAgent`](adk_agent::codeact::CodeActAgent),
 /// backed by the Monty interpreter.
 ///
 /// Build one with [`MontyRuntime::new`] for sensible defaults, or
 /// [`MontyRuntime::builder`] to set resource limits, grant OS access (mounted
 /// paths, an environment map, the host clock), or extend the language briefing.
 /// Hand the result to
-/// [`CodeAgentBuilder::runtime`](adk_agent::codeact::CodeAgentBuilder::runtime).
+/// [`CodeActAgentBuilder::runtime`](adk_agent::codeact::CodeActAgentBuilder::runtime).
 ///
 /// # Example
 ///
@@ -83,7 +83,7 @@ type Progress = RunProgress<Tracker>;
 /// use adk_codeact_monty::MontyRuntime;
 ///
 /// let runtime = Arc::new(MontyRuntime::new());
-/// // CodeAgent::builder().runtime(runtime)...
+/// // CodeActAgent::builder().runtime(runtime)...
 /// ```
 pub struct MontyRuntime {
     limits: ResourceLimits,

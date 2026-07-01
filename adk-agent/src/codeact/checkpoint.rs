@@ -4,7 +4,7 @@
 //! long-running tool call), it serializes the live interpreter continuation
 //! (Monty snapshot) plus the loop transcript into a [`CodeActCheckpoint`] and
 //! writes it to session state under [`PENDING_STATE_KEY`] via an event's
-//! `state_delta`. On the next invocation `CodeAgent::run` reads it back and
+//! `state_delta`. On the next invocation `CodeActAgent::run` reads it back and
 //! resumes — the same "save to session, rebuild, continue" model as
 //! [`LlmAgent`](crate::LlmAgent), with the snapshot standing in for the part of
 //! the continuation that can't be reconstructed from message history.

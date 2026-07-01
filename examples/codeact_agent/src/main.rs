@@ -1,6 +1,6 @@
 //! # CodeAct Agent example
 //!
-//! Runs the ADK-Rust [`CodeAgent`] — the agent that *acts by writing and running
+//! Runs the ADK-Rust [`CodeActAgent`] — the agent that *acts by writing and running
 //! code* — end-to-end against a self-contained [`LineScriptRuntime`] (see
 //! [`runtime`]). No API key or native interpreter is required: a small
 //! deterministic model (`DemoLlm`) drives the loop so the example always runs.
@@ -27,7 +27,7 @@ mod runtime;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use adk_agent::codeact::CodeAgent;
+use adk_agent::codeact::CodeActAgent;
 use adk_core::{
     Agent, Content, Llm, LlmRequest, LlmResponseStream, Part, SessionId, ToolContext, UserId,
 };
@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     println!("=== ADK-Rust CodeAct Agent example ===\n");
 
     let agent: Arc<dyn Agent> = Arc::new(
-        CodeAgent::builder()
+        CodeActAgent::builder()
             .name("calculator")
             .model(Arc::new(DemoLlm::new()))
             .runtime(Arc::new(LineScriptRuntime))

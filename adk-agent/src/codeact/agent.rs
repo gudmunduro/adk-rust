@@ -1,4 +1,4 @@
-//! The [`CodeAgent`] and its streaming loop.
+//! The [`CodeActAgent`] and its streaming loop.
 //!
 //! A peer to [`LlmAgent`](crate::LlmAgent), stateless across invocations: the
 //! Runner calls [`Agent::run`], durable state lives in the **Session**.
@@ -205,7 +205,7 @@ impl ToolPolicy<'_> {
 /// Drive CodeAct to completion as a stream of events.
 ///
 /// Yields durability/suspend events as it goes (persisted by the Runner) and a
-/// final event at the end. This is the whole loop; [`CodeAgent::run`] just
+/// final event at the end. This is the whole loop; [`CodeActAgent::run`] just
 /// gathers [`LoopInputs`] from `self` + the context and forwards.
 fn run_codeact(input: LoopInputs) -> impl Stream<Item = adk_core::Result<Event>> {
     stream! {
@@ -1400,7 +1400,7 @@ fn runtime_err(err: RuntimeError) -> AdkError {
 
 /// A configured CodeAct agent.
 ///
-/// Build one with [`CodeAgent::builder`], supplying a [`Llm`] and a
+/// Build one with [`CodeActAgent::builder`], supplying a [`Llm`] and a
 /// [`CodeRuntime`]. The agent then drives the CodeAct loop: each turn the model
 /// writes one script, tools are exposed as callable functions, and the script
 /// returns a tagged [`ScriptOutput`](crate::codeact::ScriptOutput).
@@ -1409,11 +1409,11 @@ fn runtime_err(err: RuntimeError) -> AdkError {
 ///
 /// ```rust,ignore
 /// use std::sync::Arc;
-/// use adk_agent::codeact::CodeAgent;
+/// use adk_agent::codeact::CodeActAgent;
 ///
 /// // `model` implements `adk_core::Llm`; `runtime` implements `CodeRuntime`
 /// // (e.g. a Monty-backed Python interpreter).
-/// let agent = CodeAgent::builder()
+/// let agent = CodeActAgent::builder()
 ///     .name("analyst")
 ///     .model(model)
 ///     .runtime(runtime)
@@ -1423,7 +1423,7 @@ fn runtime_err(err: RuntimeError) -> AdkError {
 ///     .build()?;
 /// # Ok::<(), adk_core::AdkError>(())
 /// ```
-pub struct CodeAgent {
+pub struct CodeActAgent {
     name: String,
     description: String,
     model: Arc<dyn Llm>,
@@ -1468,10 +1468,10 @@ pub struct CodeAgent {
     enhanced_plugin_manager: Option<Arc<EnhancedPluginManager>>,
 }
 
-impl CodeAgent {
-    /// Start building a [`CodeAgent`].
-    pub fn builder() -> CodeAgentBuilder {
-        CodeAgentBuilder::new()
+impl CodeActAgent {
+    /// Start building a [`CodeActAgent`].
+    pub fn builder() -> CodeActAgentBuilder {
+        CodeActAgentBuilder::new()
     }
 
     /// The JSON schema describing this agent's input, if set.
@@ -1608,9 +1608,9 @@ impl CodeAgent {
     }
 }
 
-impl std::fmt::Debug for CodeAgent {
+impl std::fmt::Debug for CodeActAgent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CodeAgent")
+        f.debug_struct("CodeActAgent")
             .field("name", &self.name)
             .field("tools", &self.tools.len())
             .field("supports_suspension", &self.supports_suspension)
@@ -1619,7 +1619,7 @@ impl std::fmt::Debug for CodeAgent {
 }
 
 #[async_trait]
-impl Agent for CodeAgent {
+impl Agent for CodeActAgent {
     fn name(&self) -> &str {
         &self.name
     }
@@ -1851,7 +1851,7 @@ fn callback_event(invocation_id: &str, agent_name: &str, content: Content) -> Ev
     event
 }
 
-/// Builder for [`CodeAgent`].
+/// Builder for [`CodeActAgent`].
 ///
 /// [`model`](Self::model) and [`runtime`](Self::runtime) are required; every
 /// other setting has a default. The configuration surface mirrors
@@ -1863,9 +1863,9 @@ fn callback_event(invocation_id: &str, agent_name: &str, content: Content) -> Ev
 /// ```rust,ignore
 /// use std::sync::Arc;
 /// use std::time::Duration;
-/// use adk_agent::codeact::CodeAgent;
+/// use adk_agent::codeact::CodeActAgent;
 ///
-/// let agent = CodeAgent::builder()
+/// let agent = CodeActAgent::builder()
 ///     .name("assistant")
 ///     .model(model)
 ///     .runtime(runtime)
@@ -1875,7 +1875,7 @@ fn callback_event(invocation_id: &str, agent_name: &str, content: Content) -> Ev
 ///     .build()?;
 /// # Ok::<(), adk_core::AdkError>(())
 /// ```
-pub struct CodeAgentBuilder {
+pub struct CodeActAgentBuilder {
     name: String,
     description: String,
     model: Option<Arc<dyn Llm>>,
@@ -1919,7 +1919,7 @@ pub struct CodeAgentBuilder {
     enhanced_plugins: Vec<Arc<dyn EnhancedPlugin>>,
 }
 
-impl CodeAgentBuilder {
+impl CodeActAgentBuilder {
     /// Create a builder with default settings.
     pub fn new() -> Self {
         Self {
@@ -2343,14 +2343,14 @@ impl CodeAgentBuilder {
         self
     }
 
-    /// Build the [`CodeAgent`].
+    /// Build the [`CodeActAgent`].
     ///
     /// # Errors
     /// Returns a config error if the model or runtime was not set.
-    pub fn build(self) -> adk_core::Result<CodeAgent> {
-        let model = self.model.ok_or_else(|| AdkError::config("CodeAgent requires a model"))?;
+    pub fn build(self) -> adk_core::Result<CodeActAgent> {
+        let model = self.model.ok_or_else(|| AdkError::config("CodeActAgent requires a model"))?;
         let runtime =
-            self.runtime.ok_or_else(|| AdkError::config("CodeAgent requires a code runtime"))?;
+            self.runtime.ok_or_else(|| AdkError::config("CodeActAgent requires a code runtime"))?;
 
         // Reject duplicate sub-agent names: transfer targets are addressed by
         // name, so duplicates would make routing ambiguous (mirrors LlmAgent).
@@ -2373,7 +2373,7 @@ impl CodeAgentBuilder {
             }
         }
 
-        Ok(CodeAgent {
+        Ok(CodeActAgent {
             name: self.name,
             description: self.description,
             model,
@@ -2423,7 +2423,7 @@ impl CodeAgentBuilder {
     }
 }
 
-impl Default for CodeAgentBuilder {
+impl Default for CodeActAgentBuilder {
     fn default() -> Self {
         Self::new()
     }
@@ -2967,7 +2967,7 @@ mod tests {
     /// second `run()` (with the result in the message) resumes to a final.
     #[tokio::test]
     async fn run_round_trips_through_session_state() {
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![
                 Planned::call("slow", json!({}), 1),
@@ -3068,7 +3068,7 @@ mod tests {
 
     #[test]
     fn builder_requires_model_and_runtime() {
-        assert!(CodeAgent::builder().build().unwrap_err().message.contains("model"));
+        assert!(CodeActAgent::builder().build().unwrap_err().message.contains("model"));
     }
 
     #[tokio::test]
@@ -3122,7 +3122,7 @@ mod tests {
         let before: BeforeAgentCallback = Box::new(|_ctx| {
             Box::pin(async { Ok(Some(Content::new("model").with_text("intercepted"))) })
         });
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![])))
             .before_callback(before)
@@ -3139,7 +3139,7 @@ mod tests {
         let after: AfterAgentCallback = Box::new(|_ctx| {
             Box::pin(async { Ok(Some(Content::new("model").with_text("after-done"))) })
         });
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![Planned::Complete(
                 json!({"type": "final_result", "value": "answer"}),
@@ -3158,7 +3158,7 @@ mod tests {
         let after: AfterAgentCallback = Box::new(|_ctx| {
             Box::pin(async { Ok(Some(Content::new("model").with_text("after-done"))) })
         });
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![
                 Planned::call("slow", json!({}), 1),
@@ -3200,7 +3200,7 @@ mod tests {
     #[tokio::test]
     async fn agent_instruction_precedes_the_contract() {
         let model = FakeLlm::new("noop");
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(final_runtime())
             .instruction("HOUSE RULES")
@@ -3216,7 +3216,7 @@ mod tests {
         let model = FakeLlm::new("noop");
         let provider: InstructionProvider =
             Box::new(|_ctx| Box::pin(async { Ok("DYNAMIC RULES".to_string()) }));
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(final_runtime())
             .instruction("STATIC RULES")
@@ -3232,7 +3232,7 @@ mod tests {
     #[tokio::test]
     async fn global_instruction_precedes_agent_instruction() {
         let model = FakeLlm::new("noop");
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(final_runtime())
             .global_instruction("GLOBAL IDENTITY")
@@ -3248,7 +3248,7 @@ mod tests {
     async fn default_include_contents_seeds_conversation_history() {
         let model = FakeLlm::new("noop");
         let agent =
-            CodeAgent::builder().model(model.clone()).runtime(final_runtime()).build().unwrap();
+            CodeActAgent::builder().model(model.clone()).runtime(final_runtime()).build().unwrap();
         let ctx = MockInvocationContext::new(user("q2")).with_history(vec![
             user("q1"),
             Content::new("model").with_text("a1"),
@@ -3263,7 +3263,7 @@ mod tests {
     #[tokio::test]
     async fn include_contents_none_excludes_history() {
         let model = FakeLlm::new("noop");
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(final_runtime())
             .include_contents(IncludeContents::None)
@@ -3412,7 +3412,7 @@ mod tests {
 
     #[tokio::test]
     async fn output_type_enforces_a_derived_schema() {
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![Planned::Complete(
                 json!({"type": "final_result", "value": {"answer": "hi"}}),
@@ -3427,7 +3427,7 @@ mod tests {
     #[tokio::test]
     async fn toolset_tools_are_callable_and_listed_in_the_prompt() {
         let model = FakeLlm::new("noop");
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![
                 Planned::call("echo", json!({"msg": "hi"}), 1),
@@ -3455,7 +3455,7 @@ mod tests {
         .unwrap();
 
         let model = FakeLlm::new("noop");
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(final_runtime())
             .with_skills_from_root(temp.path())
@@ -3473,7 +3473,7 @@ mod tests {
     #[tokio::test]
     async fn input_guardrail_blocks_harmful_content() {
         use crate::guardrails::{ContentFilter, GuardrailSet};
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(final_runtime())
             .input_guardrails(GuardrailSet::new().with(ContentFilter::harmful_content()))
@@ -3490,7 +3490,7 @@ mod tests {
     #[tokio::test]
     async fn output_guardrail_redacts_pii_in_final_result() {
         use crate::guardrails::{GuardrailSet, PiiRedactor};
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![Planned::Complete(
                 json!({"type": "final_result", "value": "reach me at alice@example.com"}),
@@ -3571,7 +3571,7 @@ mod tests {
             Planned::call("echo", json!({"orig": true}), 1),
             Planned::Complete(json!({"type": "final_result", "value": "done"})),
         ]]));
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(rt.clone())
             .tool(echo_tool())
@@ -3590,7 +3590,7 @@ mod tests {
             Planned::call("boom", json!({}), 1),
             Planned::Complete(json!({"type": "final_result", "value": "done"})),
         ]]));
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(rt.clone())
             .tool(failing_tool())
@@ -3607,7 +3607,7 @@ mod tests {
     #[tokio::test]
     async fn enhanced_plugin_short_circuits_model() {
         let model = FakeLlm::new("noop");
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(final_runtime())
             .enhanced_plugin(Arc::new(ModelShortCircuit))
@@ -3620,7 +3620,7 @@ mod tests {
 
     #[tokio::test]
     async fn toolset_name_conflict_is_rejected() {
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::new(vec![])))
             .tool(echo_tool())
@@ -3637,7 +3637,7 @@ mod tests {
     #[test]
     fn input_schema_is_exposed_for_introspection() {
         let schema = json!({"type": "object"});
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::new(vec![])))
             .input_schema(schema.clone())
@@ -3648,7 +3648,7 @@ mod tests {
 
     #[test]
     fn require_confirmation_for_all_sets_always_policy() {
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::new(vec![])))
             .require_tool_confirmation_for_all()
@@ -3748,7 +3748,7 @@ mod tests {
     async fn run_merges_sub_agents_and_runner_targets() {
         // A sub-agent (build time) plus a runner-provided peer (run time) are
         // both offered; the script transfers to the runner-provided one.
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![Planned::Complete(
                 json!({"type": "transfer_to_agent", "agent_name": "peer"}),
@@ -3776,8 +3776,8 @@ mod tests {
         disallow_parent: bool,
         disallow_peers: bool,
         sub_agents: Vec<Arc<dyn Agent>>,
-    ) -> CodeAgent {
-        let mut builder = CodeAgent::builder()
+    ) -> CodeActAgent {
+        let mut builder = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![
                 vec![Planned::Complete(json!({"type": "transfer_to_agent", "agent_name": first}))],
@@ -3791,7 +3791,7 @@ mod tests {
         builder.build().unwrap()
     }
 
-    async fn run_collect(agent: &CodeAgent, ctx: Arc<dyn InvocationContext>) -> Vec<Event> {
+    async fn run_collect(agent: &CodeActAgent, ctx: Arc<dyn InvocationContext>) -> Vec<Event> {
         let mut events = Vec::new();
         let mut stream = agent.run(ctx).await.unwrap();
         while let Some(item) = stream.next().await {
@@ -3950,7 +3950,7 @@ mod tests {
                 )))
             })
         });
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model.clone())
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![Planned::Complete(
                 json!({"type": "final_result", "value": "done"}),
@@ -3979,7 +3979,7 @@ mod tests {
                 Ok(Some(LlmResponse::new(Content::new("model").with_text("```\nx\n```"))))
             })
         });
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(model)
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![Planned::Complete(
                 json!({"type": "final_result", "value": "done"}),
@@ -4113,7 +4113,7 @@ mod tests {
         let after: AfterAgentCallback = Box::new(|_ctx| {
             Box::pin(async { Ok(Some(Content::new("model").with_text("after-done"))) })
         });
-        let agent = CodeAgent::builder()
+        let agent = CodeActAgent::builder()
             .model(FakeLlm::new("noop"))
             .runtime(Arc::new(ScriptedRuntime::with_suspension(vec![vec![Planned::Complete(
                 json!({"type": "transfer_to_agent", "agent_name": "child"}),

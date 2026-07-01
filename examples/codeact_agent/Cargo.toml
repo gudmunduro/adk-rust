@@ -3,7 +3,7 @@ name = "codeact-agent-example"
 version = "0.0.1"
 edition = "2024"
 publish = false
-description = "Runs the ADK-Rust CodeAgent (CodeAct loop) against a self-contained line-script CodeRuntime"
+description = "Runs the ADK-Rust CodeActAgent (CodeAct loop) against a self-contained line-script CodeRuntime"
 
 [workspace]
 

@@ -1,6 +1,6 @@
 # CodeAct Agent example
 
-Runs the ADK-Rust [`CodeAgent`](../../adk-agent/src/codeact) — the agent that
+Runs the ADK-Rust [`CodeActAgent`](../../adk-agent/src/codeact) — the agent that
 **acts by writing and running code** instead of emitting one tool call at a time.
 
 This example is fully self-contained: it ships a tiny `CodeRuntime`
@@ -42,7 +42,7 @@ The CodeAct loop, end to end:
   suspend/resume at a call boundary (the continuation is just the remaining
   lines), which is what powers HITL confirmation and long-running tool deferral.
 - **`src/main.rs`** — `DemoLlm` (a deterministic model), an `add` tool, and the
-  `CodeAgent` + `Runner` wiring.
+  `CodeActAgent` + `Runner` wiring.
 
 ## Going to production
 

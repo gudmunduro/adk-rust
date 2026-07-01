@@ -1,6 +1,6 @@
 //! # CodeAct × Monty agent example — shopping cart
 //!
-//! Runs the ADK-Rust [`CodeAgent`] against a real Python interpreter
+//! Runs the ADK-Rust [`CodeActAgent`] against a real Python interpreter
 //! ([`MontyRuntime`](adk_codeact_monty::MontyRuntime)) instead of emitting one
 //! tool call at a time. The model writes a single Python script that:
 //!
@@ -34,7 +34,7 @@
 
 use std::sync::Arc;
 
-use adk_agent::codeact::CodeAgent;
+use adk_agent::codeact::CodeActAgent;
 use adk_codeact_monty::MontyRuntime;
 use adk_core::{
     Agent, Content, Llm, LlmRequest, LlmResponseStream, Part, SessionId, ToolContext, UserId,
@@ -70,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
         .build();
 
     let agent: Arc<dyn Agent> = Arc::new(
-        CodeAgent::builder()
+        CodeActAgent::builder()
             .name("cart_assistant")
             .model(Arc::new(DemoLlm))
             .runtime(Arc::new(runtime))

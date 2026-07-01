@@ -1,11 +1,11 @@
 # adk-codeact-monty
 
 A Python [`CodeRuntime`](../adk-agent/src/codeact/runtime.rs) for the ADK-Rust
-[`CodeAgent`](../adk-agent/src/codeact), backed by
+[`CodeActAgent`](../adk-agent/src/codeact), backed by
 [Pydantic Monty](https://github.com/pydantic/monty) — a minimal, secure,
 Rust-native Python interpreter built for running LLM-generated code.
 
-With `MontyRuntime`, a `CodeAgent` *acts by writing Python*: each turn the model
+With `MontyRuntime`, a `CodeActAgent` *acts by writing Python*: each turn the model
 emits a script, invokes your `Tool`s with the built-in
 `call_tool("name", {"arg": value})` function, composes their results with real
 control flow, and returns a tagged value. Monty runs that
@@ -32,10 +32,10 @@ table in `Cargo.toml`) and is excluded from the root `adk-rust` workspace.
 
 ```rust,no_run
 use std::sync::Arc;
-use adk_agent::codeact::CodeAgent;
+use adk_agent::codeact::CodeActAgent;
 use adk_codeact_monty::MontyRuntime;
 
-let agent = CodeAgent::builder()
+let agent = CodeActAgent::builder()
     .name("python_agent")
     .model(model)
     .runtime(Arc::new(MontyRuntime::new()))
@@ -170,7 +170,7 @@ let runtime = MontyRuntime::builder()
 The granted access is described to the model in the system prompt, so it knows
 which paths it may read or write and which environment variables exist.
 
-## Notes on the CodeAgent API (dogfooding feedback)
+## Notes on the CodeActAgent API (dogfooding feedback)
 
 Building this adapter surfaced several rough edges in the `CodeRuntime` seam.
 Four of the five have since been **fixed in `adk-agent`** (the fifth was left as
