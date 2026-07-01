@@ -14,6 +14,15 @@ pub const KEY_PREFIX_TEMP: &str = "temp:";
 /// Key prefix for user-scoped state (persists across sessions).
 pub const KEY_PREFIX_USER: &str = "user:";
 
+/// Event-level `provider_metadata` key marking a tool-progress event and naming
+/// its output stream (e.g. `"stdout"`, `"stderr"`). Present only on events
+/// produced by [`ToolContext::emit_progress`](crate::ToolContext::emit_progress).
+pub const TOOL_PROGRESS_STREAM_KEY: &str = "adk.tool_progress.stream";
+
+/// Event-level `provider_metadata` key carrying the originating tool's
+/// function-call id on a tool-progress event.
+pub const TOOL_PROGRESS_CALL_ID_KEY: &str = "adk.tool_progress.call_id";
+
 /// Event represents a single interaction in a conversation.
 /// This struct embeds LlmResponse to match ADK-Go's design pattern.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +97,40 @@ pub struct EventActions {
     pub route: Option<Vec<String>>,
 }
 
+/// A typed, borrowed view of a single tool call carried by an [`Event`].
+///
+/// Produced by [`Event::tool_calls`]. Lets UI/event consumers render the tool a
+/// model requested without matching on [`Part::FunctionCall`](crate::Part::FunctionCall)
+/// internals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ToolCallView<'a> {
+    /// Provider-assigned call id (OpenAI-style). `None` for providers that omit
+    /// it (e.g. Gemini); fall back to [`name`](Self::name) for correlation.
+    pub call_id: Option<&'a str>,
+    /// The tool/function name the model requested.
+    pub name: &'a str,
+    /// The call arguments as raw JSON.
+    pub args: &'a serde_json::Value,
+}
+
+/// A typed, borrowed view of a single tool result carried by an [`Event`].
+///
+/// Produced by [`Event::tool_results`]. Surfaces a completed tool's output
+/// generically so any tool — streaming or not — can be rendered from the event
+/// stream without walking [`Part::FunctionResponse`](crate::Part::FunctionResponse)
+/// internals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ToolResultView<'a> {
+    /// Provider-assigned call id (OpenAI-style), correlating this result with
+    /// its originating [`ToolCallView`] and progress chunks. `None` for
+    /// providers that omit it (e.g. Gemini); fall back to [`name`](Self::name).
+    pub call_id: Option<&'a str>,
+    /// The tool/function name that produced this result.
+    pub name: &'a str,
+    /// The tool's JSON response payload.
+    pub response: &'a serde_json::Value,
+}
+
 impl Event {
     /// Creates a new event with a generated UUID and current timestamp.
     pub fn new(invocation_id: impl Into<String>) -> Self {
@@ -120,6 +163,166 @@ impl Event {
             llm_request: None,
             provider_metadata: HashMap::new(),
         }
+    }
+
+    /// Creates a streaming tool-progress event.
+    ///
+    /// Tools emit these via [`ToolContext::emit_progress`](crate::ToolContext::emit_progress)
+    /// to push intermediate stdout/stderr to the client *while the tool is still
+    /// running*. The event carries the chunk as partial text content (role
+    /// `"tool"`) and is tagged with [`TOOL_PROGRESS_STREAM_KEY`] /
+    /// [`TOOL_PROGRESS_CALL_ID_KEY`] so consumers can distinguish it from a
+    /// final tool result and route it to the right terminal widget.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use adk_core::Event;
+    ///
+    /// let event = Event::tool_progress("inv-1", "agent", "call-7", "stdout", "compiling...\n");
+    /// assert_eq!(event.tool_progress_stream(), Some("stdout"));
+    /// assert!(event.llm_response.partial);
+    /// ```
+    pub fn tool_progress(
+        invocation_id: impl Into<String>,
+        author: impl Into<String>,
+        function_call_id: impl Into<String>,
+        stream: impl Into<String>,
+        chunk: impl Into<String>,
+    ) -> Self {
+        let mut event = Event::new(invocation_id);
+        event.author = author.into();
+        event.llm_response.content = Some(Content {
+            role: "tool".to_string(),
+            parts: vec![crate::types::Part::Text { text: chunk.into() }],
+        });
+        // Partial so downstream aggregation/persistence treats it as a streaming
+        // chunk, never as the agent's final response.
+        event.llm_response.partial = true;
+        event.provider_metadata.insert(TOOL_PROGRESS_STREAM_KEY.to_string(), stream.into());
+        event
+            .provider_metadata
+            .insert(TOOL_PROGRESS_CALL_ID_KEY.to_string(), function_call_id.into());
+        event
+    }
+
+    /// Returns the progress stream name (`"stdout"`, `"stderr"`, …) if this is a
+    /// tool-progress event produced by [`ToolContext::emit_progress`](crate::ToolContext::emit_progress),
+    /// otherwise `None`.
+    pub fn tool_progress_stream(&self) -> Option<&str> {
+        self.provider_metadata.get(TOOL_PROGRESS_STREAM_KEY).map(String::as_str)
+    }
+
+    /// Returns the tool calls carried by this event, as a typed, render-ready view.
+    ///
+    /// A UI consuming the agent's `EventStream` can call this on every event to
+    /// detect when the model requested one or more tools, without matching on
+    /// [`Part::FunctionCall`](crate::Part::FunctionCall) internals. Pair it with
+    /// [`tool_results`](Self::tool_results) and [`tool_progress_stream`](Self::tool_progress_stream)
+    /// to render a complete tool lifecycle (call → live progress → result).
+    ///
+    /// Returns an empty vector for events that contain no tool calls.
+    ///
+    /// # Correlation
+    ///
+    /// Use [`ToolCallView::call_id`] to correlate a call with its progress chunks
+    /// and final result. For providers that omit call ids (e.g. Gemini), fall
+    /// back to [`ToolCallView::name`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use adk_core::{Content, Event, Part};
+    ///
+    /// let mut event = Event::new("inv-1");
+    /// event.llm_response.content = Some(Content {
+    ///     role: "model".to_string(),
+    ///     parts: vec![Part::FunctionCall {
+    ///         name: "bash".to_string(),
+    ///         args: serde_json::json!({ "command": "ls" }),
+    ///         id: Some("call_1".to_string()),
+    ///         thought_signature: None,
+    ///     }],
+    /// });
+    ///
+    /// let calls = event.tool_calls();
+    /// assert_eq!(calls.len(), 1);
+    /// assert_eq!(calls[0].name, "bash");
+    /// assert_eq!(calls[0].call_id, Some("call_1"));
+    /// ```
+    pub fn tool_calls(&self) -> Vec<ToolCallView<'_>> {
+        let Some(content) = &self.llm_response.content else {
+            return Vec::new();
+        };
+        content
+            .parts
+            .iter()
+            .filter_map(|part| match part {
+                crate::types::Part::FunctionCall { name, args, id, .. } => {
+                    Some(ToolCallView { call_id: id.as_deref(), name, args })
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Returns the tool results carried by this event, as a typed, render-ready view.
+    ///
+    /// After a tool executes, the agent yields its result on the same
+    /// `EventStream` as everything else, as a `function`-role event holding a
+    /// [`Part::FunctionResponse`](crate::Part::FunctionResponse). This accessor
+    /// surfaces those results generically so a UI can render the output of *any*
+    /// tool — streaming or not — without walking part internals.
+    ///
+    /// Returns an empty vector for events that contain no tool results.
+    ///
+    /// # Correlation
+    ///
+    /// Use [`ToolResultView::call_id`] to attach a result to the originating
+    /// [`tool_calls`](Self::tool_calls) entry and its progress chunks. For
+    /// providers that omit call ids, fall back to [`ToolResultView::name`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use adk_core::{Content, Event, FunctionResponseData, Part};
+    ///
+    /// let mut event = Event::new("inv-1");
+    /// event.llm_response.content = Some(Content {
+    ///     role: "function".to_string(),
+    ///     parts: vec![Part::FunctionResponse {
+    ///         function_response: FunctionResponseData::new(
+    ///             "bash",
+    ///             serde_json::json!({ "stdout": "ok\n", "exit_code": 0 }),
+    ///         ),
+    ///         id: Some("call_1".to_string()),
+    ///     }],
+    /// });
+    ///
+    /// let results = event.tool_results();
+    /// assert_eq!(results.len(), 1);
+    /// assert_eq!(results[0].name, "bash");
+    /// assert_eq!(results[0].call_id, Some("call_1"));
+    /// assert_eq!(results[0].response["exit_code"], 0);
+    /// ```
+    pub fn tool_results(&self) -> Vec<ToolResultView<'_>> {
+        let Some(content) = &self.llm_response.content else {
+            return Vec::new();
+        };
+        content
+            .parts
+            .iter()
+            .filter_map(|part| match part {
+                crate::types::Part::FunctionResponse { function_response, id } => {
+                    Some(ToolResultView {
+                        call_id: id.as_deref(),
+                        name: &function_response.name,
+                        response: &function_response.response,
+                    })
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     /// Convenience method to access content directly.

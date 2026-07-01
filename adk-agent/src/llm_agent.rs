@@ -950,11 +950,24 @@ struct AgentToolContext {
     parent_ctx: Arc<dyn InvocationContext>,
     function_call_id: String,
     actions: Mutex<EventActions>,
+    progress_tx: Option<tokio::sync::mpsc::UnboundedSender<Event>>,
 }
 
 impl AgentToolContext {
     fn new(parent_ctx: Arc<dyn InvocationContext>, function_call_id: String) -> Self {
-        Self { parent_ctx, function_call_id, actions: Mutex::new(EventActions::default()) }
+        Self {
+            parent_ctx,
+            function_call_id,
+            actions: Mutex::new(EventActions::default()),
+            progress_tx: None,
+        }
+    }
+
+    /// Attach a progress sink so [`ToolContext::emit_progress`] forwards chunks
+    /// as partial [`Event`]s onto the agent's `EventStream`.
+    fn with_progress(mut self, tx: tokio::sync::mpsc::UnboundedSender<Event>) -> Self {
+        self.progress_tx = Some(tx);
+        self
     }
 
     fn actions_guard(&self) -> std::sync::MutexGuard<'_, EventActions> {
@@ -1037,6 +1050,29 @@ impl ToolContext for AgentToolContext {
 
     async fn get_secret(&self, name: &str) -> Result<Option<String>> {
         self.parent_ctx.get_secret(name).await
+    }
+
+    async fn emit_progress(&self, stream: &str, chunk: &str) {
+        // Primary path: forward as a partial Event on the agent's EventStream so
+        // UIs consume tool progress through the same channel as everything else.
+        if let Some(tx) = &self.progress_tx {
+            let event = Event::tool_progress(
+                self.parent_ctx.invocation_id(),
+                self.parent_ctx.agent_name(),
+                &self.function_call_id,
+                stream,
+                chunk,
+            );
+            // Best-effort: a closed receiver just means nobody is listening.
+            let _ = tx.send(event);
+        }
+        // Secondary path: structured trace for log-based observability.
+        tracing::debug!(
+            target: "adk_agent::tool_progress",
+            tool_call_id = %self.function_call_id,
+            stream = %stream,
+            "{chunk}",
+        );
     }
 }
 
@@ -2107,6 +2143,13 @@ impl Agent for LlmAgent {
                         &ctx.run_config().tool_concurrency,
                     );
 
+                    // Channel for streaming tool progress (stdout/stderr) onto the
+                    // agent's EventStream while tools are still executing. Each
+                    // AgentToolContext gets a clone; the dispatch loop below drains
+                    // it concurrently and yields progress events to the client.
+                    let (progress_tx, mut progress_rx) =
+                        tokio::sync::mpsc::unbounded_channel::<Event>();
+
                     // Per-tool execution async block. Returns (index, Content, EventActions, escalate_or_skip).
                     // Each tool retains its own retry budget, circuit breaker, tracing span,
                     // before/after callbacks, and error handling. Errors are captured as
@@ -2125,6 +2168,7 @@ impl Agent for LlmAgent {
                         let cb_mutex = &cb_mutex;
                         let invocation_id = &invocation_id;
                         let concurrency_manager = &concurrency_manager;
+                        let progress_tx = progress_tx.clone();
                         #[cfg(feature = "enhanced-plugins")]
                         let enhanced_plugin_manager = &enhanced_plugin_manager;
                         async move {
@@ -2304,7 +2348,8 @@ impl Agent for LlmAgent {
                             if response_content.is_none() {
                                 if let Some(tool) = tool_map.get(&name) {
                                     let tool_ctx: Arc<dyn ToolContext> = Arc::new(
-                                        AgentToolContext::new(ctx.clone(), function_call_id.clone()),
+                                        AgentToolContext::new(ctx.clone(), function_call_id.clone())
+                                            .with_progress(progress_tx.clone()),
                                     );
                                     let span_name = format!("execute_tool {name}");
                                     let tool_span = tracing::info_span!(
@@ -2587,7 +2632,12 @@ impl Agent for LlmAgent {
                     };
 
                     // ===== DISPATCH BASED ON STRATEGY =====
-                    let mut results: Vec<(usize, Content, EventActions, bool)> = match strategy {
+                    // Scoped so the dispatch future (which borrows the tool
+                    // closure and circuit-breaker mutex) is dropped before we
+                    // reclaim `cb_mutex` below.
+                    let mut results = {
+                    let dispatch = async {
+                    let results: Vec<(usize, Content, EventActions, bool)> = match strategy {
                         ToolExecutionStrategy::Sequential => {
                             let mut results = Vec::with_capacity(fc_parts.len());
                             for (idx, name, args, id, fcid) in fc_parts {
@@ -2645,6 +2695,30 @@ impl Agent for LlmAgent {
                             }
                             all_results
                         }
+                    };
+                    results
+                    };
+
+                    // Drain tool progress concurrently with execution, yielding
+                    // each chunk as a partial Event the moment it arrives. The
+                    // dispatch future and the progress receiver are polled together
+                    // so output streams live rather than buffering until the tool
+                    // finishes.
+                    tokio::pin!(dispatch);
+                    let results = loop {
+                        tokio::select! {
+                            biased;
+                            Some(progress_event) = progress_rx.recv() => {
+                                yield Ok(progress_event);
+                            }
+                            done = &mut dispatch => break done,
+                        }
+                    };
+                    // Flush any progress chunks buffered between the last poll and completion.
+                    while let Ok(progress_event) = progress_rx.try_recv() {
+                        yield Ok(progress_event);
+                    }
+                    results
                     };
                     // Preserve LLM-returned order even when tool futures finish out of order.
                     results.sort_by_key(|r| r.0);

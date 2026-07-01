@@ -467,6 +467,59 @@ This adds a note to prevent the LLM from calling the tool repeatedly.
 
 ---
 
+## Streaming Progress from a Tool
+
+Long-running tools can push intermediate output to the UI *while still
+executing*, so the user sees a shell command's stdout, a build's logs, or a
+download's bytes live instead of waiting for the final result. Call
+`ToolContext::emit_progress` as output arrives:
+
+```rust
+use adk_core::{Result, Tool, ToolContext};
+use std::sync::Arc;
+
+#[async_trait::async_trait]
+impl Tool for BuildTool {
+    // ... name(), description(), parameters_schema() ...
+
+    async fn execute(&self, ctx: Arc<dyn ToolContext>, args: serde_json::Value) -> Result<serde_json::Value> {
+        // Emit chunks as they arrive — each becomes a partial Event on the
+        // agent's EventStream, the SAME stream the model's reply travels on.
+        ctx.emit_progress("stdout", "Compiling project...\n").await;
+        ctx.emit_progress("stdout", "Build finished in 4.2s\n").await;
+        ctx.emit_progress("stderr", "warning: unused variable `x`\n").await;
+
+        // The final return value is still the complete result the model consumes.
+        Ok(serde_json::json!({ "status": "ok", "warnings": 1 }))
+    }
+}
+```
+
+**The signature:**
+
+```rust
+async fn emit_progress(&self, stream: &str, chunk: &str)
+```
+
+- `stream` — a label for the chunk: `"stdout"`, `"stderr"`, or any custom channel.
+- `chunk` — the text to emit (emit per line for terminal-style output).
+
+**How it reaches the UI.** The framework forwards each chunk as a partial
+[`Event`](../events/events.md#streaming-tool-progress) on the agent's
+`EventStream`. A consumer detects it with `event.tool_progress_stream()` and
+renders it live. There is no second channel and no log scraping — progress,
+model text, and the final tool result all arrive on one ordered stream.
+
+**Backward compatible.** The default `emit_progress` is a no-op, so existing
+tools and runners that don't stream are unaffected. Only tools that opt in emit
+progress, and only consumers that check `tool_progress_stream()` observe it.
+
+> See the `streaming_bash` example for a complete web UI that renders live
+> `bash` output and one-shot tool results (`read_file`, `grep`, `glob`) from a
+> single event feed. The streaming `bash` tool itself lives in `adk-devtools`.
+
+---
+
 ## Run Examples
 
 ```bash
